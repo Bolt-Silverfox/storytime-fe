@@ -85,7 +85,7 @@ export const VerifyStep = () => {
                   <InputOTP maxLength={6} {...field}>
                     <InputOTPGroup className='gap-[9px] justify-center items-center'>
                       {Array.from({ length: 6 }).map((_, i) => (
-                        <InputOTPSlot key={Math.random()} index={i} />
+                        <InputOTPSlot key={i} index={i} />
                       ))}
                     </InputOTPGroup>
                   </InputOTP>

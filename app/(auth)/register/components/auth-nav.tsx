@@ -8,7 +8,7 @@ export const AuthNav = () => {
       <Logo />
       <Link href='/' className='flex items-center gap-3'>
         <Icons.home />
-        <span className=''>Back to website</span>
+        <span className='font-abeezee'>Back to website</span>
       </Link>
     </div>
   );

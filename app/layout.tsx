@@ -5,6 +5,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 import localFont from 'next/font/local';
 import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/sonner';
+import AuthContextProvider from '@/context/auth-context';
 
 const abeezee = ABeeZee({
   variable: '--font-abeezee',
@@ -28,7 +29,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang='en'>
+    <html lang='en' suppressHydrationWarning>
       <body className={cn(abeezee.variable, qilka.variable, 'antialiased')}>
         <ThemeProvider
           attribute='class'
@@ -36,7 +37,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <AuthContextProvider>{children}</AuthContextProvider>
           <Toaster />
         </ThemeProvider>
       </body>

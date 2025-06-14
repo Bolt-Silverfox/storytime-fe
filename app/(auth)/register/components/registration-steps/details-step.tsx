@@ -19,11 +19,11 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { zodResolver } from '@hookform/resolvers/zod';
-
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/context/auth-context';
 
 const FormSchema = z.object({
   title: z
@@ -44,12 +44,27 @@ const FormSchema = z.object({
 });
 
 export const DetailsStep = () => {
+  const {
+    registrationData,
+    setRegistrationData,
+    handleRegistrationStepForward,
+  } = useAuth();
+
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
     mode: 'onChange',
+    defaultValues: {
+      title: registrationData?.title || '',
+      name: registrationData?.name || '',
+    },
   });
 
   function onSubmit(data: z.infer<typeof FormSchema>) {
+    setRegistrationData({
+      ...registrationData,
+      title: data.title,
+      name: data.name,
+    });
     toast('You submitted the following values', {
       description: (
         <pre className='mt-2 w-[320px] rounded-md bg-neutral-950 p-4'>
@@ -57,6 +72,8 @@ export const DetailsStep = () => {
         </pre>
       ),
     });
+
+    handleRegistrationStepForward('credentials');
   }
 
   return (

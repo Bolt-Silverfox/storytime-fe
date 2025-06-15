@@ -19,7 +19,7 @@ const stepComponents = {
   verify: VerifyStep,
 } as const;
 
-const Page = () => {
+const RegisterPage = () => {
   const {
     registrationStep,
     handleRegistrationStepForward,
@@ -91,4 +91,4 @@ const Page = () => {
   );
 };
 
-export default Page;
+export default RegisterPage;

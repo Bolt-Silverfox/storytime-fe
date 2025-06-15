@@ -103,7 +103,7 @@ export const CredentialsStep = () => {
             control={form.control}
             name='password'
             render={({ field }) => (
-              <FormItem className='bg-white dark:bg-background z-[1] relative px-1'>
+              <FormItem className='bg-background dark:bg-background z-[1] relative px-1'>
                 <FormControl>
                   <div className='relative group'>
                     <Input

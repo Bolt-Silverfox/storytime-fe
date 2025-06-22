@@ -10,11 +10,27 @@ interface ProfileDropdownProps {
 }
 
 const menuItems = [
-  { label: 'Personal settings', icon: '/profile.svg' },
-  { label: 'Security settings', icon: '/safe.svg' },
-  { label: 'Notification', icon: '/notification.svg' },
-  { label: 'AI Voice selection', icon: '/ai-voice.svg' },
-  { label: 'Logout', icon: '/logout.svg' },
+  {
+    label: 'Personal settings',
+    icon: '/profile.svg',
+    link: '/dashboard/profile',
+  },
+  {
+    label: 'Security settings',
+    icon: '/safe.svg',
+    link: '/dashboard/security',
+  },
+  {
+    label: 'Notification',
+    icon: '/notification.svg',
+    link: '/dashboard/notification',
+  },
+  {
+    label: 'AI Voice selection',
+    icon: '/ai-voice.svg',
+    link: '/dashboard/ai-voice',
+  },
+  { label: 'Logout', icon: '/logout.svg', link: '/dashboard/logout' },
 ];
 
 export default function ProfileDropdown({

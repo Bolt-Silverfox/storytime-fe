@@ -11,6 +11,7 @@ interface RecommendedCardProps {
   image: string | StaticImageData;
   author: string;
   favorite: boolean;
+  setModal?: (modal: boolean) => void;
 }
 
 const RecommendedCard = ({
@@ -19,10 +20,21 @@ const RecommendedCard = ({
   image,
   author,
   favorite,
+  setModal,
 }: RecommendedCardProps) => {
   const [isFavorite, setIsFavorite] = useState(favorite);
+
+  const handleClick = () => {
+    if (setModal) {
+      setModal(true);
+    }
+  };
+
   return (
-    <div className='border-stone-100 bg-white shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)]  pr-6 rounded-3xl border-[0.5px] border-solid hover:scale-105 transition-all duration-300 cursor-pointer'>
+    <div
+      className='border-stone-100 bg-white shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)]  pr-6 rounded-3xl border-[0.5px] border-solid hover:scale-105 transition-all duration-300 cursor-pointer'
+      onClick={handleClick}
+    >
       <div className='flex gap-4 h-full'>
         <div className=''>
           <Image
@@ -43,7 +55,10 @@ const RecommendedCard = ({
               alt='heart'
               width={20}
               height={20}
-              onClick={() => setIsFavorite(!isFavorite)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsFavorite(!isFavorite);
+              }}
             />
           </div>
           <p className='text-[#4A413F] text-base not-italic font-normal leading-5 font-abeezee mt-[0.37rem] w-[85%]'>

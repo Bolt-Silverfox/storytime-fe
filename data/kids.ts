@@ -192,3 +192,30 @@ export const storyCategory = [
     img: story19,
   },
 ];
+
+export const aiVoices = [
+  {
+    name: 'Milo',
+    description: 'A happy, curious voice full of questions and laughs.',
+  },
+  {
+    name: 'Bella',
+    description: 'Gentle and kind, with a warm heart in every word.',
+  },
+  {
+    name: 'Cosmo',
+    description: 'Cool and cosmic, with a voice from the stars.',
+  },
+  {
+    name: 'Nimbus',
+    description: 'Floaty and calm, like clouds telling stories.',
+  },
+  {
+    name: 'Grandpa Jo',
+    description: 'Classic and comforting, with a steady rhythm.',
+  },
+  {
+    name: 'Chip',
+    description: 'Chirpy and clever, loves to tell jokes and riddles.',
+  },
+];

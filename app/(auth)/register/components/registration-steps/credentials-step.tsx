@@ -17,6 +17,8 @@ import { useForm } from 'react-hook-form';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { useAuth } from '@/context/auth-context';
+import { registerService } from '@/lib/services';
+import { PageLoader } from '@/components/page-loader';
 
 const FormSchema = z
   .object({
@@ -46,6 +48,7 @@ export const CredentialsStep = () => {
     handleRegistrationStepForward,
   } = useAuth();
 
+  const [isLoading, setIsLoading] = useState(false);
   const [passwordType, setPasswordType] = useState(true);
   const EyeComponent = passwordType ? EyeOff : EyeIcon;
 
@@ -58,24 +61,35 @@ export const CredentialsStep = () => {
     },
   });
 
-  function onSubmit(data: z.infer<typeof FormSchema>) {
-    setRegistrationData({
-      ...registrationData,
-      email: data.email,
-    });
+  const onSubmit = async (data: z.infer<typeof FormSchema>) => {
+    setIsLoading(true);
+    try {
+      const response = await registerService({
+        email: data.email,
+        password: data.password,
+        fullName: registrationData?.name ?? '',
+        title: registrationData?.title ?? '',
+      });
 
-    toast('You submitted the following values', {
-      description: (
-        <pre className='mt-2 w-[320px] rounded-md bg-neutral-950 p-4'>
-          <code className='text-white'>{JSON.stringify(data, null, 2)}</code>
-        </pre>
-      ),
-    });
+      console.log(response);
+      setRegistrationData({
+        ...registrationData,
+        email: data.email,
+      });
 
-    handleRegistrationStepForward('verify');
+      toast.success('Registration successful. Check your email to verify.');
+      handleRegistrationStepForward('verify');
+      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+    } catch (error: any) {
+      toast.error(error?.message || 'Registration failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return <PageLoader />;
   }
-
-  
 
   return (
     <Form {...form}>

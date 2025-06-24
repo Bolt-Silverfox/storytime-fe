@@ -17,6 +17,8 @@ const ThemeStory = () => {
             img={story.img}
             title={story.title}
             desc={story.description}
+            link={`/dashboard/${story.title}/${story.id}`}
+            dynamic={false}
           />
         ))}
       </div>

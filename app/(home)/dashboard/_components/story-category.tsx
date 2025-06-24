@@ -14,6 +14,8 @@ const StoryCategory = () => {
             img={category.img}
             title={category.title}
             desc={category.description}
+            link={`/dashboard/category/${category.id}`}
+            dynamic={false}
           />
         ))}
       </div>

@@ -1,5 +1,5 @@
-@import "tailwindcss";
-@import "tw-animate-css";
+@import 'tailwindcss';
+@import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -124,6 +124,10 @@
 html,
 body {
   height: 100%;
+}
+
+.scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 .custom-border {

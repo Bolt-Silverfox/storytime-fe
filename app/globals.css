@@ -125,3 +125,8 @@ html,
 body {
   height: 100%;
 }
+
+.custom-border {
+  background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='34' ry='34' stroke='%23FB9583FF' stroke-width='2' stroke-dasharray='8%2c16' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e");
+  border-radius: 34px;
+}

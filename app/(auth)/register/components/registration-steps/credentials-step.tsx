@@ -75,6 +75,8 @@ export const CredentialsStep = () => {
     handleRegistrationStepForward('verify');
   }
 
+  
+
   return (
     <Form {...form}>
       <form

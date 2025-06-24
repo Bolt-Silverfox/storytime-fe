@@ -71,7 +71,7 @@ export const VerifyStep = () => {
               Verify your email
             </h1>
             <p className='text-center text-[#4A413F] dark:text-white font-abeezee'>
-              We have sent a special code to your registered email address
+              We have sent a special code to your registered email address{' '}
               {maskEmail(registrationData?.email || '')}.
             </p>
           </div>
@@ -85,7 +85,7 @@ export const VerifyStep = () => {
                   <InputOTP maxLength={6} {...field}>
                     <InputOTPGroup className='gap-[9px] justify-center items-center'>
                       {Array.from({ length: 6 }).map((_, i) => (
-                        <InputOTPSlot key={i} index={i} />
+                        <InputOTPSlot key={Math.random()} index={i} />
                       ))}
                     </InputOTPGroup>
                   </InputOTP>

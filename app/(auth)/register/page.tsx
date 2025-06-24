@@ -12,6 +12,7 @@ import { StepBack } from 'lucide-react';
 import { StepProgress } from './components/step-progress';
 import { StepBackButton } from './components/step-back';
 import { AuthFooter } from './components/auth-footer';
+import { getFirstName } from '@/lib/utils';
 
 const stepComponents = {
   details: DetailsStep,
@@ -24,6 +25,7 @@ const RegisterPage = () => {
     registrationStep,
     handleRegistrationStepForward,
     handleRegistrationStepBackward,
+    registrationData,
   } = useAuth();
   const StepComponent =
     stepComponents[registrationStep as keyof typeof stepComponents];
@@ -35,7 +37,7 @@ const RegisterPage = () => {
             <div className='relative'>
               <StepBackButton onClick={handleRegistrationStepBackward} />
               <p className="text-[26px] [font-feature-settings:'liga'_off,_'clig'_off] text-[#221D1D] text-center dark:text-white font-abeezee">
-                Hello! 👋 🥰
+                Hello! {getFirstName(registrationData?.name)}👋 🥰
               </p>
               <div />
             </div>

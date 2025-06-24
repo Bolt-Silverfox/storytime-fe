@@ -46,7 +46,7 @@ export const VerifyStep = () => {
 
   function handleResend() {
     toast('A new OTP has been sent to your email.');
-    setTimeLeft(60); // reset timer
+    setTimeLeft(60);
   }
 
   function onSubmit(data: z.infer<typeof FormSchema>) {

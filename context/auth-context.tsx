@@ -14,6 +14,12 @@ import {
 
 type RegistrationStep = 'details' | 'credentials' | 'verify';
 
+export type KidsInfo = {
+  name: string;
+  ageRange: string;
+  avatar: string;
+};
+
 type AuthContextValue = {
   registrationData: RegistrationData | null;
   registrationStep: RegistrationStep;
@@ -47,6 +53,12 @@ const AuthContextProvider = ({ children }: { children: React.ReactNode }) => {
 
   const [registrationData, setRegistrationData] =
     useState<RegistrationData | null>(null);
+  const registrationSteps: RegistrationStep[] = [
+    'details',
+    'credentials',
+    'verify',
+  ];
+
   const [registrationStep, setRegistrationStep] = useState<RegistrationStep>(
     () => getInitialState(searchParams).registrationStep
   );
@@ -74,6 +86,24 @@ const AuthContextProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [searchParams, registrationStep]);
 
+  useEffect(() => {
+    if (!registrationData) {
+      handleRegistrationStepForward('details');
+      return;
+    }
+
+    if (
+      (registrationStep === 'credentials' || registrationStep === 'verify') &&
+      !(registrationData.title && registrationData.name)
+    ) {
+      handleRegistrationStepForward('details');
+    }
+
+    if (registrationStep === 'verify' && !registrationData.email) {
+      handleRegistrationStepForward('credentials');
+    }
+  }, [registrationData, registrationStep]);
+
   const handleRegistrationStepForward = useCallback(
     (step: RegistrationStep) => {
       const params = new URLSearchParams(searchParams.toString());
@@ -85,12 +115,11 @@ const AuthContextProvider = ({ children }: { children: React.ReactNode }) => {
   );
 
   const handleRegistrationStepBackward = useCallback(() => {
-    if (registrationStep === 'verify') {
-      handleRegistrationStepForward('credentials');
-    } else if (registrationStep === 'credentials') {
-      handleRegistrationStepForward('details');
+    const currentIndex = registrationSteps.indexOf(registrationStep);
+    if (currentIndex > 0) {
+      handleRegistrationStepForward(registrationSteps[currentIndex - 1]);
     }
-  }, [handleRegistrationStepForward, registrationStep]);
+  }, [registrationStep, handleRegistrationStepForward]);
 
   const value = useMemo(
     () => ({

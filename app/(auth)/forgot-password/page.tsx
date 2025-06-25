@@ -17,6 +17,9 @@ import { StepBackButton } from '../register/components/step-back';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { useRouter } from 'next/navigation';
+import { requestPasswordResetService } from '@/lib/services';
+import { useState } from 'react';
+import { PageLoader } from '@/components/page-loader';
 
 const FormSchema = z.object({
   email: z
@@ -28,6 +31,8 @@ const Page = () => {
   const router = useRouter();
   const { registrationData, setRegistrationData } = useAuth();
 
+  const [isLoading, setIsLoading] = useState(false);
+
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
     mode: 'onChange',
@@ -36,21 +41,34 @@ const Page = () => {
     },
   });
 
-  function onSubmit(data: z.infer<typeof FormSchema>) {
-    setRegistrationData({
-      ...registrationData,
-      email: data.email,
-    });
-    toast('You submitted the following values', {
-      description: (
-        <pre className='mt-2 w-[320px] rounded-md bg-neutral-950 p-4'>
-          <code className='text-white'>{JSON.stringify(data, null, 2)}</code>
-        </pre>
-      ),
-    });
+  async function onSubmit(data: z.infer<typeof FormSchema>) {
+    setIsLoading(true);
+    try {
+      const res = await requestPasswordResetService(data.email);
+      setRegistrationData({
+        ...registrationData,
+        email: data.email,
+      });
 
-    router.push('/forgot-password/verify');
+      toast.success('Success', {
+        description: res?.message || 'Password reset email sent.',
+      });
+
+      router.push('/forgot-password/verify');
+      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+    } catch (error: any) {
+      toast.error('Something went wrong', {
+        description: error?.message || 'Failed to send password reset email.',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   }
+
+  if (isLoading) {
+    return <PageLoader />;
+  }
+
   return (
     <div className='md:space-y-[103px]'>
       <div className='space-y-[26px] flex flex-col items-center'>

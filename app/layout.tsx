@@ -30,14 +30,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang='en' suppressHydrationWarning>
-      <body
-        className={cn(
-          abeezee.variable,
-          qilka.variable,
-          'antialiased',
-          'bg-[#FAF4F2]'
-        )}
-      >
+      <body className={cn(abeezee.variable, qilka.variable, 'antialiased')}>
         <ThemeProvider
           attribute='class'
           defaultTheme='light'

@@ -17,6 +17,8 @@ import { useForm } from 'react-hook-form';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { useAuth } from '@/context/auth-context';
+import { registerService } from '@/lib/services';
+import { PageLoader } from '@/components/page-loader';
 
 const FormSchema = z
   .object({
@@ -31,8 +33,30 @@ const FormSchema = z
       })
       .max(50, {
         message: 'Password must be at most 50 characters long',
+      })
+      .min(1, { message: 'Please enter a password' })
+      .min(8, { message: 'Passwords must be at least 8 characters long' })
+      .refine(
+        (value) => /[a-z]/.test(value),
+        'Password must contain at least one lowercase letter'
+      )
+      .refine(
+        (value) => /[A-Z]/.test(value),
+        'Password must contain at least one uppercase letter'
+      )
+      .refine(
+        (value) => /\d/.test(value),
+        'Password must contain at least one number'
+      )
+      .refine(
+        (value) => /[!$%&*?@]/.test(value),
+        'Password must contain at least one special character'
+      ),
+    confirm_password: z
+      .string({ required_error: 'Please confirm password' })
+      .min(8, {
+        message: 'Password has to be 8 characters long',
       }),
-    confirm_password: z.string({ required_error: 'Please confirm password' }),
   })
   .refine((data) => data.password === data.confirm_password, {
     message: "Passwords don't match",
@@ -46,6 +70,7 @@ export const CredentialsStep = () => {
     handleRegistrationStepForward,
   } = useAuth();
 
+  const [isLoading, setIsLoading] = useState(false);
   const [passwordType, setPasswordType] = useState(true);
   const EyeComponent = passwordType ? EyeOff : EyeIcon;
 
@@ -58,21 +83,34 @@ export const CredentialsStep = () => {
     },
   });
 
-  function onSubmit(data: z.infer<typeof FormSchema>) {
-    setRegistrationData({
-      ...registrationData,
-      email: data.email,
-    });
+  const onSubmit = async (data: z.infer<typeof FormSchema>) => {
+    setIsLoading(true);
+    try {
+      // todo: set user to global context
+      const response = await registerService({
+        email: data.email,
+        password: data.password,
+        fullName: registrationData?.name ?? '',
+        title: registrationData?.title ?? '',
+      });
 
-    toast('You submitted the following values', {
-      description: (
-        <pre className='mt-2 w-[320px] rounded-md bg-neutral-950 p-4'>
-          <code className='text-white'>{JSON.stringify(data, null, 2)}</code>
-        </pre>
-      ),
-    });
+      setRegistrationData({
+        ...registrationData,
+        email: data.email,
+      });
 
-    handleRegistrationStepForward('verify');
+      toast.success('Registration successful. Check your email to verify.');
+      handleRegistrationStepForward('verify');
+      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+    } catch (error: any) {
+      toast.error(error?.message || 'Registration failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return <PageLoader />;
   }
 
   return (
@@ -103,7 +141,7 @@ export const CredentialsStep = () => {
             control={form.control}
             name='password'
             render={({ field }) => (
-              <FormItem className='bg-white dark:bg-background z-[1] relative px-1'>
+              <FormItem className='bg-background dark:bg-background z-[1] relative px-1'>
                 <FormControl>
                   <div className='relative group'>
                     <Input

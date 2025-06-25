@@ -16,7 +16,9 @@ import { useForm } from 'react-hook-form';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { EyeIcon, EyeOff } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { resetPasswordService } from '@/lib/services';
+import { PageLoader } from '@/components/page-loader';
 
 const FormSchema = z
   .object({
@@ -27,7 +29,25 @@ const FormSchema = z
       })
       .max(50, {
         message: 'Password must be at most 50 characters long',
-      }),
+      })
+      .min(1, { message: 'Please enter a password' })
+      .min(8, { message: 'Passwords must be at least 8 characters long' })
+      .refine(
+        (value) => /[a-z]/.test(value),
+        'Password must contain at least one lowercase letter'
+      )
+      .refine(
+        (value) => /[A-Z]/.test(value),
+        'Password must contain at least one uppercase letter'
+      )
+      .refine(
+        (value) => /\d/.test(value),
+        'Password must contain at least one number'
+      )
+      .refine(
+        (value) => /[!$%&*?@]/.test(value),
+        'Password must contain at least one special character'
+      ),
     confirm_password: z.string({ required_error: 'Please confirm password' }),
   })
   .refine((data) => data.password === data.confirm_password, {
@@ -37,7 +57,11 @@ const FormSchema = z
 
 const Page = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const token = searchParams.get('token');
   const [passwordType, setPasswordType] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+
   const EyeComponent = passwordType ? EyeOff : EyeIcon;
 
   const form = useForm<z.infer<typeof FormSchema>>({
@@ -45,15 +69,31 @@ const Page = () => {
     mode: 'onChange',
   });
 
-  function onSubmit(data: z.infer<typeof FormSchema>) {
-    toast('You submitted the following values', {
-      description: (
-        <pre className='mt-2 w-[320px] rounded-md bg-neutral-950 p-4'>
-          <code className='text-white'>{JSON.stringify(data, null, 2)}</code>
-        </pre>
-      ),
-    });
-    router.push('/create-new-password/success');
+  async function onSubmit(data: z.infer<typeof FormSchema>) {
+    if (!token) {
+      toast.error('Token is missing from the URL');
+      return;
+    }
+    setIsLoading(true);
+
+    try {
+      const response = await resetPasswordService({
+        token,
+        newPassword: data.password,
+      });
+
+      toast.success(response.message);
+      router.push('/create-new-password/success');
+      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+    } catch (err: any) {
+      toast.error(err.message || 'Something went wrong');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  if (isLoading) {
+    return <PageLoader />;
   }
 
   return (
@@ -82,7 +122,7 @@ const Page = () => {
               control={form.control}
               name='password'
               render={({ field }) => (
-                <FormItem className='bg-white dark:bg-background z-[1] relative px-1'>
+                <FormItem>
                   <FormControl>
                     <div className='relative group'>
                       <Input
@@ -107,7 +147,7 @@ const Page = () => {
               control={form.control}
               name='confirm_password'
               render={({ field }) => (
-                <FormItem className='bg-white dark:bg-background z-[1] relative px-1'>
+                <FormItem>
                   <FormControl>
                     <div className='relative group'>
                       <Input

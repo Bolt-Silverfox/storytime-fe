@@ -20,6 +20,12 @@ import {
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { maskEmail } from '@/lib/utils';
+import {
+  sendVerificationEmailService,
+  verifyEmailService,
+} from '@/lib/services';
+import { PageLoader } from '@/components/page-loader';
+import { useRouter } from 'next/navigation';
 
 const FormSchema = z.object({
   pin: z.string().min(6, {
@@ -29,7 +35,9 @@ const FormSchema = z.object({
 
 export const VerifyStep = () => {
   const { registrationData } = useAuth();
+  const router = useRouter();
   const [timeLeft, setTimeLeft] = useState(60);
+  const [loading, setLoading] = useState(false);
 
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
@@ -44,19 +52,36 @@ export const VerifyStep = () => {
     return () => clearInterval(timer);
   }, [timeLeft]);
 
-  function handleResend() {
-    toast('A new OTP has been sent to your email.');
-    setTimeLeft(60);
+  async function handleResend() {
+    try {
+      const response = await sendVerificationEmailService(
+        registrationData?.email ?? ''
+      );
+      toast.success(response.message);
+      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+    } catch (error: any) {
+      toast.error(error.message || 'Could not send verification email');
+    } finally {
+      setTimeLeft(60);
+    }
   }
 
-  function onSubmit(data: z.infer<typeof FormSchema>) {
-    toast('You submitted the following values', {
-      description: (
-        <pre className='mt-2 w-[320px] rounded-md bg-neutral-950 p-4'>
-          <code className='text-white'>{JSON.stringify(data, null, 2)}</code>
-        </pre>
-      ),
-    });
+  const onSubmit = async (data: z.infer<typeof FormSchema>) => {
+    setLoading(true);
+    try {
+      await verifyEmailService(data.pin);
+      toast.success('Email verified successfully!');
+      router.push('/register/setup');
+      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+    } catch (error: any) {
+      toast.error(error?.message || 'Verification failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return <PageLoader />;
   }
 
   return (
@@ -102,6 +127,7 @@ export const VerifyStep = () => {
         </div>
         <Button
           variant='secondary'
+          type='button'
           onClick={handleResend}
           disabled={timeLeft > 0}
           className='py-2.5 px-6 rounded-[50px] !mx-auto max-w-max bg-white border-[#FAF4F2] shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] border dark:bg-neutral-950 text-[#221D1D] dark:text-white'

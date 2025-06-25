@@ -23,12 +23,7 @@ export type KidsInfo = {
 type AuthContextValue = {
   registrationData: RegistrationData | null;
   registrationStep: RegistrationStep;
-  kidsInfo: KidsInfo[];
-  kidsAmount: number;
-  setKidsAmount: (kidsAmount: number) => void;
-  setKidsInfo: (kidsInfo: KidsInfo[]) => void;
   setRegistrationData: (data: RegistrationData | null) => void;
-  handleUpdateKidsInfo: (index: number, updatedData: Partial<KidsInfo>) => void;
   handleRegistrationStepForward: (step: RegistrationStep) => void;
   handleRegistrationStepBackward: () => void;
 };
@@ -67,37 +62,6 @@ const AuthContextProvider = ({ children }: { children: React.ReactNode }) => {
   const [registrationStep, setRegistrationStep] = useState<RegistrationStep>(
     () => getInitialState(searchParams).registrationStep
   );
-
-  const [kidsAmount, setKidsAmount] = useState(0);
-
-  const [kidsInfo, setKidsInfo] = useState<KidsInfo[]>(
-    Array.from({ length: kidsAmount }, () => ({
-      name: '',
-      ageRange: '',
-      avatar: '/avatar.svg',
-    }))
-  );
-
-  useEffect(() => {
-    setKidsInfo((prev) => {
-      const currentLength = prev.length;
-      if (kidsAmount > currentLength) {
-        const additional = Array.from(
-          { length: kidsAmount - currentLength },
-          () => ({
-            name: '',
-            ageRange: '',
-            avatar: '/avatar.svg',
-          })
-        );
-        return [...prev, ...additional];
-      }
-      if (kidsAmount < currentLength) {
-        return prev.slice(0, kidsAmount);
-      }
-      return prev;
-    });
-  }, [kidsAmount]);
 
   useEffect(() => {
     const stored = localStorage.getItem(storageKey);
@@ -150,24 +114,6 @@ const AuthContextProvider = ({ children }: { children: React.ReactNode }) => {
     [pathname, router, searchParams]
   );
 
-  const handleUpdateKidsInfo = useCallback(
-    (index: number, updatedData: Partial<KidsInfo>) => {
-      const updatedKids = [...kidsInfo];
-
-      if (index < 0 || index >= updatedKids.length) {
-        return;
-      }
-
-      updatedKids[index] = {
-        ...updatedKids[index],
-        ...updatedData,
-      };
-
-      setKidsInfo(updatedKids);
-    },
-    [kidsInfo]
-  );
-
   const handleRegistrationStepBackward = useCallback(() => {
     const currentIndex = registrationSteps.indexOf(registrationStep);
     if (currentIndex > 0) {
@@ -180,20 +126,12 @@ const AuthContextProvider = ({ children }: { children: React.ReactNode }) => {
       registrationData,
       registrationStep,
       setRegistrationData,
-      kidsAmount,
-      kidsInfo,
-      setKidsInfo,
-      setKidsAmount,
-      handleUpdateKidsInfo,
       handleRegistrationStepForward,
       handleRegistrationStepBackward,
     }),
     [
       registrationData,
       registrationStep,
-      kidsAmount,
-      kidsInfo,
-      handleUpdateKidsInfo,
       handleRegistrationStepForward,
       handleRegistrationStepBackward,
     ]

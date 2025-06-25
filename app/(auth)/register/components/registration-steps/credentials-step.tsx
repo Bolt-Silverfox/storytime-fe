@@ -33,8 +33,30 @@ const FormSchema = z
       })
       .max(50, {
         message: 'Password must be at most 50 characters long',
+      })
+      .min(1, { message: 'Please enter a password' })
+      .min(8, { message: 'Passwords must be at least 8 characters long' })
+      .refine(
+        (value) => /[a-z]/.test(value),
+        'Password must contain at least one lowercase letter'
+      )
+      .refine(
+        (value) => /[A-Z]/.test(value),
+        'Password must contain at least one uppercase letter'
+      )
+      .refine(
+        (value) => /\d/.test(value),
+        'Password must contain at least one number'
+      )
+      .refine(
+        (value) => /[!$%&*?@]/.test(value),
+        'Password must contain at least one special character'
+      ),
+    confirm_password: z
+      .string({ required_error: 'Please confirm password' })
+      .min(8, {
+        message: 'Password has to be 8 characters long',
       }),
-    confirm_password: z.string({ required_error: 'Please confirm password' }),
   })
   .refine((data) => data.password === data.confirm_password, {
     message: "Passwords don't match",
@@ -64,6 +86,7 @@ export const CredentialsStep = () => {
   const onSubmit = async (data: z.infer<typeof FormSchema>) => {
     setIsLoading(true);
     try {
+      // todo: set user to global context
       const response = await registerService({
         email: data.email,
         password: data.password,
@@ -71,7 +94,6 @@ export const CredentialsStep = () => {
         title: registrationData?.title ?? '',
       });
 
-      console.log(response);
       setRegistrationData({
         ...registrationData,
         email: data.email,

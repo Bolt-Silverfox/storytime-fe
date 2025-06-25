@@ -8,8 +8,11 @@ import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import ProfileDropdown from './ui/profile-dropdown';
+import { getUserFromStorage } from '@/lib/services';
 
 const Header = ({ white = false }: { white?: boolean }) => {
+  const user = getUserFromStorage();
+  console.log(user);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   return (
     <header>
@@ -21,7 +24,7 @@ const Header = ({ white = false }: { white?: boolean }) => {
             white ? 'text-white' : 'text-[#4A413F]'
           )}
         >
-          Good day! Felicia
+          Good day! {user?.name}
         </h1>
         <div className='flex items-center'>
           <Image src={heart} alt='heart' />
@@ -33,13 +36,19 @@ const Header = ({ white = false }: { white?: boolean }) => {
               }}
             >
               <div className='flex items-center gap-2'>
-                <Image src={avatar} alt='avatar' />
+                <Image
+                  src={user?.avatarUrl || avatar}
+                  alt='avatar'
+                  width={40}
+                  height={40}
+                  className='rounded-full'
+                />
                 <h3
                   className={cn(
                     'text-[#4A413F] text-center text-sm not-italic font-medium leading-6 font-abeezee'
                   )}
                 >
-                  Felicia
+                  {user?.name}
                 </h3>
               </div>
               <Image src={arrow_down} alt='arrow-down' />

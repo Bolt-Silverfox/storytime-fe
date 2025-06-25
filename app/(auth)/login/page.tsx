@@ -18,6 +18,9 @@ import { useAuth } from '@/context/auth-context';
 import { useState } from 'react';
 import { EyeIcon, EyeOff } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { loginService } from '@/lib/services';
+import { PageLoader } from '@/components/page-loader';
 
 const FormSchema = z.object({
   email: z
@@ -27,8 +30,10 @@ const FormSchema = z.object({
 });
 
 const Page = () => {
+  const router = useRouter();
   const { registrationData } = useAuth();
   const [passwordType, setPasswordType] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const EyeComponent = passwordType ? EyeOff : EyeIcon;
 
   const form = useForm<z.infer<typeof FormSchema>>({
@@ -40,14 +45,27 @@ const Page = () => {
     },
   });
 
-  function onSubmit(data: z.infer<typeof FormSchema>) {
-    toast('You submitted the following values', {
-      description: (
-        <pre className='mt-2 w-[320px] rounded-md bg-neutral-950 p-4'>
-          <code className='text-white'>{JSON.stringify(data, null, 2)}</code>
-        </pre>
-      ),
-    });
+  async function onSubmit(data: z.infer<typeof FormSchema>) {
+    setIsLoading(true);
+    try {
+      // todo: set user to global context
+      const response = await loginService(data);
+
+      toast.success('Login successful!');
+
+      router.push('/dashboard');
+      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+    } catch (error: any) {
+      toast.error('Login failed', {
+        description: error.message,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  if (isLoading) {
+    return <PageLoader />;
   }
 
   return (
@@ -95,7 +113,7 @@ const Page = () => {
               control={form.control}
               name='password'
               render={({ field }) => (
-                <FormItem className='bg-white dark:bg-background z-[1] relative px-1'>
+                <FormItem className='relative px-1'>
                   <FormControl>
                     <div className='relative group'>
                       <Input

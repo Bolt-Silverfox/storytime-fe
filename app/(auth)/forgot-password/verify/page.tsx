@@ -23,6 +23,11 @@ import { useRouter } from 'next/navigation';
 import { StepBackButton } from '../../register/components/step-back';
 import { maskEmail } from '@/lib/utils';
 import { useEffect, useState } from 'react';
+import {
+  sendVerificationEmailService,
+  validateResetTokenService,
+} from '@/lib/services';
+import { PageLoader } from '@/components/page-loader';
 
 const FormSchema = z.object({
   pin: z.string().min(6, {
@@ -34,6 +39,7 @@ const Page = () => {
   const router = useRouter();
   const { registrationData } = useAuth();
   const [timeLeft, setTimeLeft] = useState(60);
+  const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
@@ -48,22 +54,50 @@ const Page = () => {
     return () => clearInterval(timer);
   }, [timeLeft]);
 
-  function handleResend() {
-    toast('A new OTP has been sent to your email.');
-    setTimeLeft(60); // reset timer
+  async function handleResend() {
+    try {
+      const response = await sendVerificationEmailService(
+        registrationData?.email ?? ''
+      );
+      toast.success(response.message);
+      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+    } catch (error: any) {
+      toast.error(error.message || 'Could not send verification email');
+    } finally {
+      setTimeLeft(60);
+    }
   }
 
-  function onSubmit(data: z.infer<typeof FormSchema>) {
-    toast('You submitted the following values', {
-      description: (
-        <pre className='mt-2 w-[320px] rounded-md bg-neutral-950 p-4'>
-          <code className='text-white'>{JSON.stringify(data, null, 2)}</code>
-        </pre>
-      ),
-    });
+  async function onSubmit(data: z.infer<typeof FormSchema>) {
+    const token = data.pin;
+    const email = registrationData?.email;
 
-    router.push('/create-new-password');
+    if (!email) {
+      toast.error('Email is missing from context.');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await validateResetTokenService({ token, email });
+
+      toast.success(response.message);
+      router.push(`/create-new-password?token=${data.pin}`);
+      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+    } catch (error: any) {
+      toast.error('OTP verification failed', {
+        description: error?.message || 'An unexpected error occurred.',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   }
+
+  if (isLoading) {
+    return <PageLoader />;
+  }
+
   return (
     <div className='md:space-y-[103px]'>
       <div className='space-y-[26px] flex flex-col items-center'>
@@ -109,6 +143,7 @@ const Page = () => {
 
           <Button
             variant='secondary'
+            type='button'
             onClick={handleResend}
             disabled={timeLeft > 0}
             className='py-2.5 px-6 rounded-[50px] !mx-auto max-w-max bg-white border-[#FAF4F2] shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] border dark:bg-neutral-950 text-[#221D1D] dark:text-white'

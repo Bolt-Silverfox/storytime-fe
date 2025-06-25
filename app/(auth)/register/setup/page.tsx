@@ -32,6 +32,10 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import Link from 'next/link';
 import { KidsInformationLoader } from './components/kids-information-loader';
 import { KidsInformationContent } from './components/kids-information-content';
+import { addKidsService } from '@/lib/services';
+import { PageLoader } from '@/components/page-loader';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 const KidsFormSchema = z.object({
   name: z
@@ -51,7 +55,11 @@ const FormSchema = z.object({
 });
 
 const Page = () => {
+  const router = useRouter();
+
   const { registrationData } = useAuth();
+
+  const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
@@ -77,14 +85,24 @@ const Page = () => {
     !errors.country &&
     !errors.kids;
 
-  function onSubmit(data: z.infer<typeof FormSchema>) {
-    toast('You submitted the following values', {
-      description: (
-        <pre className='mt-2 w-[320px] rounded-md bg-neutral-950 p-4'>
-          <code className='text-white'>{JSON.stringify(data, null, 2)}</code>
-        </pre>
-      ),
-    });
+  async function onSubmit(data: z.infer<typeof FormSchema>) {
+    setIsLoading(true);
+
+    try {
+      const response = await addKidsService(data.kidsInfo);
+
+      toast.success(response.message || 'Kids successfully added!');
+      router.push('/register/setup/success');
+      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+    } catch (err: any) {
+      toast.error(err.message || 'Something went wrong while adding kids');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  if (isLoading) {
+    return <PageLoader />;
   }
 
   return (

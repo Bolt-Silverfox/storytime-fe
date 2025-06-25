@@ -29,8 +29,8 @@ export function getFirstName(fullName?: string | null): string {
 export const countryOptions = [
   { value: 'US', label: 'United States' },
   ...countries
-    .filter((c) => c.cca2 !== 'US')
-    .map((c) => ({
+    .filter((c: any) => c.cca2 !== 'US')
+    .map((c: any) => ({
       value: c.cca2,
       label: c.name.common,
     })),
@@ -39,8 +39,8 @@ export const countryOptions = [
 export const languageOptions = [
   { value: 'en', label: 'English' },
   ...ISO6391.getAllNames()
-    .filter((name) => ISO6391.getCode(name) !== 'en')
-    .map((name) => ({
+    .filter((name: string) => ISO6391.getCode(name) !== 'en')
+    .map((name: string) => ({
       value: ISO6391.getCode(name),
       label: name,
     })),

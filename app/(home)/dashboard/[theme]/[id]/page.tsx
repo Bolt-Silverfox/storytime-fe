@@ -1,4 +1,3 @@
-import { recommended, stories, storyCategory } from '@/data/kids';
 import ThemePageClient from './theme-page-client';
 
 const ThemePage = async ({
@@ -7,15 +6,8 @@ const ThemePage = async ({
   params: Promise<{ theme: string; id: string }>;
 }) => {
   const { theme, id } = await params;
-  const story = stories.find((story) => story.id === Number(id));
 
-  return (
-    <ThemePageClient
-      story={story}
-      recommended={recommended}
-      storyCategory={storyCategory}
-    />
-  );
+  return <ThemePageClient theme={theme} />;
 };
 
 export default ThemePage;

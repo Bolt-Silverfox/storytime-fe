@@ -5,8 +5,6 @@ import { ThemeProvider } from '@/components/theme-provider';
 import localFont from 'next/font/local';
 import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/sonner';
-import AuthContextProvider from '@/context/auth-context';
-import { LenisProvider } from '@/components/lenis-provider';
 
 const abeezee = ABeeZee({
   variable: '--font-abeezee',

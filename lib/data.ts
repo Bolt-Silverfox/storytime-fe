@@ -197,22 +197,35 @@ export const testimonials = [
 export const faqItems = [
   {
     question: 'What is storytime?',
-    answer: '',
+    answer:
+      'Storytime is a safe and accessible audio storytelling app for kids, designed to make story listening magical, educational, and screen-free. With interactive features, local languages, and a calm, kid-friendly experience, Storytime brings bedtime tales and cultural stories to life for all ages.',
   },
   {
     question: 'Is Storytime free?',
-    answer: '',
+    answer:
+      'Yes! Storytime offers one free audio story every day. You can also upgrade to a premium plan for unlimited access to our full story library.',
   },
   {
     question: 'Can I filter out certain types of stories?',
-    answer: '',
+    answer:
+      'Absolutely. Parents can use the Parental Dashboard to filter stories by: Age group, Language, Story category (e.g., fairy tales, fables, religious stories), Themes (e.g., magic, bedtime, bravery, adventure). This gives you full control over the kind of content your child listens to, so they only hear what’s right for them.',
   },
   {
     question: 'What languages do you support?',
-    answer: '',
+    answer:
+      "Currently, Storytime supports english, We're working to add even more local and global languages soon!",
   },
   {
     question: 'What age is Storytime suitable for?',
-    answer: '',
+    answer:
+      'Storytime is designed for kids aged 3 to 12, but it’s loved by toddlers, older siblings, and even adults who enjoy calm storytelling. Every story is categorized by age to help parents choose what’s best for their child’s developmental stage.',
   },
+];
+
+export const footerLinks = [
+  { title: 'About', url: '#' },
+  { title: 'Contact', url: '#' },
+  { title: 'FAQ', url: '#' },
+  { title: 'Terms & conditions', url: '#' },
+  { title: 'Privacy policy', url: '#' },
 ];

@@ -1,13 +1,16 @@
 import { AppNavbar } from '@/components/app-navbar';
 import { Footer } from '@/components/footer';
+import LenisProvider from '@/components/lenis-provider';
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
   return (
-    <div className='relative '>
-      <AppNavbar />
-      {children}
-      <Footer />
-    </div>
+    <LenisProvider>
+      <div className='relative '>
+        <AppNavbar />
+        {children}
+        <Footer />
+      </div>
+    </LenisProvider>
   );
 };
 

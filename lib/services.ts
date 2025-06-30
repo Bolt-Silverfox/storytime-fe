@@ -34,11 +34,69 @@ interface User {
   id: string;
   email: string;
   name: string;
+  title: string;
   avatarUrl: string | null;
   role: string;
   createdAt: string;
   updatedAt: string;
   profile: UserProfile;
+}
+
+interface VoiceLabels {
+  accent: string;
+  description: string;
+  age: string;
+  gender: string;
+  use_case: string;
+}
+
+interface VoiceFineTuning {
+  is_allowed_to_fine_tune: boolean;
+  state: Record<string, any>;
+  verification_failures: any[];
+  verification_attempts_count: number;
+  manual_verification_requested: boolean;
+  language: string | null;
+  progress: Record<string, any>;
+  message: Record<string, any>;
+  dataset_duration_seconds: number | null;
+  verification_attempts: any;
+  slice_ids: any;
+  manual_verification: any;
+  max_verification_attempts: number | null;
+  next_max_verification_attempts_reset_unix_ms: number | null;
+}
+
+interface VoiceVerification {
+  requires_verification: boolean;
+  is_verified: boolean;
+  verification_failures: any[];
+  verification_attempts_count: number;
+  language: string | null;
+  verification_attempts: any;
+}
+
+interface Voice {
+  voice_id: string;
+  name: string;
+  samples: any;
+  category: string;
+  fine_tuning: VoiceFineTuning;
+  labels: VoiceLabels;
+  description: string | null;
+  preview_url: string;
+  available_for_tiers: any[];
+  settings: any;
+  sharing: any;
+  high_quality_base_model_ids: string[];
+  verified_languages: any[];
+  safety_control: any;
+  voice_verification: VoiceVerification;
+  permission_on_resource: any;
+  is_owner: boolean;
+  is_legacy: boolean;
+  is_mixed: boolean;
+  created_at_unix: number | null;
 }
 
 const setTokens = (jwt: string, refreshToken: string, userData?: any) => {
@@ -261,6 +319,50 @@ export const getKidsService = async () => {
   }
 };
 
+export const getAvailableVoicesService = async (): Promise<Voice[]> => {
+  try {
+    const response = await api.get('/stories/voices/available');
+    return response.data;
+    // biome-ignore lint/suspicious/noExplicitAny: external error shape
+  } catch (error: any) {
+    if (error.response) {
+      throw {
+        message:
+          error.response.data?.message || 'Failed to fetch available voices',
+        status: error.response.status,
+        data: error.response.data,
+      };
+    }
+    if (error.request) {
+      throw { message: 'No response from server', status: null };
+    }
+    throw { message: error.message || 'Unexpected error', status: null };
+  }
+};
+
+export const setPreferredVoiceService = async (voiceId: string) => {
+  try {
+    const response = await api.patch('/stories/voices/preferred', {
+      voiceId: voiceId,
+    });
+    return response.data;
+    // biome-ignore lint/suspicious/noExplicitAny: external error shape
+  } catch (error: any) {
+    if (error.response) {
+      throw {
+        message:
+          error.response.data?.message || 'Failed to set preferred voice',
+        status: error.response.status,
+        data: error.response.data,
+      };
+    }
+    if (error.request) {
+      throw { message: 'No response from server', status: null };
+    }
+    throw { message: error.message || 'Unexpected error', status: null };
+  }
+};
+
 // Utility functions for managing user data in local storage
 export const getUserFromStorage = (): User | null => {
   try {
@@ -284,4 +386,187 @@ export const isUserLoggedIn = () => {
   const user = getUserFromStorage();
   const accessToken = Cookies.get('accessToken');
   return !!(user && accessToken);
+};
+
+export const getStoriesByKidIdService = async (kidId: string) => {
+  try {
+    const response = await api.get(`/stories?kidId=${kidId}`);
+    return response.data;
+    // biome-ignore lint/suspicious/noExplicitAny: external error shape
+  } catch (error: any) {
+    if (error.response) {
+      throw {
+        message: error.response.data?.message || 'Failed to fetch stories',
+        status: error.response.status,
+        data: error.response.data,
+      };
+    }
+    if (error.request) {
+      throw { message: 'No response from server', status: null };
+    }
+    throw { message: error.message || 'Unexpected error', status: null };
+  }
+};
+
+export const getStoryCategoriesService = async () => {
+  try {
+    const response = await api.get('/stories/categories');
+    return response.data;
+    // biome-ignore lint/suspicious/noExplicitAny: external error shape
+  } catch (error: any) {
+    if (error.response) {
+      throw {
+        message:
+          error.response.data?.message || 'Failed to fetch story categories',
+        status: error.response.status,
+        data: error.response.data,
+      };
+    }
+    if (error.request) {
+      throw { message: 'No response from server', status: null };
+    }
+    throw { message: error.message || 'Unexpected error', status: null };
+  }
+};
+
+export const getStoryThemesService = async () => {
+  try {
+    const response = await api.get('/stories/themes');
+    return response.data;
+    // biome-ignore lint/suspicious/noExplicitAny: external error shape
+  } catch (error: any) {
+    if (error.response) {
+      throw {
+        message: error.response.data?.message || 'Failed to fetch story themes',
+        status: error.response.status,
+        data: error.response.data,
+      };
+    }
+    if (error.request) {
+      throw { message: 'No response from server', status: null };
+    }
+    throw { message: error.message || 'Unexpected error', status: null };
+  }
+};
+
+export const getStoryByIdService = async (storyId: string) => {
+  try {
+    const response = await api.get(`/stories/${storyId}`);
+    return response.data;
+    // biome-ignore lint/suspicious/noExplicitAny: external error shape
+  } catch (error: any) {
+    if (error.response) {
+      throw {
+        message: error.response.data?.message || 'Failed to fetch story',
+        status: error.response.status,
+        data: error.response.data,
+      };
+    }
+    if (error.request) {
+      throw { message: 'No response from server', status: null };
+    }
+    throw { message: error.message || 'Unexpected error', status: null };
+  }
+};
+
+export const getDailyChallengesService = async (kidId: string) => {
+  try {
+    const response = await api.get(`/stories/daily-challenge/kid/${kidId}`);
+    return response.data;
+    // biome-ignore lint/suspicious/noExplicitAny: external error shape
+  } catch (error: any) {
+    if (error.response) {
+      throw {
+        message:
+          error.response.data?.message || 'Failed to fetch daily challenges',
+        status: error.response.status,
+        data: error.response.data,
+      };
+    }
+    if (error.request) {
+      throw { message: 'No response from server', status: null };
+    }
+    throw { message: error.message || 'Unexpected error', status: null };
+  }
+};
+
+export const getStoriesByThemeAndKidService = async (
+  theme: string,
+  kidId: string
+) => {
+  try {
+    const response = await api.get(
+      `/stories?theme=${encodeURIComponent(theme)}&kidId=${kidId}`
+    );
+    return response.data;
+    // biome-ignore lint/suspicious/noExplicitAny: external error shape
+  } catch (error: any) {
+    if (error.response) {
+      throw {
+        message:
+          error.response.data?.message || 'Failed to fetch stories by theme',
+        status: error.response.status,
+        data: error.response.data,
+      };
+    }
+    if (error.request) {
+      throw { message: 'No response from server', status: null };
+    }
+    throw { message: error.message || 'Unexpected error', status: null };
+  }
+};
+
+export const setKidPreferredVoiceService = async (
+  kidId: string,
+  voiceId: string
+) => {
+  try {
+    const response = await api.patch(`/user/kids/${kidId}/voice`, {
+      kidId,
+      voiceId,
+    });
+    return response.data;
+    // biome-ignore lint/suspicious/noExplicitAny: external error shape
+  } catch (error: any) {
+    if (error.response) {
+      throw {
+        message:
+          error.response.data?.message || 'Failed to set kid preferred voice',
+        status: error.response.status,
+        data: error.response.data,
+      };
+    }
+    if (error.request) {
+      throw { message: 'No response from server', status: null };
+    }
+    throw { message: error.message || 'Unexpected error', status: null };
+  }
+};
+
+// Utility functions for managing mode selection
+export const getSelectedModeFromStorage = (): string | null => {
+  try {
+    return typeof window !== 'undefined'
+      ? localStorage.getItem('selectedMode')
+      : null;
+  } catch (error) {
+    console.error('Error getting selected mode from localStorage:', error);
+    return null;
+  }
+};
+
+export const setSelectedModeToStorage = (mode: string) => {
+  try {
+    localStorage.setItem('selectedMode', mode);
+  } catch (error) {
+    console.error('Error setting selected mode to localStorage:', error);
+  }
+};
+
+export const clearSelectedModeFromStorage = () => {
+  try {
+    localStorage.removeItem('selectedMode');
+  } catch (error) {
+    console.error('Error clearing selected mode from localStorage:', error);
+  }
 };

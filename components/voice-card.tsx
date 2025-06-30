@@ -11,7 +11,7 @@ const VoiceCard = ({
 }: {
   name: string;
   description: string;
-  onListen: () => void;
+  onListen: (e: React.MouseEvent) => void;
   active?: boolean;
   onClick?: () => void;
 }) => (
@@ -44,8 +44,8 @@ const VoiceCard = ({
           : 'bg-white text-[#4A413F]'
       }`}
       onClick={(e) => {
-        e.stopPropagation();
-        onListen();
+        onListen(e);
+        onClick?.();
       }}
     >
       <Image src={active ? volumeActive : volume} alt='volume' />

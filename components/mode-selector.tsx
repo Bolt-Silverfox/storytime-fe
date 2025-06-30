@@ -1,14 +1,34 @@
 import { useState } from 'react';
 import ModeCard from './mode-card';
+import plain from '@/public/plain.png';
+import interactive from '@/public/interactive.png';
+import { setSelectedModeToStorage } from '@/lib/services';
 
-const ModeSelector = ({
-  setStep,
-  expand,
-}: {
+interface ModeSelectorProps {
   setStep: (step: number) => void;
   expand: boolean;
-}) => {
+  onModeSelect?: (mode: string) => void;
+}
+
+const ModeSelector = ({ setStep, expand, onModeSelect }: ModeSelectorProps) => {
   const [selectedMode, setSelectedMode] = useState<string | null>(null);
+
+  const handleModeSelect = (mode: string) => {
+    setSelectedMode(mode);
+    // Save to localStorage using utility function
+    setSelectedModeToStorage(mode);
+    // Pass to parent component if callback provided
+    if (onModeSelect) {
+      onModeSelect(mode);
+    }
+  };
+
+  const handleSetMode = () => {
+    if (selectedMode) {
+      setStep(3);
+    }
+  };
+
   return (
     <div className='flex flex-col justify-between h-[90%]'>
       <div className=''>
@@ -23,13 +43,15 @@ const ModeSelector = ({
             title='Plain story mode'
             description='Just sit back and listen! The story is told from start to finish no interruptions, just imagination and fun.'
             active={selectedMode === 'plain'}
-            onClick={() => setSelectedMode('plain')}
+            onClick={() => handleModeSelect('plain')}
+            img={plain}
           />
           <ModeCard
             title='Interactive story mode'
             description={`Get ready to join the adventure! You'll be asked questions, make choices, and help shape how the story goes.`}
             active={selectedMode === 'interactive'}
-            onClick={() => setSelectedMode('interactive')}
+            onClick={() => handleModeSelect('interactive')}
+            img={interactive}
           />
         </div>
       </div>
@@ -40,7 +62,7 @@ const ModeSelector = ({
             : 'bg-[#FEEAE6] text-[#FB9583]'
         }`}
         disabled={!selectedMode}
-        onClick={() => setStep(3)}
+        onClick={handleSetMode}
       >
         Set-up story mode
       </button>

@@ -10,8 +10,9 @@ interface RecommendedCardProps {
   description: string;
   image: string | StaticImageData;
   author: string;
-  favorite: boolean;
+  favorite?: boolean;
   setModal?: (modal: boolean) => void;
+  mode?: string;
 }
 
 const RecommendedCard = ({
@@ -21,6 +22,7 @@ const RecommendedCard = ({
   author,
   favorite,
   setModal,
+  mode,
 }: RecommendedCardProps) => {
   const [isFavorite, setIsFavorite] = useState(favorite);
 
@@ -40,6 +42,8 @@ const RecommendedCard = ({
           <Image
             src={image}
             alt='image'
+            width={224}
+            height={224}
             //   fill
             className='w-[12rem] h-full rounded-l-3xl'
             //   sizes='(max-width: 768px) 100vw, 176px'

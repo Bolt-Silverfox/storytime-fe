@@ -44,6 +44,8 @@ const StoryCard = ({
       <Image
         src={img}
         alt={title}
+        width={224}
+        height={224}
         className={cn(
           'w-full rounded-t-3xl object-cover',
           dynamic ? 'h-[19.25rem]' : 'h-[14.25rem]'

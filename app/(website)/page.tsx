@@ -147,7 +147,6 @@ export default function Home() {
             <h2 className='w-full max-w-[654px] leading-[113.636%] font-bold text-[44px] text-[#221D1D] font-qilka text-center'>
               A world of endless possibilities
             </h2>
-
             <p className='w-full max-w-[596px] text-xl text-[#4A413F] font-abeezee text-center'>
               We have so many categories to explore from
             </p>

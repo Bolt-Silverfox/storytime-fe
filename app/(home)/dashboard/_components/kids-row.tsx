@@ -8,17 +8,6 @@ import kid2 from '@/public/kid-4.svg';
 import kid3 from '@/public/kid-3.svg';
 import kid4 from '@/public/kid-4.svg';
 
-interface Kid {
-  id: string;
-  name: string;
-  avatarUrl: string | null;
-  ageRange: string;
-  parentId: string;
-  createdAt: string;
-  updatedAt: string;
-  preferredVoiceId: string | null;
-}
-
 const KidsRow = () => {
   const [kids, setKids] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

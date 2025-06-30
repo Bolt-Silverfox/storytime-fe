@@ -138,8 +138,8 @@ const VoiceSelector = ({ setStep, expand }: VoiceSelectorProps) => {
             key={voice.voice_id}
             name={voice.name}
             description={voice.description}
-            active={selectedVoice === voice.voice_id}
-            onClick={() => handleVoiceSelect(voice.voice_id)}
+            active={selectedVoice === voice.name}
+            onClick={() => handleVoiceSelect('Milo')}
             onListen={(e) => handleListen(voice, e)}
           />
         ))}

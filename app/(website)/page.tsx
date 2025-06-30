@@ -410,7 +410,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className='space-y-[60px] max-w-[1140px] mx-auto'>
+      <section className='space-y-[60px] py-[160px] max-w-[1140px] mx-auto'>
         <div className='space-y-[60px]'>
           <div className='space-y-3'>
             <h2 className='font-qilka font-bold text-[#221D1D] text-[60px] leading-[103.333%] text-center'>
@@ -438,14 +438,11 @@ export default function Home() {
             ))}
           </Accordion>
         </div>
-
         <Button
           variant='outline'
-          className='w-[186px] border-[0.5px] border-solid border-[#ec4007] rounded-[50px] px-[50px] py-2.5'
+          className='rounded-full bg-transparent mx-auto block border-[#EC4007] text-[#EC4007] px-[54px] border h-auto py-2.5'
         >
-          <span className='text-primarykids-orange font-regular-body text-center whitespace-nowrap'>
-            See all
-          </span>
+          See all
         </Button>
       </section>
     </main>

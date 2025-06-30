@@ -63,6 +63,38 @@ export const storyCategories = [
   },
 ];
 
+export const featureCard2 = [
+  {
+    icon: Icons.mic,
+    iconBg: 'bg-[#f84020]',
+    iconBorder: 'border-[#f84020]',
+    title: 'Designed for families',
+    description:
+      'Every part of Storytime is made for busy parents and growing kids: from gentle voices to simple controls.',
+  },
+  {
+    icon: Icons.like,
+    iconBg: 'bg-[#5d20f8]',
+    iconBorder: 'border-[#5d20f8]',
+    title: 'Content with care',
+    description:
+      'We work with educators, child psychologists, and parents to ensure stories are age appropriate and value driven.',
+  },
+  {
+    icon: Icons.happy,
+    iconBg: 'bg-[#2047f8]',
+    iconBorder: 'border-[#2047f8]',
+    title: 'Interactive story modes for learning and fun',
+    description: 'Learn fun stories by making decisions you like.',
+  },
+  {
+    icon: Icons.security,
+    iconBg: 'bg-[#f820a5]',
+    iconBorder: 'border-[#f820a5]',
+    title: 'Safe & Curated Content for your kids',
+    description: 'Every story is reviewed for age appropriateness.',
+  },
+];
 export const featureCards = [
   {
     icon: Icons.mic,

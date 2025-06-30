@@ -34,7 +34,10 @@ import justiceAndFairness from '@/public/theme/Justice-and-fairness.jpg';
 import loveAndFamily from '@/public/theme/Love-and-family.jpg';
 import sciFi from '@/public/theme/Sci-fi.jpg';
 import trustAndLoyalty from '@/public/theme/Trust-and-loyalty.jpg';
-import { getStoriesByThemeAndKidService } from '@/lib/services';
+import {
+  getStoriesByThemeAndKidService,
+  getStoryByIdService,
+} from '@/lib/services';
 
 interface ThemePageClientProps {
   theme: string;
@@ -203,7 +206,7 @@ const ThemePageClient = ({ theme }: ThemePageClientProps) => {
         </div>
         <div className='mt-10'>
           <h2 className='text-[#4A413F] text-base not-italic font-normal leading-5 font-abeezee mb-4 uppercase'>
-            {encodeURIComponent(theme)} STORIES TOP PICKS FOR {selectedKid.name}
+            {theme} STORIES TOP PICKS FOR {selectedKid?.name}
           </h2>
           <div className='grid grid-cols-2 gap-12'>
             {recommendedStories.map((item) => (
@@ -212,7 +215,7 @@ const ThemePageClient = ({ theme }: ThemePageClientProps) => {
                 image={item.coverImageUrl}
                 title={item.title}
                 description={item.description}
-                setModal={setModal}
+                setModal={() => handleStorySelect(item.id)}
                 author={item.author}
               />
             ))}
@@ -228,7 +231,7 @@ const ThemePageClient = ({ theme }: ThemePageClientProps) => {
                 desc={item.description}
                 author={item.author}
                 dynamic={true}
-                setModal={setModal}
+                setModal={() => handleStorySelect(item.id)}
               />
             ))}
           </div>
@@ -243,7 +246,13 @@ const ThemePageClient = ({ theme }: ThemePageClientProps) => {
         expand={expand}
       >
         {step === 1 && <VoiceSelector setStep={setStep} expand={expand} />}
-        {step === 2 && <ModeSelector setStep={setStep} expand={expand} />}
+        {step === 2 && (
+          <ModeSelector
+            setStep={setStep}
+            expand={expand}
+            onModeSelect={handleModeSelect}
+          />
+        )}
         {step === 3 && (
           <StoryReader
             description='A boy and a dog are best friends. They go on an adventure together and have a lot of fun. The boy is a superhero and the dog is a superhero too.'
@@ -252,6 +261,8 @@ const ThemePageClient = ({ theme }: ThemePageClientProps) => {
             img={story2.src}
             setStep={setStep}
             expand={expand}
+            mode={selectedMode}
+            storyId={selectedStoryId}
           />
         )}
       </Modal>

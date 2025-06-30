@@ -14,7 +14,17 @@ const DashboardPage = () => {
   const [selectedKidId, setSelectedKidId] = useState<string | null>(null);
 
   useEffect(() => {
-    setSelectedKidId(localStorage.getItem('selectedKidId'));
+    // Check for selectedKid in localStorage (the full kid object)
+    const selectedKidData = localStorage.getItem('selectedKid');
+    if (selectedKidData) {
+      try {
+        const selectedKid = JSON.parse(selectedKidData);
+        setSelectedKidId(selectedKid.id);
+      } catch (error) {
+        console.error('Error parsing selectedKid from localStorage:', error);
+        setSelectedKidId(null);
+      }
+    }
   }, []);
 
   // Handler to update selectedKidId from KidPicker

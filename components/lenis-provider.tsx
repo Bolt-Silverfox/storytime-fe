@@ -6,9 +6,7 @@ import { frame, cancelFrame } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 
-export default function LenisProvider({
-  children,
-}: { children: React.ReactNode }) {
+export function LenisProvider({ children }: { children: React.ReactNode }) {
   const lenisRef = useRef<LenisRef>(null);
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);

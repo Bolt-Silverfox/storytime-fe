@@ -1,16 +1,17 @@
-import Image from 'next/image';
-import background from '@/public/background.png';
+import Image, { StaticImageData } from 'next/image';
 
 const ModeCard = ({
   title,
   description,
   active,
   onClick,
+  img,
 }: {
   title: string;
   description: string;
   active: boolean;
   onClick: () => void;
+  img: StaticImageData;
 }) => {
   return (
     <div
@@ -21,7 +22,7 @@ const ModeCard = ({
       }`}
       onClick={onClick}
     >
-      <Image src={background} alt='background' />
+      <Image src={img} alt='background' />
       <div className='p-6'>
         <h3
           className={` text-xl not-italic font-normal leading-5 font-qilka ${

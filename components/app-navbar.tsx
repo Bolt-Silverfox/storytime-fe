@@ -13,7 +13,9 @@ import {
 import { useState } from 'react';
 import { ScrollProgress } from './ui/scroll-progress';
 import { Logo } from './logo';
-import { Button } from './ui/button';
+import { Button, buttonVariants } from './ui/button';
+import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 export function AppNavbar() {
   const navItems = [
@@ -44,20 +46,25 @@ export function AppNavbar() {
           <ScrollProgress className='top-[-5px]' />
           <Logo />
           <NavItems items={navItems} />
-          <div className='flex items-center gap-4'>
-            <Button
-              variant='outline'
-              className='rounded-full bg-transparent border-[#EC4007] border px-9 h-auto py-4'
+          <div className='flex items-center gap-4 relative'>
+            <Link
+              href='/login'
+              className={cn(
+                buttonVariants({ variant: 'outline' }),
+                'rounded-full bg-transparent border-[#EC4007] border px-9 h-auto py-4'
+              )}
             >
               Login
-            </Button>
-            <Button
-              variant='primary'
-              type='submit'
-              className='px-9 h-auto py-4'
+            </Link>
+            <Link
+              href='/register'
+              className={cn(
+                buttonVariants({ variant: 'primary' }),
+                'px-9 h-auto py-4'
+              )}
             >
               Get started
-            </Button>
+            </Link>
           </div>
         </NavBody>
 

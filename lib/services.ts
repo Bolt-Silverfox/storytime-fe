@@ -518,12 +518,11 @@ export const getStoriesByThemeAndKidService = async (
 
 export const setKidPreferredVoiceService = async (
   kidId: string,
-  voiceId: string
+  voiceType: string
 ) => {
   try {
     const response = await api.patch(`/user/kids/${kidId}/voice`, {
-      kidId,
-      voiceId,
+      voiceType,
     });
     return response.data;
     // biome-ignore lint/suspicious/noExplicitAny: external error shape
@@ -568,5 +567,34 @@ export const clearSelectedModeFromStorage = () => {
     localStorage.removeItem('selectedMode');
   } catch (error) {
     console.error('Error clearing selected mode from localStorage:', error);
+  }
+};
+
+export const getStoryAudioService = async (
+  storyId: string
+): Promise<{
+  message: string;
+  audioUrl: string;
+  voiceType: string;
+  statusCode: number;
+}> => {
+  try {
+    const response = await api.get(
+      `/stories/story/audio/${storyId}?voiceType=MILO`
+    );
+    return response.data;
+    // biome-ignore lint/suspicious/noExplicitAny: external error shape
+  } catch (error: any) {
+    if (error.response) {
+      throw {
+        message: error.response.data?.message || 'Failed to fetch story audio',
+        status: error.response.status,
+        data: error.response.data,
+      };
+    }
+    if (error.request) {
+      throw { message: 'No response from server', status: null };
+    }
+    throw { message: error.message || 'Unexpected error', status: null };
   }
 };

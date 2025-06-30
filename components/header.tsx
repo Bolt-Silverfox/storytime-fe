@@ -12,7 +12,6 @@ import { getUserFromStorage } from '@/lib/services';
 
 const Header = ({ white = false }: { white?: boolean }) => {
   const user = getUserFromStorage();
-  console.log(user);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   return (
     <header>

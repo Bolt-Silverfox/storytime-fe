@@ -115,8 +115,9 @@ const Page = () => {
         </div>
       </section>
 
-
-      <section></section>
+      <section>
+        <div className='rounded-[37px] bg-white'></div>
+      </section>
     </main>
   );
 };

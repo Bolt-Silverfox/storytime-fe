@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
+import Link from 'next/link';
 
 interface ProfileDropdownProps {
   open: boolean;
@@ -13,12 +14,12 @@ const menuItems = [
   {
     label: 'Personal settings',
     icon: '/profile.svg',
-    link: '/dashboard/profile',
+    link: '/dashboard/personal-settings',
   },
   {
     label: 'Security settings',
     icon: '/safe.svg',
-    link: '/dashboard/security',
+    link: '/dashboard/security-settings',
   },
   {
     label: 'Notification',
@@ -65,15 +66,16 @@ export default function ProfileDropdown({
           onClick={(e) => e.stopPropagation()}
         >
           {menuItems.map((item) => (
-            <div
+            <Link
               key={item.label}
               className='flex items-center gap-3 py-6 px-4 hover:bg-gray-50  rounded-[1.6875rem] cursor-pointer transition-colors border-b-[0.5px] border-solid border-stone-100'
+              href={item.link}
             >
               <Image src={item.icon} alt='' width={24} height={24} />
               <span className='text-[#4A413F] not-italic leading-6 font-abeezee text-base'>
                 {item.label}
               </span>
-            </div>
+            </Link>
           ))}
         </motion.div>
       )}

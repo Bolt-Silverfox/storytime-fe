@@ -65,7 +65,7 @@ export const storyCategories = [
 
 export const featureCard2 = [
   {
-    icon: Icons.mic,
+    icon: Icons.family,
     iconBg: 'bg-[#f84020]',
     iconBorder: 'border-[#f84020]',
     title: 'Designed for families',
@@ -73,7 +73,7 @@ export const featureCard2 = [
       'Every part of Storytime is made for busy parents and growing kids: from gentle voices to simple controls.',
   },
   {
-    icon: Icons.like,
+    icon: Icons.document,
     iconBg: 'bg-[#5d20f8]',
     iconBorder: 'border-[#5d20f8]',
     title: 'Content with care',
@@ -81,14 +81,14 @@ export const featureCard2 = [
       'We work with educators, child psychologists, and parents to ensure stories are age appropriate and value driven.',
   },
   {
-    icon: Icons.happy,
+    icon: Icons.gift,
     iconBg: 'bg-[#2047f8]',
     iconBorder: 'border-[#2047f8]',
     title: 'Interactive story modes for learning and fun',
     description: 'Learn fun stories by making decisions you like.',
   },
   {
-    icon: Icons.security,
+    icon: Icons.award,
     iconBg: 'bg-[#f820a5]',
     iconBorder: 'border-[#f820a5]',
     title: 'Safe & Curated Content for your kids',
@@ -253,6 +253,68 @@ export const faqItems = [
       'Storytime is designed for kids aged 3 to 12, but it’s loved by toddlers, older siblings, and even adults who enjoy calm storytelling. Every story is categorized by age to help parents choose what’s best for their child’s developmental stage.',
   },
 ];
+export const faqPageItems = [
+  {
+    question: 'Is StoryTime free to use?',
+    answer: '',
+  },
+  {
+    question: 'What devices can I use StoryTime on?',
+    answer: '',
+  },
+  {
+    question: 'Is there a version for schools and libraries?',
+    answer: '',
+  },
+  {
+    question: 'Can I control what stories my child hears?',
+    answer: '',
+  },
+  {
+    question: 'Are the stories safe and age-appropriate?',
+    answer: '',
+  },
+  {
+    question: 'Can I block fantasy or sad stories?',
+    answer: '',
+  },
+  {
+    question: 'What’s the difference between Plain Mode and Interactive Mode?',
+    answer: '',
+  },
+  {
+    question: "Can I choose the narrator's voice?",
+    answer: '',
+  },
+  {
+    question: 'Is there background music in stories?',
+    answer: '',
+  },
+  {
+    question: 'How do I upgrade to premium?',
+    answer: '',
+  },
+  {
+    question: 'Can I share my account with more than one child?',
+    answer: '',
+  },
+  {
+    question: 'What happens if I cancel my premium plan?',
+    answer: '',
+  },
+  {
+    question: 'Which languages does Storytime support?',
+    answer: '',
+  },
+  {
+    question: 'Do the stories include read-along text?',
+    answer: '',
+  },
+  {
+    question: 'Is Storytime accessible for kids with visual impairments?',
+    answer: '',
+  },
+];
 
 export const footerLinks = [
   { title: 'About', url: '#' },
@@ -260,4 +322,201 @@ export const footerLinks = [
   { title: 'FAQ', url: '#' },
   { title: 'Terms & conditions', url: '#' },
   { title: 'Privacy policy', url: '#' },
+];
+
+export const termsSections = [
+  {
+    title: 'Acceptance of Terms',
+    content:
+      'By downloading, installing, or using the Storytime app, you agree to be bound by these Terms and Conditions and our Privacy Policy. If you do not agree, do not use our services.',
+  },
+  {
+    title: 'Eligibility',
+    content:
+      'Storytime is intended for use by parents and guardians on behalf of children under 13. By using the app, you confirm that you are at least 18 years old or have the consent of a parent or guardian.',
+  },
+  {
+    title: 'User Accounts',
+    content:
+      'To access premium features, you must create an account. You are responsible for safeguarding your login information and for any activities under your account.',
+  },
+  {
+    title: 'Subscriptions and Payments',
+    content:
+      'Storytime offers free and paid subscription plans. Paid plans renew automatically unless cancelled before the renewal date. All fees are non-refundable unless otherwise stated.',
+  },
+  {
+    title: 'Content Use',
+    content:
+      'All content, including stories, illustrations, and audio, is the property of Storytime or its licensors. You may not copy, distribute, or use content outside the app without written permission.',
+  },
+  {
+    title: 'User Conduct',
+    content: 'You agree not to:',
+    bulletPoints: [
+      'Share inappropriate content',
+      'Interfere with or disrupt the service',
+      'Reverse-engineer or hack any part of the app',
+    ],
+  },
+  {
+    title: 'Parental Controls and Responsibilities',
+    content:
+      "Storytime provides content filters and controls, but it is your responsibility to supervise your child's use of the app. We recommend reviewing all content accessed by your child.",
+  },
+  {
+    title: 'Termination',
+    content:
+      'We may update these Terms from time to time. We will notify users of major changes via the app or email. Continued use after changes constitutes acceptance.',
+  },
+  {
+    title: 'Disclaimer of Warranties',
+    content:
+      'The app and its content are provided "as is." We do not guarantee uninterrupted service or error-free content.',
+  },
+  {
+    title: 'Limitation of Liability',
+    content:
+      'Storytime is not liable for any damages arising from your use or inability to use the app, including data loss or service interruptions.',
+  },
+  {
+    title: 'Governing Law',
+    content:
+      'These Terms are governed by the laws of [Insert Country/Region]. Any disputes shall be resolved in the courts of that jurisdiction.',
+  },
+];
+
+export const privacySections = [
+  {
+    title: 'Introduction',
+    content:
+      'Storytime values your privacy. This Privacy Policy explains how we collect, use, and protect your information when you use our app, website, and related services.',
+  },
+  {
+    title: 'Information We Collect',
+    content:
+      'We collect information you provide directly to us, such as when you create an account, subscribe to our services, or contact us for support.',
+    subsections: [
+      {
+        subtitle: 'Personal Information',
+        content:
+          'This may include your name, email address, payment information, and any other information you choose to provide.',
+      },
+      {
+        subtitle: 'Usage Information',
+        content:
+          'We automatically collect information about how you use our app, including the stories accessed, time spent in the app, and device information.',
+      },
+      {
+        subtitle: 'Device Information',
+        content:
+          'We collect information about the device you use to access Storytime, including device type, operating system, and unique device identifiers.',
+      },
+    ],
+  },
+  {
+    title: 'How We Use Your Information',
+    content: 'We use the information we collect to:',
+    bulletPoints: [
+      'Provide, maintain, and improve our services',
+      'Process transactions and send related information',
+      'Send you technical notices and support messages',
+      'Communicate with you about products, services, and events',
+      'Monitor and analyze trends and usage',
+      'Personalize your experience with age-appropriate content',
+    ],
+  },
+  {
+    title: 'Information Sharing and Disclosure',
+    content:
+      'We do not sell, trade, or otherwise transfer your personal information to third parties without your consent, except as described in this policy.',
+    subsections: [
+      {
+        subtitle: 'Service Providers',
+        content:
+          'We may share information with third-party service providers who perform services on our behalf, such as payment processing and analytics.',
+      },
+      {
+        subtitle: 'Legal Requirements',
+        content:
+          'We may disclose information if required by law or if we believe disclosure is necessary to protect our rights or comply with legal proceedings.',
+      },
+    ],
+  },
+  {
+    title: "Children's Privacy",
+    content:
+      "Storytime is designed for children under 13, and we take special care to protect children's privacy in accordance with COPPA (Children's Online Privacy Protection Act).",
+    subsections: [
+      {
+        subtitle: 'Parental Consent',
+        content:
+          'We require verifiable parental consent before collecting personal information from children under 13.',
+      },
+      {
+        subtitle: 'Limited Collection',
+        content:
+          'We collect only the minimum information necessary to provide our services and do not require children to provide more information than necessary.',
+      },
+      {
+        subtitle: 'Parental Rights',
+        content:
+          "Parents have the right to review, delete, or refuse further collection of their child's personal information.",
+      },
+    ],
+  },
+  {
+    title: 'Data Security',
+    content:
+      'We implement appropriate technical and organizational measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction.',
+    subsections: [
+      {
+        subtitle: 'Encryption',
+        content:
+          'We use industry-standard encryption to protect sensitive information during transmission and storage.',
+      },
+      {
+        subtitle: 'Access Controls',
+        content:
+          'We limit access to personal information to employees and contractors who need it to perform their job functions.',
+      },
+    ],
+  },
+  {
+    title: 'Data Retention',
+    content:
+      'We retain your personal information for as long as necessary to provide our services, comply with legal obligations, resolve disputes, and enforce our agreements.',
+  },
+  {
+    title: 'Your Rights and Choices',
+    content:
+      'Depending on your location, you may have certain rights regarding your personal information:',
+    bulletPoints: [
+      'Access: Request access to your personal information',
+      'Correction: Request correction of inaccurate information',
+      'Deletion: Request deletion of your personal information',
+      'Portability: Request a copy of your information in a portable format',
+      'Opt-out: Opt out of certain communications or data processing',
+    ],
+  },
+  {
+    title: 'International Data Transfers',
+    content:
+      'Your information may be transferred to and processed in countries other than your own. We ensure appropriate safeguards are in place to protect your information during such transfers.',
+  },
+  {
+    title: 'Changes to This Privacy Policy',
+    content:
+      "We may update this Privacy Policy from time to time. We will notify you of any material changes by posting the new policy on this page and updating the 'Last Updated' date.",
+  },
+  {
+    title: 'Contact Us',
+    content:
+      'If you have any questions about this Privacy Policy or our privacy practices, please contact us at:',
+    contactInfo: {
+      email: 'privacy@storytime.com',
+      address: '123 Story Lane, Imagination City, IC 12345',
+      phone: '+1 (555) 123-4567',
+    },
+  },
 ];

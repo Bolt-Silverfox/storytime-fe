@@ -427,10 +427,10 @@ export default function Home() {
                 value={`item-${index}`}
                 className='mb-4 bg-white rounded-[27px] border-[0.5px] border-solid border-stone-100'
               >
-                <AccordionTrigger className='px-8 py-6 font-regular-h4 text-body-shadelight hover:no-underline'>
+                <AccordionTrigger className='px-8 py-6 text-xl hover:no-underline'>
                   {item.question}
                 </AccordionTrigger>
-                <AccordionContent className='px-8 pb-6'>
+                <AccordionContent className='px-8 pb-6 text-xl'>
                   {item.answer}
                 </AccordionContent>
               </AccordionItem>

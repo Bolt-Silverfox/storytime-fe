@@ -115,8 +115,66 @@ const Page = () => {
         </div>
       </section>
 
-      <section>
-        <div className='rounded-[37px] bg-white'></div>
+      <section className='max-w-[1140px] py-[80px] mx-auto flex items-center gap-8'>
+        <div className='rounded-[37px] overflow-hidden w-max bg-white'>
+          <div className='space-y-3 py-[42px] px-8'>
+            <h2 className='w-full max-w-[654px] mx-auto leading-[113.636%] font-bold text-[44px] text-[#221D1D] font-qilka'>
+              Our mission
+            </h2>
+            <p className='w-full max-w-[596px] mx-auto text-xl text-[#4A413F] font-abeezee'>
+              To make storytelling magical again by giving every child access to
+              stories that are joyful, calming, and full of meaning.
+            </p>
+          </div>
+          <Image src='/about-c.png' alt='' height={356} width={554} />
+        </div>
+        <div className='rounded-[37px] overflow-hidden w-max bg-white'>
+          <div className='space-y-3 py-[42px] px-8'>
+            <h2 className='w-full max-w-[654px] mx-auto leading-[113.636%] font-bold text-[44px] text-[#221D1D] font-qilka '>
+              Our vision
+            </h2>
+            <p className='w-full max-w-[596px] mx-auto text-xl text-[#4A413F] font-abeezee '>
+              A future where screen-free, audio-first experiences become the
+              foundation for how kids learn, imagine, and connect.
+            </p>
+          </div>
+          <Image src='/about-c.png' alt='' height={356} width={554} />
+        </div>
+      </section>
+
+      <section className='pt-[80px] pb-[160px]'>
+        <Card className='w-full max-w-[1140px] mx-auto bg-[#EC4007] rounded-[51px] border-[0.5px] border-solid border-[#f84020] p-[62px]'>
+          <CardContent className='p-0'>
+            <div className='flex items-center gap-[70px] w-full'>
+              <div className='flex flex-col items-start gap-8 flex-1 max-w-[473px]'>
+                <div className='space-y-3'>
+                  <h2 className='font-qilka text-[60px] font-bold text-white leading-[103.333%]'>
+                    Want to join the movement
+                  </h2>
+
+                  <p className='text-[#FEEAE6] font-abeezee text-xl max-w-[500px]'>
+                    Let’s build a world where stories still matter.
+                  </p>
+                </div>
+
+                <Button
+                  variant='outline'
+                  className='rounded-full bg-transparent text-white px-[54px] border h-auto py-2.5'
+                >
+                  Create an account today
+                </Button>
+              </div>
+
+              <Image
+                src='/about-d.png'
+                height={473}
+                width={366}
+                className='rounded-[37px] w-full max-w-[473px]'
+                alt='Digital storybook illustration'
+              />
+            </div>
+          </CardContent>
+        </Card>
       </section>
     </main>
   );

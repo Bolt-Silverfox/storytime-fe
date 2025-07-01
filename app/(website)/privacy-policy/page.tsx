@@ -18,7 +18,7 @@ const Page = () => {
           </p>
         </div>
       </section>
-      <section className='max-w-[1128px] mx-auto'>
+      <section className='max-w-[1128px] mx-auto px-5'>
         <Card className='w-full border-none bg-transparent shadow-none'>
           <CardContent className='flex flex-col items-start gap-[42px] p-0'>
             {privacySections.map((section, index) => (
@@ -26,7 +26,7 @@ const Page = () => {
                 key={index}
                 className='flex flex-col items-start gap-3 w-full'
               >
-                <h2 className='w-full text-xl text-[#221D1D] font-bold font-qilka'>
+                <h2 className='w-full md:text-xl text-[26px] text-[#221D1D] font-bold font-qilka'>
                   {section.title}
                 </h2>
 
@@ -54,7 +54,7 @@ const Page = () => {
                         key={idx}
                         className='flex flex-col items-start gap-2 w-full'
                       >
-                        <h3 className='w-full text-xl text-[#221D1D] font-bold font-qilka'>
+                        <h3 className='w-full md:text-xl text-[26px] text-[#221D1D] font-bold font-qilka'>
                           {subsection.subtitle}
                         </h3>
                         <p className='w-full font-abeezee text-xl text-[#4A413F]'>

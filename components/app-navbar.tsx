@@ -21,19 +21,19 @@ export function AppNavbar() {
   const navItems = [
     {
       name: 'Home',
-      link: '#features',
+      link: '/',
     },
     {
       name: 'About',
-      link: '#pricing',
+      link: '/about',
     },
     {
       name: 'Contact',
-      link: '#contact',
+      link: '/contact',
     },
     {
       name: 'FAQ',
-      link: '#contact',
+      link: '/faq',
     },
   ];
 
@@ -70,7 +70,7 @@ export function AppNavbar() {
 
         <MobileNav>
           <MobileNavHeader>
-            <NavbarLogo />
+            <Logo />
             <MobileNavToggle
               isOpen={isMobileMenuOpen}
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -92,20 +92,24 @@ export function AppNavbar() {
               </a>
             ))}
             <div className='flex w-full flex-col gap-4'>
-              <NavbarButton
-                onClick={() => setIsMobileMenuOpen(false)}
-                variant='primary'
-                className='w-full'
+              <Link
+                href='/login'
+                className={cn(
+                  buttonVariants({ variant: 'outline' }),
+                  'rounded-full bg-transparent border-[#EC4007] border px-9 h-auto py-4'
+                )}
               >
                 Login
-              </NavbarButton>
-              <NavbarButton
-                onClick={() => setIsMobileMenuOpen(false)}
-                variant='primary'
-                className='w-full'
+              </Link>
+              <Link
+                href='/register'
+                className={cn(
+                  buttonVariants({ variant: 'primary' }),
+                  'px-9 h-auto py-4'
+                )}
               >
-                Book a call
-              </NavbarButton>
+                Get started
+              </Link>
             </div>
           </MobileNavMenu>
         </MobileNav>

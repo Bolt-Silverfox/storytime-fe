@@ -7,7 +7,7 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { AvatarCircles } from '@/components/ui/avatar-circles';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Icons } from '@/components/ui/icons';
 import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern';
@@ -21,17 +21,19 @@ import {
   testimonials,
   yellowFeatures,
 } from '@/lib/data';
+import { cn } from '@/lib/utils';
 import { Volume2Icon } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
 
 export default function Home() {
   return (
     <main className='space-y-16'>
       <section className='relative py-40'>
         <InteractiveGridPattern width={150} height={150} />
-        <section className='flex relative z-10 flex-col items-center gap-[60px] w-full max-w-[946px] mx-auto'>
+        <section className='flex relative z-10 px-5  flex-col items-center gap-[60px] w-full max-w-[946px] mx-auto'>
           <div className='flex flex-col items-center gap-[42px] w-full'>
-            <div className='flex flex-col items-center gap-5 w-full'>
+            <div className='flex  flex-col items-center gap-5 w-full'>
               <div className='flex flex-col items-center gap-6 w-full'>
                 <Badge
                   variant='outline'
@@ -40,7 +42,7 @@ export default function Home() {
                   WELCOME TO STORYTIME
                 </Badge>
 
-                <h1 className='font-qilka font-bold text-[#221D1D] text-[59.8px] max-w-[926px] mx-auto text-center leading-[68px]'>
+                <h1 className='font-qilka font-bold text-[#221D1D] md:text-[60px] text-[44px] md:leading-[68px] leading-[50px] max-w-[926px] mx-auto text-center'>
                   Re-defining storytelling for kids with big imaginations
                 </h1>
               </div>
@@ -54,7 +56,7 @@ export default function Home() {
 
             <Button
               variant='primary'
-              className='w-[237px] text-white rounded-[50px] px-[50px] py-2.5 gap-2.5'
+              className='md:w-[237px] w-full text-white rounded-[50px] px-[50px] py-2.5 gap-2.5'
             >
               <Volume2Icon className='w-6 h-6' />
               <span className='font-regular-body'>Start listening</span>
@@ -64,41 +66,41 @@ export default function Home() {
           <div className='flex items-center gap-4'>
             <AvatarCircles avatarUrls={avatars} />
             <div className='flex items-center gap-1.5'>
-              <span className='text-xs text-[#4A413F] font-abeezee'>
+              <span className='text-xs whitespace-nowrap text-[#4A413F] font-abeezee'>
                 Visited by over
               </span>
-              <span className='font-bold text-lg font-qilka text-[#EC4007] text-center'>
+              <span className='font-bold whitespace-nowrap text-xl font-qilka text-[#EC4007] text-center'>
                 5k visitors
               </span>
             </div>
           </div>
         </section>
       </section>
-      <section className='relative grid-cols-6 grid w-full max-w-[990px] mx-auto gap-5'>
+      <section className='relative px-5 grid-cols-6 grid w-full max-w-[990px] mx-auto gap-5'>
         <Image
           src='/landing-1.png'
-          className='rounded-[12px_60px] col-span-4 h-full'
+          className='md:rounded-[12px_60px] rounded-[3.96px_19.8px] col-span-4 h-full'
           alt=''
           height={456}
           width={630}
         />
         <Image
           src='/landing-2.png'
-          className='rounded-[12px_60px] col-span-2 h-full'
+          className='md:rounded-[12px_60px] rounded-[3.96px_19.8px] col-span-2 h-full'
           alt=''
           height={456}
           width={340}
         />
 
-        <Icons.starOne className='absolute -bottom-25 left-[27%]' />
-        <Icons.starTwo className='absolute -bottom-6 -right-6' />
-        <Icons.starThree className='absolute -top-16 -right-2' />
-        <Icons.starFour className='absolute -top-23 -left-16' />
+        <Icons.starOne className='absolute -bottom-25 left-[27%] md:scale-100 scale-40' />
+        <Icons.starTwo className='absolute -bottom-6 -right-6 md:scale-100 scale-40' />
+        <Icons.starThree className='absolute -top-16 -right-2 md:scale-100 scale-40' />
+        <Icons.starFour className='absolute -top-23 -left-16 md:scale-100 scale-40' />
       </section>
-      <section className='flex flex-row gap-[50px] py-16 w-full max-w-[1140px] mx-auto'>
+      <section className='flex md:flex-row flex-col px-5 gap-[50px] py-16 w-full max-w-[1140px] mx-auto'>
         <div className='max-w-[419px] space-y-4'>
           <div className='space-y-3'>
-            <h2 className='font-qilka font-bold text-[#221D1D] text-6xl'>
+            <h2 className='font-qilka font-bold text-[#221D1D] md:text-[60px] text-[44px] md:leading-[68px] leading-[50px]'>
               Explore story-telling like never before
             </h2>
 
@@ -112,7 +114,7 @@ export default function Home() {
           <Icons.starOne className='mx-auto' />
         </div>
 
-        <div className='grid grid-cols-2 gap-6 w-full'>
+        <div className='grid md:grid-cols-2 gap-6 w-full'>
           {featureCards.map((card, index) => (
             <Card
               key={`feature-card-top-${index}`}
@@ -141,10 +143,10 @@ export default function Home() {
           ))}
         </div>
       </section>
-      <section className='flex flex-col items-center gap-[60px] w-full py-16 max-w-[1240px] mx-auto'>
+      <section className='flex px-5 flex-col items-center gap-[60px] w-full py-16 max-w-[1240px] mx-auto'>
         <div className='flex flex-col items-center gap-[60px] w-full'>
           <div className='space-y-3'>
-            <h2 className='w-full max-w-[654px] leading-[113.636%] font-bold text-[44px] text-[#221D1D] font-qilka text-center'>
+            <h2 className='w-full max-w-[654px] leading-[113.636%] font-bold md:text-[44px] text-[34px] text-[#221D1D] font-qilka text-center'>
               A world of endless possibilities
             </h2>
             <p className='w-full max-w-[596px] text-xl text-[#4A413F] font-abeezee text-center'>
@@ -152,11 +154,11 @@ export default function Home() {
             </p>
           </div>
 
-          <div className='grid grid-cols-3'>
+          <div className='grid md:grid-cols-3'>
             {storyCategories.map((category, index) => (
               <Card
                 key={`category-${index}`}
-                className=' [&:nth-child(1)]:border-t-0 [&:nth-child(1)]:border-l-0 [&:nth-child(2)]:border-t-0 [&:nth-child(3)]:border-t-0 [&:nth-child(3)]:border-r-0 !border-b-0 [&:nth-child(4)]:border-l-0 last:border-r-0 border-4 border-l-0 p-8 border-[#F8EEEB] rounded-none shadow-none bg-transparent'
+                className='md:[&:nth-child(1)]:border-t-0 md:[&:nth-child(1)]:border-l-0 md:[&:nth-child(2)]:border-t-0 md:[&:nth-child(3)]:border-t-0 md:[&:nth-child(3)]:border-r-0 !border-b-0 md:[&:nth-child(4)]:border-l-0 md:last:border-r-0 md:border-4 border-l-0 p-8 border-[#F8EEEB] rounded-none shadow-none bg-transparent'
               >
                 <CardContent className='flex flex-col items-start gap-6 p-0'>
                   <Image
@@ -164,7 +166,7 @@ export default function Home() {
                     height={194}
                     width={301}
                     alt='Category Image'
-                    className='rounded-[23px] w-full aspect-square'
+                    className='rounded-[23px] w-full md:aspect-square'
                   />
                   <div className='flex flex-col items-start gap-3 w-full'>
                     <h3 className='text-[26px] font-bold font-qilka text-[#221D1D] '>
@@ -180,47 +182,52 @@ export default function Home() {
           </div>
         </div>
 
-        <Button
-          variant='outline'
-          className='rounded-full bg-transparent border-[#EC4007] text-[#EC4007] px-[54px] border h-auto py-2.5'
+        <Link
+          href='/dashboard'
+          className={cn(
+            buttonVariants({ variant: 'outline' }),
+            'rounded-full bg-transparent border-[#EC4007] text-[#EC4007] px-[54px] border h-auto py-2.5'
+          )}
         >
           Browse all stories
-        </Button>
+        </Link>
       </section>
-      <Card className='w-full max-w-[1140px] mx-auto bg-[#EC4007] rounded-[51px] border-[0.5px] border-solid border-[#f84020] p-[62px]'>
-        <CardContent className='p-0'>
-          <div className='flex items-center gap-[70px] w-full'>
-            <div className='flex flex-col items-start gap-8 flex-1 max-w-[473px]'>
-              <div className='space-y-3'>
-                <h2 className='font-qilka text-[60px] font-bold text-white leading-[103.333%]'>
-                  Built with kids in mind + AI integration
-                </h2>
+      <section className='px-5'>
+        <Card className='w-full max-w-[1140px] md:mx-auto bg-[#EC4007] rounded-[51px] border-[0.5px] border-solid border-[#f84020] md:p-[62px] p-8'>
+          <CardContent className='p-0'>
+            <div className='flex md:flex-row flex-col items-center gap-[70px] w-full'>
+              <div className='flex flex-col items-start gap-8 flex-1 max-w-[473px]'>
+                <div className='space-y-3'>
+                  <h2 className='font-qilka md:text-[60px] text-[34px] md:leading-[68px] leading-[50px] font-bold text-white'>
+                    Built with kids in mind + AI integration
+                  </h2>
 
-                <p className='text-[#FEEAE6] font-abeezee text-xl max-w-[500px]'>
-                  A combination of intentionality, AI integration and
-                  simplicity, we have created an amazing digital storybook to
-                  aid your kids all the way through in their day to day lives.
-                </p>
+                  <p className='text-[#FEEAE6] font-abeezee text-xl max-w-[500px]'>
+                    A combination of intentionality, AI integration and
+                    simplicity, we have created an amazing digital storybook to
+                    aid your kids all the way through in their day to day lives.
+                  </p>
+                </div>
+
+                <Button
+                  variant='outline'
+                  className='rounded-full bg-transparent text-white px-[54px] border h-auto py-2.5'
+                >
+                  Browse all stories
+                </Button>
               </div>
 
-              <Button
-                variant='outline'
-                className='rounded-full bg-transparent text-white px-[54px] border h-auto py-2.5'
-              >
-                Browse all stories
-              </Button>
+              <Image
+                src='/landing-3.png'
+                height={473}
+                width={366}
+                className='rounded-[37px] w-full max-w-[473px]'
+                alt='Digital storybook illustration'
+              />
             </div>
-
-            <Image
-              src='/landing-3.png'
-              height={473}
-              width={366}
-              className='rounded-[37px] w-full max-w-[473px]'
-              alt='Digital storybook illustration'
-            />
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </section>
       <section className=' bg-[#4807EC] pt-[60px] space-y-[60px]'>
         <div className='space-y-3 '>
           <h2 className='font-qilka font-bold text-white text-[44px] text-center'>
@@ -233,14 +240,14 @@ export default function Home() {
         </div>
 
         {/* Features section */}
-        <div className='grid grid-cols-5 gap-[53px]'>
-          <div className='col-span-3 flex items-end flex-col py-[112px]'>
-            <div className='space-y-[50px]'>
-              <div className='grid grid-cols-2 gap-x-[52px] gap-y-[62px] max-w-[706px] justify-between'>
+        <div className='grid md:grid-cols-5 md:gap-[53px]'>
+          <div className='md:col-span-3 flex md:items-end items-center flex-col md:py-[112px] py-[32px]'>
+            <div className='space-y-[50px] px-5'>
+              <div className='grid md:grid-cols-2 md:gap-x-[52px] gap-y-[62px] max-w-[706px] justify-between'>
                 {purpleFeatures.map((feature, index) => (
                   <Card
                     key={index}
-                    className=' max-w-[301px] space-y-3 col-span-1 bg-transparent border-none shadow-none'
+                    className=' md:max-w-[301px] space-y-3 md:col-span-1 bg-transparent border-none shadow-none'
                   >
                     <CardContent className='flex  flex-col items-start gap-3 relative self-stretch w-full p-0'>
                       <h3 className='text-[26px] font-bold text-white font-qilka'>
@@ -255,20 +262,20 @@ export default function Home() {
               </div>
 
               <Button
-                variant='primary'
+                variant='secondary'
                 type='submit'
-                className='px-9 h-auto py-4'
+                className='px-[50px] h-auto py-4 rounded-full md:w-max w-full '
               >
                 Get started
               </Button>
             </div>
           </div>
 
-          <div className='space-y-[62px] bg-[#ECC607] py-[112px] col-span-2 w-full px-[80px]'>
+          <div className='space-y-[62px] bg-[#ECC607] md:py-[112px] py-8 md:col-span-2 w-full md:px-[80px]'>
             {yellowFeatures.map((feature, index) => (
               <Card
                 key={index}
-                className='max-w-[301px] space-y-3 bg-transparent border-none shadow-none'
+                className='md:max-w-[301px] px-5 space-y-3 bg-transparent border-none shadow-none'
               >
                 <CardContent className='flex  flex-col items-start gap-3 relative self-stretch w-full p-0'>
                   <h3 className='text-[26px] font-bold text-[#221D1D] font-qilka'>
@@ -283,9 +290,9 @@ export default function Home() {
           </div>
         </div>
       </section>
-      <section className=' max-w-[1140px] space-y-[60px] mx-auto py-16'>
+      <section className=' max-w-[1140px] px-5 space-y-[60px] mx-auto py-16'>
         <div className='space-y-3'>
-          <h2 className='font-qilka font-bold text-[#221D1D] text-[44px] text-center'>
+          <h2 className='font-qilka font-bold text-[#221D1D] md:text-[44px] text-[34px] text-center'>
             Complete Parental control
           </h2>
           <p className='font-abeezee text-xl text-[#4A413F] text-center'>
@@ -304,7 +311,7 @@ export default function Home() {
           <div className='flex flex-col items-start gap-8 flex-1'>
             <div className='flex flex-col items-start gap-6 w-full'>
               <div className='space-y-3'>
-                <h2 className='font-qilka font-bold text-[#221D1D] text-[44px] text-center'>
+                <h2 className='font-qilka font-bold text-[#221D1D] md:text-[44px] text-[34px]'>
                   Stay in control always
                 </h2>
                 <p className='font-abeezee text-xl text-[#4A413F] text-center'>
@@ -338,17 +345,17 @@ export default function Home() {
         </div>
       </section>
 
-      <section className='space-y-10 py-20 max-w-[1140px] mx-auto'>
-        <div className='flex gap-[50px]'>
+      <section className='space-y-10 px-5 md:py-20 max-w-[1140px] mx-auto'>
+        <div className='flex md:flex-row flex-col gap-[50px]'>
           <div className='space-y-3 col-span-5 max-w-[419px]'>
-            <h2 className='font-qilka font-bold text-[#221D1D] text-[60px] leading-[103.333%]'>
+            <h2 className='font-qilka font-bold text-[#221D1D] md:text-[60px] text-[44px] md:leading-[68px] leading-[50px]'>
               Loved by families everywhere
             </h2>
             <p className='font-abeezee text-xl text-[#4A413F]'>
               Hear from parents who have engaged with out product.
             </p>
           </div>
-          <div className='grid grid-cols-2 gap-[25px] w-full'>
+          <div className='grid md:grid-cols-2 gap-[25px] w-full'>
             {testimonials.slice(0, 2).map((testimonial, index) => (
               <Card
                 key={`top-testimonial-${index}`}
@@ -378,7 +385,7 @@ export default function Home() {
             ))}
           </div>
         </div>
-        <div className='grid grid-cols-3 gap-x-[25px] gap-y-10 w-full'>
+        <div className='grid md:grid-cols-3 gap-x-[25px] gap-y-10 w-full'>
           {testimonials.slice(2).map((testimonial, index) => (
             <Card
               key={`top-testimonial-${index}`}
@@ -409,10 +416,10 @@ export default function Home() {
         </div>
       </section>
 
-      <section className='space-y-[60px] py-[160px] max-w-[1140px] mx-auto'>
+      <section className='space-y-[60px] px-5 py-[80px] md:py-[160px] max-w-[1140px] mx-auto'>
         <div className='space-y-[60px]'>
           <div className='space-y-3'>
-            <h2 className='font-qilka font-bold text-[#221D1D] text-[60px] leading-[103.333%] text-center'>
+            <h2 className='font-qilka font-bold text-[#221D1D] md:text-[60px] text-[44px] md:leading-[68px] leading-[50px] text-center'>
               Common questions
             </h2>
             <p className='font-abeezee text-xl text-[#4A413F] text-center'>

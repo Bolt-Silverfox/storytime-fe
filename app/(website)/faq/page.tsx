@@ -4,6 +4,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import { Card, CardContent } from '@/components/ui/card';
 import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern';
 import { faqPageItems } from '@/lib/data';
 
@@ -113,6 +114,25 @@ const faq = () => {
             </AccordionItem>
           ))}
         </Accordion>
+      </section>{' '}
+      <section className='pb-[160px]'>
+        <Card className='w-full max-w-[1140px] mx-auto bg-[#EC4007] rounded-[51px] border-[0.5px] border-solid border-[#f84020] p-[62px]'>
+          <CardContent className='p-0 space-y-3'>
+            <h2 className='font-qilka text-[60px] text-center font-bold text-white leading-[103.333%]'>
+              Need more help?
+            </h2>
+
+            <p className='text-[#FEEAE6] text-center font-abeezee text-xl '>
+              Email us anytime{' '}
+              <a
+                href='mailto:support@storytimeapp.me'
+                className=' hover:underline'
+              >
+                support@storytimeapp.me
+              </a>
+            </p>
+          </CardContent>
+        </Card>
       </section>
     </main>
   );

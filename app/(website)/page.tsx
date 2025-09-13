@@ -57,6 +57,7 @@ export default function Home() {
             <Button
               variant='primary'
               className='md:w-[237px] w-full text-white rounded-[50px] px-[50px] py-2.5 gap-2.5'
+              href='/register'
             >
               <Volume2Icon className='w-6 h-6' />
               <span className='font-regular-body'>Start listening</span>
@@ -265,6 +266,7 @@ export default function Home() {
                 variant='secondary'
                 type='submit'
                 className='px-[50px] h-auto py-4 rounded-full md:w-max w-full '
+                href='/login'
               >
                 Get started
               </Button>
@@ -338,6 +340,7 @@ export default function Home() {
               variant='primary'
               type='submit'
               className='px-[100px] h-auto py-2.5'
+              href='/register'
             >
               Start listening
             </Button>
@@ -446,7 +449,8 @@ export default function Home() {
         </div>
         <Button
           variant='outline'
-          className='rounded-full bg-transparent mx-auto block border-[#EC4007] text-[#EC4007] px-[54px] border h-auto py-2.5'
+          className='rounded-full bg-transparent mx-auto block border-[#EC4007] text-[#EC4007] px-[54px] border h-auto py-2.5 w-fit'
+          href='/faq'
         >
           See all
         </Button>

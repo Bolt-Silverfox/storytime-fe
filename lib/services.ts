@@ -16,7 +16,8 @@ interface LoginPayload {
 interface KidsPayload {
   name: string;
   ageRange: string;
-  avatar: string;
+  avatar?: string;
+  avatarUrl?: string;
 }
 
 interface UserProfile {

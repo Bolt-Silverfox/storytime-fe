@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Slot } from '@radix-ui/react-slot';
 import { cva, type VariantProps } from 'class-variance-authority';
+import Link from 'next/link'; // Add this import
 
 import { cn } from '@/lib/utils';
 
@@ -37,24 +38,54 @@ const buttonVariants = cva(
   }
 );
 
-export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> &
+export type ButtonProps = (
+  | (React.ButtonHTMLAttributes<HTMLButtonElement> & { href?: undefined })
+  | (React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string })
+) &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean;
   };
 
-const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
-    const Comp = asChild ? Slot : 'button';
-
+const Button = React.forwardRef<
+  HTMLButtonElement | HTMLAnchorElement,
+  ButtonProps
+>(({ className, variant, size, asChild = false, href, ...props }, ref) => {
+  if (href) {
     return (
-      <Comp
-        data-slot='button'
+      <Link
+        href={href}
         className={cn(buttonVariants({ variant, size, className }))}
-        ref={ref}
-        {...props}
+        {...(props as React.AnchorHTMLAttributes<HTMLAnchorElement>)}
+        ref={ref as React.Ref<HTMLAnchorElement>}
       />
     );
   }
-);
 
+  const Comp = asChild ? Slot : 'button';
+
+  // If rendering a button, ensure type is correct
+  if (!asChild) {
+    const { type, ...restProps } =
+      props as React.ButtonHTMLAttributes<HTMLButtonElement>;
+    return (
+      <button
+        data-slot='button'
+        className={cn(buttonVariants({ variant, size, className }))}
+        ref={ref as React.Ref<HTMLButtonElement>}
+        type={type === undefined ? 'button' : type}
+        {...restProps}
+      />
+    );
+  }
+
+  return (
+    <Slot
+      data-slot='button'
+      className={cn(buttonVariants({ variant, size, className }))}
+      ref={ref}
+      {...props}
+    />
+  );
+});
+Button.displayName = 'Button';
 export { Button, buttonVariants };

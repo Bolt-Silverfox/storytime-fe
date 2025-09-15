@@ -256,72 +256,87 @@ export const faqItems = [
 export const faqPageItems = [
   {
     question: 'Is StoryTime free to use?',
-    answer: '',
+    answer:
+      'StoryTime offers a free plan with access to a limited selection of stories. For unlimited access and premium features, you can upgrade to a paid subscription.',
   },
   {
     question: 'What devices can I use StoryTime on?',
-    answer: '',
+    answer:
+      'You can use StoryTime on any device with a modern web browser, including smartphones, tablets, and computers. Dedicated mobile apps may also be available.',
   },
   {
     question: 'Is there a version for schools and libraries?',
-    answer: '',
+    answer:
+      'Yes, StoryTime offers special plans and features for schools and libraries. Please contact us for more information about institutional access.',
   },
   {
     question: 'Can I control what stories my child hears?',
-    answer: '',
+    answer:
+      'Absolutely! Parents can filter stories by age, theme, and category, and block specific stories or types to ensure a safe and personalized experience.',
   },
   {
     question: 'Are the stories safe and age-appropriate?',
-    answer: '',
+    answer:
+      'All stories are reviewed by educators and child development experts to ensure they are safe, age-appropriate, and suitable for children.',
   },
   {
     question: 'Can I block fantasy or sad stories?',
-    answer: '',
+    answer:
+      'Yes, you can block specific themes or types of stories, including fantasy or sad stories, using the parental controls in your dashboard.',
   },
   {
     question: 'What’s the difference between Plain Mode and Interactive Mode?',
-    answer: '',
+    answer:
+      'Plain Mode lets kids listen to stories passively, while Interactive Mode allows them to make choices and influence the story’s direction for a more engaging experience.',
   },
   {
     question: "Can I choose the narrator's voice?",
-    answer: '',
+    answer:
+      'Yes! You can select from a variety of narrator voices, including different accents and languages, to personalize your child’s listening experience.',
   },
   {
     question: 'Is there background music in stories?',
-    answer: '',
+    answer:
+      'Many stories include gentle background music and sound effects to enhance the storytelling experience. You can adjust or mute these in the settings.',
   },
   {
     question: 'How do I upgrade to premium?',
-    answer: '',
+    answer:
+      'You can upgrade to premium from your account dashboard. Simply follow the prompts to choose a plan and complete your payment securely.',
   },
   {
     question: 'Can I share my account with more than one child?',
-    answer: '',
+    answer:
+      'Yes, you can create multiple child profiles under one parent account, allowing each child to have a personalized experience.',
   },
   {
     question: 'What happens if I cancel my premium plan?',
-    answer: '',
+    answer:
+      'If you cancel your premium plan, you’ll retain access to premium features until the end of your billing cycle. After that, your account will revert to the free plan.',
   },
   {
     question: 'Which languages does Storytime support?',
-    answer: '',
+    answer:
+      'Currently, StoryTime supports English, with more local and global languages coming soon.',
   },
   {
     question: 'Do the stories include read-along text?',
-    answer: '',
+    answer:
+      'Many stories include read-along text so children can follow along as they listen. Look for the read-along icon or enable it in your settings.',
   },
   {
     question: 'Is Storytime accessible for kids with visual impairments?',
-    answer: '',
+    answer:
+      'Yes, StoryTime is designed to be accessible, with audio-first experiences and compatibility with screen readers and other assistive technologies.',
   },
 ];
 
 export const footerLinks = [
-  { title: 'About', url: '#' },
-  { title: 'Contact', url: '#' },
-  { title: 'FAQ', url: '#' },
-  { title: 'Terms & conditions', url: '#' },
-  { title: 'Privacy policy', url: '#' },
+  { title: 'About', url: '/about' },
+  { title: 'Contact', url: '/contact' },
+  { title: 'FAQ', url: '/faq' },
+  { title: 'Terms & conditions', url: '/terms-and-conditions' },
+  { title: 'Privacy policy', url: '/privacy-policy' },
 ];
 
 export const termsSections = [

@@ -1,6 +1,5 @@
 'use client';
 
-import { Logo } from './logo';
 import heart from '@/public/heart.svg';
 import avatar from '@/public/avatar.svg';
 import arrow_down from '@/public/arrow-down.svg';
@@ -16,7 +15,14 @@ const Header = ({ white = false }: { white?: boolean }) => {
   return (
     <header>
       <div className='flex items-center justify-between relative'>
-        <Logo />
+        <Image
+          src='/logo-light.svg'
+          alt='Logo'
+          width={140}
+          height={24}
+          priority
+          draggable={false}
+        />
         <h1
           className={cn(
             ' text-center text-xl not-italic font-bold leading-6 font-qilka',
@@ -50,7 +56,13 @@ const Header = ({ white = false }: { white?: boolean }) => {
                   {user?.name}
                 </h3>
               </div>
-              <Image src={arrow_down} alt='arrow-down' />
+              <Image
+                src={arrow_down}
+                alt='arrow-down'
+                className={`${
+                  dropdownOpen ? 'rotate-180' : ''
+                } transition-all duration-300`}
+              />
             </div>
             <ProfileDropdown
               open={dropdownOpen}

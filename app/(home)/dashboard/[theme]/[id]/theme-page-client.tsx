@@ -167,7 +167,9 @@ const ThemePageClient = ({ theme }: ThemePageClientProps) => {
     <div>
       <div
         style={{
-          backgroundImage: `linear-gradient(to bottom, #00000040, #00000040), url(${themeImageMap[theme]})`,
+          backgroundImage: `linear-gradient(to bottom, #00000040, #00000040), url(${
+            themeImageMap[theme]?.src || themeImageMap[theme] || ''
+          })`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',

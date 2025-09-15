@@ -71,9 +71,9 @@ const StoryCard = ({
         <p className='text-[#4A413F] text-base not-italic font-normal leading-5 mt-1.5 font-abeezee'>
           {desc}
         </p>
-        <p className='text-[#4A413F] text-xs not-italic font-normal leading-4 mt-6 font-abeezee'>
+        {/* <p className='text-[#4A413F] text-xs not-italic font-normal leading-4 mt-6 font-abeezee'>
           Written by: {author}
-        </p>
+        </p> */}
       </div>
     </div>
   );

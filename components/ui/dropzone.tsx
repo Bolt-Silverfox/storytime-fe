@@ -132,21 +132,24 @@ const getRootError = (
 ) => {
   const errors = errorCodes.map((error) => {
     switch (error) {
-      case 'file-invalid-type':
+      case 'file-invalid-type': {
         const acceptedTypes = Object.values(limits.accept ?? {})
           .flat()
           .join(', ');
         return `only ${acceptedTypes} are allowed`;
-      case 'file-too-large':
+      }
+      case 'file-too-large': {
         const maxMb = limits.maxSize
           ? (limits.maxSize / (1024 * 1024)).toFixed(2)
           : 'infinite?';
         return `max size is ${maxMb}MB`;
-      case 'file-too-small':
+      }
+      case 'file-too-small': {
         const roundedMinSize = limits.minSize
           ? (limits.minSize / (1024 * 1024)).toFixed(2)
           : 'negative?';
         return `min size is ${roundedMinSize}MB`;
+      }
       case 'too-many-files':
         return `max ${limits.maxFiles} files`;
     }
@@ -177,10 +180,10 @@ type UseDropzoneProps<TUploadRes, TUploadError> = {
   shiftOnMaxFiles?: boolean;
 } & (TUploadError extends string
   ? {
-      shapeUploadError?: (error: TUploadError) => string | void;
+      shapeUploadError?: (error: TUploadError) => string | undefined;
     }
   : {
-      shapeUploadError: (error: TUploadError) => string | void;
+      shapeUploadError: (error: TUploadError) => string | undefined;
     });
 
 interface UseDropzoneReturn<TUploadRes, TUploadError> {
@@ -228,7 +231,7 @@ const useDropzone = <TUploadRes, TUploadError = string>(
         pOnRootError(error);
       }
     },
-    [pOnRootError, _setRootError]
+    [pOnRootError]
   );
 
   const [fileStatuses, dispatch] = useReducer(fileStatusReducer, []);
@@ -245,7 +248,7 @@ const useDropzone = <TUploadRes, TUploadError = string>(
       const result = await pOnDropFile(file);
 
       if (result.status === 'error') {
-        if (autoRetry === true && tries < (maxRetryCount ?? Infinity)) {
+        if (autoRetry === true && tries < (maxRetryCount ?? Number.POSITIVE_INFINITY)) {
           dispatch({ type: 'update-status', id, status: 'pending' });
           return _uploadFile(file, id, tries + 1);
         }
@@ -296,7 +299,7 @@ const useDropzone = <TUploadRes, TUploadError = string>(
       const fileStatus = fileStatuses.find((file) => file.id === id);
       return (
         fileStatus?.status === 'error' &&
-        fileStatus.tries < (maxRetryCount ?? Infinity)
+        fileStatus.tries < (maxRetryCount ?? Number.POSITIVE_INFINITY)
       );
     },
     [fileStatuses, maxRetryCount]
@@ -330,7 +333,7 @@ const useDropzone = <TUploadRes, TUploadError = string>(
       const fileCount = fileStatuses.length;
       const maxNewFiles =
         validation?.maxFiles === undefined
-          ? Infinity
+          ? Number.POSITIVE_INFINITY
           : validation?.maxFiles - fileCount;
 
       if (maxNewFiles < newFiles.length) {
@@ -385,7 +388,7 @@ const useDropzone = <TUploadRes, TUploadError = string>(
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const DropZoneContext = createContext<UseDropzoneReturn<any, any>>({
+const DropZoneContext = createContext<UseDropzoneReturn<unknown, unknown>>({
   getRootProps: () => ({}) as never,
   getInputProps: () => ({}) as never,
   onRemoveFile: async () => {},
@@ -655,10 +658,10 @@ const DropzoneMessage = forwardRef<HTMLParagraphElement, DropzoneMessageProps>(
 );
 DropzoneMessage.displayName = 'DropzoneMessage';
 
-interface DropzoneRemoveFileProps extends ButtonProps {
+type DropzoneRemoveFileProps = ButtonProps & {
   className?: string;
   children?: React.ReactNode;
-}
+};
 
 const DropzoneRemoveFile = forwardRef<
   HTMLButtonElement,
@@ -690,7 +693,7 @@ const DropzoneRemoveFile = forwardRef<
 });
 DropzoneRemoveFile.displayName = 'DropzoneRemoveFile';
 
-interface DropzoneRetryFileProps extends ButtonProps {}
+type DropzoneRetryFileProps = ButtonProps;
 
 const DropzoneRetryFile = forwardRef<HTMLButtonElement, DropzoneRetryFileProps>(
   ({ className, ...props }, ref) => {
@@ -795,8 +798,18 @@ const InfiniteProgress = forwardRef<HTMLDivElement, InfiniteProgressProps>(
       <div
         ref={ref}
         role='progressbar'
+        tabIndex={0}
         aria-valuemin={0}
         aria-valuemax={100}
+        aria-valuenow={
+          props.status === 'pending'
+            ? undefined
+            : props.status === 'success'
+            ? 100
+            : props.status === 'error'
+            ? 0
+            : undefined
+        }
         aria-valuetext={valueTextMap[props.status]}
         {...props}
         className={cn(

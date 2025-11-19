@@ -1,1 +1,62 @@
+name: Deploy Frontend (Staging)
 
+on:
+  push:
+    branches:
+      - develop-v0.0.1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Set up SSH key
+        run: |
+          echo "${{ secrets.SERVER_SSH_KEY }}" > id_ed25519
+          chmod 600 id_ed25519
+
+      - name: Build Frontend
+        run: |
+          npm install
+          npm run build
+
+      - name: Deploy to Server
+        run: |
+          ssh -i id_ed25519 -o StrictHostKeyChecking=no jerriemiah@3.136.23.56 "
+            set -e
+
+            echo '👉 Pulling latest code'
+            sudo mkdir -p /var/www/storytime/staging/frontend
+            cd /var/www/storytime/staging/frontend
+
+            # Clone once; pull on subsequent deploys
+            if [ ! -d .git ]; then
+              sudo git clone https://github.com/Bolt-Silverfox/storytime-fe .
+            else
+              sudo git fetch --all
+              sudo git reset --hard origin/develop-v0.0.1
+            fi
+
+            echo '👉 Installing dependencies'
+            sudo npm install --legacy-peer-deps
+
+            echo '👉 Building project'
+            sudo npm run build
+
+            echo '👉 Restarting PM2'
+            sudo pm2 restart storytime-frontend-staging || sudo pm2 start 'npm -- start' --name storytime-frontend-staging
+
+            echo '👉 Saving PM2 boot'
+            sudo pm2 save
+
+            echo '👉 Reloading nginx'
+            sudo systemctl reload nginx
+          "

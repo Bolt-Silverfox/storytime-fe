@@ -267,7 +267,8 @@ function SidebarTrigger({
       variant="ghost"
       size="icon"
       className={cn("size-7", className)}
-      onClick={(event) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      onClick={(event: any) => {
         onClick?.(event)
         toggleSidebar()
       }}

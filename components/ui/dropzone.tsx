@@ -655,10 +655,10 @@ const DropzoneMessage = forwardRef<HTMLParagraphElement, DropzoneMessageProps>(
 );
 DropzoneMessage.displayName = 'DropzoneMessage';
 
-interface DropzoneRemoveFileProps extends ButtonProps {
+type DropzoneRemoveFileProps = ButtonProps & {
   className?: string;
   children?: React.ReactNode;
-}
+};
 
 const DropzoneRemoveFile = forwardRef<
   HTMLButtonElement,
@@ -690,7 +690,7 @@ const DropzoneRemoveFile = forwardRef<
 });
 DropzoneRemoveFile.displayName = 'DropzoneRemoveFile';
 
-interface DropzoneRetryFileProps extends ButtonProps {}
+type DropzoneRetryFileProps = ButtonProps;
 
 const DropzoneRetryFile = forwardRef<HTMLButtonElement, DropzoneRetryFileProps>(
   ({ className, ...props }, ref) => {

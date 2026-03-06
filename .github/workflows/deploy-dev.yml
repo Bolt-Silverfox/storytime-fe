@@ -119,7 +119,8 @@ jobs:
         run: |
           ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
             cd ${{ secrets.DEPLOY_PATH }}
-            pm2 restart ecosystem.config.js --env production || pm2 start ecosystem.config.js --env production
+            source ~/.nvm/nvm.sh
+            pm2 restart ecosystem.config.js --env development --update-env || pm2 start ecosystem.config.js --env development
           EOF
 
       - name: Cleanup SSH key

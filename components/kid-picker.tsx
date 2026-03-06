@@ -1,12 +1,12 @@
-import { getKidsService, addKidsService } from '@/lib/services';
-import { useState, useEffect } from 'react';
+import { addKidsService, getKidsService } from '@/lib/services';
 import kid1 from '@/public/kid-3.svg';
-import kid2 from '@/public/kid-4.svg';
 import kid3 from '@/public/kid-3.svg';
+import kid2 from '@/public/kid-4.svg';
 import kid4 from '@/public/kid-4.svg';
 import Image from 'next/image';
-import Modal from './ui/modal'; // Import Modal
+import { useEffect, useState } from 'react';
 import { Input } from './ui/input';
+import Modal from './ui/modal'; // Import Modal
 import {
   Select,
   SelectContent,
@@ -20,8 +20,10 @@ const KidPicker = ({
 }: {
   onKidSelect: (kidId: string) => void;
 }) => {
-  const [kids, setKids] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [kids, setKids] = useState<
+    { id: string; name: string; age: string; cstories: string; img: string }[]
+  >([]);
+  const [_loading, setLoading] = useState(true);
   const defaultAvatars = [kid1, kid2, kid3, kid4];
   const [selectedKidId, setSelectedKidId] = useState<string | null>(null);
 
@@ -33,7 +35,7 @@ const KidPicker = ({
     ageRange: '',
   });
   const [formLoading, setFormLoading] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+  const [_formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchKids();
@@ -60,7 +62,13 @@ const KidPicker = ({
     }
   };
 
-  const handleKidSelect = (kid: Kid) => {
+  const handleKidSelect = (kid: {
+    id: string;
+    name: string;
+    age: string;
+    cstories: string;
+    img: string;
+  }) => {
     setSelectedKidId(kid.id);
     localStorage.setItem('selectedKid', JSON.stringify(kid));
     onKidSelect(kid.id);
@@ -81,8 +89,8 @@ const KidPicker = ({
       setModalOpen(false);
       setForm({ name: '', avatarUrl: '', ageRange: '' });
       fetchKids();
-    } catch (err: any) {
-      setFormError(err?.message || 'Failed to add child');
+    } catch (err: unknown) {
+      setFormError(err instanceof Error ? err.message : 'Failed to add child');
     } finally {
       setFormLoading(false);
     }
@@ -112,6 +120,7 @@ const KidPicker = ({
           </p>
         </div>
         <button
+          type='button'
           className='bg-[#EC4007] text-white rounded-[3.12rem] py-3 px-6 font-abeezee text-base'
           onClick={() => setModalOpen(true)}
         >
@@ -130,6 +139,12 @@ const KidPicker = ({
         }
       `}
             onClick={() => handleKidSelect(kid)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleKidSelect(kid);
+              }
+            }}
           >
             <div className='w-full h-48 bg-gray-100 flex items-center justify-center'>
               <Image
@@ -171,6 +186,7 @@ const KidPicker = ({
                   />
                 ) : (
                   <svg width='68' height='68' viewBox='0 0 48 48' fill='none'>
+                    <title>Default avatar</title>
                     <circle
                       cx='24'
                       cy='24'
@@ -198,10 +214,14 @@ const KidPicker = ({
               </div>
             </div>
 
-            <label className='block mb-1 text-[#4A413F] text-sm font-abeezee'>
+            <label
+              htmlFor='kid-name'
+              className='block mb-1 text-[#4A413F] text-sm font-abeezee'
+            >
               Name
             </label>
             <Input
+              id='kid-name'
               className='border rounded px-3 py-2 w-full'
               type='text'
               value={form.name}
@@ -210,7 +230,10 @@ const KidPicker = ({
               required
             />
             <div className='mt-6'>
-              <label className='block mb-1 text-[#4A413F] text-sm font-abeezee'>
+              <label
+                htmlFor='kid-age'
+                className='block mb-1 text-[#4A413F] text-sm font-abeezee'
+              >
                 Age
               </label>
               <Select

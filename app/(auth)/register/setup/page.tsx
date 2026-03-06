@@ -1,14 +1,14 @@
 'use client';
 
-import { useAuth } from '@/context/auth-context';
+import { PageLoader } from '@/components/page-loader';
+import { Button, buttonVariants } from '@/components/ui/button';
 import {
-  cn,
-  countryOptions,
-  getFirstName,
-  kidsOptions,
-  languageOptions,
-} from '@/lib/utils';
-import { StepProgress } from '../components/step-progress';
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormMessage,
+} from '@/components/ui/form';
 import {
   Select,
   SelectContent,
@@ -17,25 +17,25 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { useAuth } from '@/context/auth-context';
+import { addKidsService } from '@/lib/services';
 import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormMessage,
-} from '@/components/ui/form';
+  cn,
+  countryOptions,
+  getFirstName,
+  kidsOptions,
+  languageOptions,
+} from '@/lib/utils';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
-import { Button, buttonVariants } from '@/components/ui/button';
-import Link from 'next/link';
-import { KidsInformationLoader } from './components/kids-information-loader';
+import { z } from 'zod';
+import { StepProgress } from '../components/step-progress';
 import { KidsInformationContent } from './components/kids-information-content';
-import { addKidsService } from '@/lib/services';
-import { PageLoader } from '@/components/page-loader';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { KidsInformationLoader } from './components/kids-information-loader';
 
 const KidsFormSchema = z.object({
   name: z

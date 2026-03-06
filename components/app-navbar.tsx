@@ -1,21 +1,19 @@
 'use client';
 import {
-  Navbar,
+  MobileNav,
+  MobileNavHeader,
+  MobileNavMenu,
+  MobileNavToggle,
   NavBody,
   NavItems,
-  MobileNav,
-  NavbarLogo,
-  NavbarButton,
-  MobileNavHeader,
-  MobileNavToggle,
-  MobileNavMenu,
+  Navbar,
 } from '@/components/ui/resizable-navbar';
-import { useState } from 'react';
-import { ScrollProgress } from './ui/scroll-progress';
-import { Logo } from './logo';
-import { Button, buttonVariants } from './ui/button';
-import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
+import { useState } from 'react';
+import { Logo } from './logo';
+import { buttonVariants } from './ui/button';
+import { ScrollProgress } from './ui/scroll-progress';
 
 export function AppNavbar() {
   const navItems = [
@@ -81,9 +79,9 @@ export function AppNavbar() {
             isOpen={isMobileMenuOpen}
             onClose={() => setIsMobileMenuOpen(false)}
           >
-            {navItems.map((item, idx) => (
+            {navItems.map((item) => (
               <a
-                key={`mobile-link-${idx}`}
+                key={`mobile-link-${item.name}`}
                 href={item.link}
                 onClick={() => setIsMobileMenuOpen(false)}
                 className='relative text-neutral-600 dark:text-neutral-300'

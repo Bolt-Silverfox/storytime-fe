@@ -1,18 +1,18 @@
 'use client';
 
-import React from 'react';
+import { EmptyStates } from '@/components/ui/empty-states';
 import { useAuth } from '@/context/auth-context';
-import { DetailsStep } from './components/registration-steps/details-step';
-import { CredentialsStep } from './components/registration-steps/credentials-step';
-import { VerifyStep } from './components/registration-steps/verify-step';
+import { getFirstName } from '@/lib/utils';
 import { IconMoodSad } from '@tabler/icons-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { EmptyStates } from '@/components/ui/empty-states';
 import { StepBack } from 'lucide-react';
-import { StepProgress } from './components/step-progress';
-import { StepBackButton } from './components/step-back';
+import React from 'react';
 import { AuthFooter } from './components/auth-footer';
-import { getFirstName } from '@/lib/utils';
+import { CredentialsStep } from './components/registration-steps/credentials-step';
+import { DetailsStep } from './components/registration-steps/details-step';
+import { VerifyStep } from './components/registration-steps/verify-step';
+import { StepBackButton } from './components/step-back';
+import { StepProgress } from './components/step-progress';
 
 const stepComponents = {
   details: DetailsStep,

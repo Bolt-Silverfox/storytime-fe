@@ -1,7 +1,7 @@
 'use client';
 
+import { PageLoader } from '@/components/page-loader';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   Form,
   FormControl,
@@ -9,16 +9,16 @@ import {
   FormItem,
   FormMessage,
 } from '@/components/ui/form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { EyeIcon, EyeOff } from 'lucide-react';
-import { toast } from 'sonner';
-import { z } from 'zod';
-import { useForm } from 'react-hook-form';
-import { cn } from '@/lib/utils';
-import { useState } from 'react';
+import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/auth-context';
 import { registerService } from '@/lib/services';
-import { PageLoader } from '@/components/page-loader';
+import { cn } from '@/lib/utils';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { EyeIcon, EyeOff } from 'lucide-react';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
+import { z } from 'zod';
 
 const FormSchema = z
   .object({
@@ -87,7 +87,7 @@ export const CredentialsStep = () => {
     setIsLoading(true);
     try {
       // todo: set user to global context
-      const response = await registerService({
+      const _response = await registerService({
         email: data.email,
         password: data.password,
         fullName: registrationData?.name ?? '',

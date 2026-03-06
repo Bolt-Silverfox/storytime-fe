@@ -1,7 +1,8 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import React, { useState } from 'react';
+import type React from 'react';
+import { useState } from 'react';
 
 /**
  * InteractiveGridPattern is a component that renders a grid pattern with interactive squares.
@@ -47,12 +48,13 @@ export function InteractiveGridPattern({
       )}
       {...props}
     >
+      <title>Interactive grid pattern</title>
       {Array.from({ length: horizontal * vertical }).map((_, index) => {
         const x = (index % horizontal) * width;
         const y = Math.floor(index / horizontal) * height;
         return (
           <rect
-            key={index}
+            key={`grid-${x}-${y}`}
             x={x}
             y={y}
             width={width}

@@ -116,9 +116,9 @@ export default function Home() {
         </div>
 
         <div className='grid md:grid-cols-2 gap-6 w-full'>
-          {featureCards.map((card, index) => (
+          {featureCards.map((card) => (
             <Card
-              key={`feature-card-top-${index}`}
+              key={`feature-card-${card.title}`}
               className='border-[0.5px] border-solid shadow-none border-stone-100 rounded-[21px] bg-white'
             >
               <CardContent className='flex flex-col items-start gap-2.5 p-8'>
@@ -156,9 +156,9 @@ export default function Home() {
           </div>
 
           <div className='grid md:grid-cols-3'>
-            {storyCategories.map((category, index) => (
+            {storyCategories.map((category) => (
               <Card
-                key={`category-${index}`}
+                key={`category-${category.title}`}
                 className='md:[&:nth-child(1)]:border-t-0 md:[&:nth-child(1)]:border-l-0 md:[&:nth-child(2)]:border-t-0 md:[&:nth-child(3)]:border-t-0 md:[&:nth-child(3)]:border-r-0 !border-b-0 md:[&:nth-child(4)]:border-l-0 md:last:border-r-0 md:border-4 border-l-0 p-8 border-[#F8EEEB] rounded-none shadow-none bg-transparent'
               >
                 <CardContent className='flex flex-col items-start gap-6 p-0'>
@@ -245,9 +245,9 @@ export default function Home() {
           <div className='md:col-span-3 flex md:items-end items-center flex-col md:py-[112px] py-[32px]'>
             <div className='space-y-[50px] px-5'>
               <div className='grid md:grid-cols-2 md:gap-x-[52px] gap-y-[62px] max-w-[706px] justify-between'>
-                {purpleFeatures.map((feature, index) => (
+                {purpleFeatures.map((feature) => (
                   <Card
-                    key={index}
+                    key={`purple-${feature.title}`}
                     className=' md:max-w-[301px] space-y-3 md:col-span-1 bg-transparent border-none shadow-none'
                   >
                     <CardContent className='flex  flex-col items-start gap-3 relative self-stretch w-full p-0'>
@@ -274,9 +274,9 @@ export default function Home() {
           </div>
 
           <div className='space-y-[62px] bg-[#ECC607] md:py-[112px] py-8 md:col-span-2 w-full md:px-[80px]'>
-            {yellowFeatures.map((feature, index) => (
+            {yellowFeatures.map((feature) => (
               <Card
-                key={index}
+                key={`yellow-${feature.title}`}
                 className='md:max-w-[301px] px-5 space-y-3 bg-transparent border-none shadow-none'
               >
                 <CardContent className='flex  flex-col items-start gap-3 relative self-stretch w-full p-0'>
@@ -322,9 +322,9 @@ export default function Home() {
               </div>
 
               <div className='flex flex-col items-start gap-8 w-full'>
-                {parentalFeatures.map((feature, index) => (
+                {parentalFeatures.map((feature) => (
                   <div
-                    key={`feature-${index}`}
+                    key={`parental-${feature}`}
                     className='flex items-center gap-3 w-full'
                   >
                     <Icons.check />
@@ -359,9 +359,9 @@ export default function Home() {
             </p>
           </div>
           <div className='grid md:grid-cols-2 gap-[25px] w-full'>
-            {testimonials.slice(0, 2).map((testimonial, index) => (
+            {testimonials.slice(0, 2).map((testimonial) => (
               <Card
-                key={`top-testimonial-${index}`}
+                key={`top-testimonial-${testimonial.name}-${testimonial.location}`}
                 className='w-full col-span-1 bg-white shadow-none rounded-[21px] border-[0.5px] border-solid border-stone-100'
               >
                 <CardContent className='flex flex-col items-start gap-6 p-8'>
@@ -391,7 +391,7 @@ export default function Home() {
         <div className='grid md:grid-cols-3 gap-x-[25px] gap-y-10 w-full'>
           {testimonials.slice(2).map((testimonial, index) => (
             <Card
-              key={`top-testimonial-${index}`}
+              key={`bottom-testimonial-${testimonial.name}-${index}`}
               className='w-full col-span-1 bg-white shadow-none rounded-[21px] border-[0.5px] border-solid border-stone-100'
             >
               <CardContent className='flex flex-col items-start gap-6 p-8'>
@@ -431,10 +431,10 @@ export default function Home() {
           </div>
 
           <Accordion type='single' collapsible className='w-full'>
-            {faqItems.map((item, index) => (
+            {faqItems.map((item) => (
               <AccordionItem
-                key={`faq-${index}`}
-                value={`item-${index}`}
+                key={`faq-${item.question}`}
+                value={`item-${item.question}`}
                 className='mb-4 bg-white rounded-[27px] border-[0.5px] border-solid border-stone-100'
               >
                 <AccordionTrigger className='px-8 py-6 text-xl hover:no-underline'>

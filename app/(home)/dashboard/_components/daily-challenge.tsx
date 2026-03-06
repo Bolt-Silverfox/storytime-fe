@@ -1,14 +1,14 @@
 'use client';
 
-import Image from 'next/image';
+import { getDailyChallengesService } from '@/lib/services';
+import arrowRight from '@/public/arrow-right.svg';
 import slice1 from '@/public/slice-1.svg';
 import slice2 from '@/public/slice-2.svg';
 import slice3 from '@/public/slice-3.svg';
 import slice4 from '@/public/slice-4.svg';
 import timer from '@/public/timer.svg';
-import arrowRight from '@/public/arrow-right.svg';
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
-import { getDailyChallengesService } from '@/lib/services';
 
 const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -54,8 +54,10 @@ const DailyChallenge = () => {
   };
 
   const getDayStatus = (dayIndex: number) => {
-    if (dayIndex >= challenges.length) return false;
-    return challenges[dayIndex]?.completed || false;
+    if (dayIndex >= challenges.length) {
+      return false;
+    }
+    return challenges[dayIndex]?.completed;
   };
 
   if (loading) {
@@ -115,6 +117,7 @@ const DailyChallenge = () => {
                         viewBox='0 0 16 11'
                         fill='none'
                       >
+                        <title>Completed</title>
                         <path
                           d='M14.6667 0.833984L10.1744 6.22466C8.39434 8.36079 7.50428 9.42886 6.33334 9.42886C5.16241 9.42886 4.27235 8.36079 2.49224 6.22466L1.33334 4.83398'
                           stroke='#221D1D'
@@ -130,6 +133,7 @@ const DailyChallenge = () => {
                         viewBox='0 0 14 14'
                         fill='none'
                       >
+                        <title>Not completed</title>
                         <path
                           d='M1.16666 1.16602L12.8333 12.8327M1.16668 12.8327L7.00001 6.99935L12.8333 1.16602'
                           stroke='#EDE6FE'

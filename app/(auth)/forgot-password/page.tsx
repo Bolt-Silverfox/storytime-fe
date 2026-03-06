@@ -1,5 +1,6 @@
 'use client';
 
+import { PageLoader } from '@/components/page-loader';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -8,18 +9,17 @@ import {
   FormItem,
   FormMessage,
 } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { useAuth } from '@/context/auth-context';
+import { requestPasswordResetService } from '@/lib/services';
 import { zodResolver } from '@hookform/resolvers/zod';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { useForm } from 'react-hook-form';
-import { useAuth } from '@/context/auth-context';
 import { StepBackButton } from '../register/components/step-back';
-import Link from 'next/link';
-import { Input } from '@/components/ui/input';
-import { useRouter } from 'next/navigation';
-import { requestPasswordResetService } from '@/lib/services';
-import { useState } from 'react';
-import { PageLoader } from '@/components/page-loader';
 
 const FormSchema = z.object({
   email: z

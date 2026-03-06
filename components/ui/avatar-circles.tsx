@@ -19,27 +19,26 @@ export const AvatarCircles = ({
 }: AvatarCirclesProps) => {
   return (
     <div className={cn('z-10 flex -space-x-4 rtl:space-x-reverse', className)}>
-      {avatarUrls.map((url, index) => (
+      {avatarUrls.map((url) => (
         <a
-          key={index}
+          key={url.profileUrl}
           href={url.profileUrl}
           target='_blank'
           rel='noopener noreferrer'
         >
           <img
-            key={index}
             className='md:size-[64px] size-[62px] rounded-full border-2 border-white dark:border-gray-800'
             src={url.imageUrl}
             width={40}
             height={40}
-            alt={`Avatar ${index + 1}`}
+            alt='Avatar'
           />
         </a>
       ))}
       {(numPeople ?? 0) > 0 && (
         <a
           className='flex md:size-[64px] size-[62px] items-center justify-center rounded-full border-2 border-white bg-black text-center text-xs font-medium text-white hover:bg-gray-600 dark:border-gray-800 dark:bg-white dark:text-black'
-          href=''
+          href='#more-people'
         >
           +{numPeople}
         </a>

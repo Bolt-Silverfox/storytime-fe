@@ -4,8 +4,8 @@ import {
   getAvailableVoicesService,
   setKidPreferredVoiceService,
 } from '@/lib/services';
+import { useEffect, useState } from 'react';
 import VoiceCard from './voice-card';
-import { useState, useEffect } from 'react';
 
 interface VoiceSelectorProps {
   setStep: (step: number) => void;
@@ -14,7 +14,21 @@ interface VoiceSelectorProps {
 
 const VoiceSelector = ({ setStep, expand }: VoiceSelectorProps) => {
   const [selectedVoice, setSelectedVoice] = useState<string | null>(null);
-  const [voices, setVoices] = useState<any[]>([]);
+  const [voices, setVoices] = useState<
+    {
+      name: string;
+      description: string;
+      voice_id: string;
+      preview_url: string;
+      labels: {
+        accent: string;
+        description: string;
+        age: string;
+        gender: string;
+        use_case: string;
+      };
+    }[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [settingVoice, setSettingVoice] = useState(false);
 
@@ -43,7 +57,10 @@ const VoiceSelector = ({ setStep, expand }: VoiceSelectorProps) => {
     fetchVoices();
   }, []);
 
-  const handleListen = (voice: any, e?: React.MouseEvent) => {
+  const handleListen = (
+    voice: { name: string; preview_url: string },
+    e?: React.MouseEvent
+  ) => {
     // Stop propagation to prevent card selection when clicking listen
     if (e) {
       e.stopPropagation();
@@ -65,7 +82,9 @@ const VoiceSelector = ({ setStep, expand }: VoiceSelectorProps) => {
   };
 
   const handleSetVoice = async () => {
-    if (!selectedVoice) return;
+    if (!selectedVoice) {
+      return;
+    }
 
     // Get the selected kid from localStorage
     const selectedKidData = localStorage.getItem('selectedKid');
@@ -106,11 +125,12 @@ const VoiceSelector = ({ setStep, expand }: VoiceSelectorProps) => {
         >
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <div key={i} className='animate-pulse'>
-              <div className='border-stone-100 bg-gray-200 px-4 py-3 rounded-3xl border-[0.5px] border-solid h-24'></div>
+              <div className='border-stone-100 bg-gray-200 px-4 py-3 rounded-3xl border-[0.5px] border-solid h-24' />
             </div>
           ))}
         </div>
         <button
+          type='button'
           className='w-full py-4 cursor-not-allowed bg-[#FEEAE6] text-[#FB9583] rounded-[3.125rem] font-semibold'
           disabled
         >
@@ -145,6 +165,7 @@ const VoiceSelector = ({ setStep, expand }: VoiceSelectorProps) => {
         ))}
       </div>
       <button
+        type='button'
         className={`w-full py-4 cursor-pointer hover:scale-105 transition-all duration-300 rounded-[3.125rem] font-semibold ${
           selectedVoice
             ? 'bg-[#EC4007] text-white'

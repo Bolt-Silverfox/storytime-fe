@@ -1,5 +1,6 @@
 'use client';
 
+import { PageLoader } from '@/components/page-loader';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -8,24 +9,23 @@ import {
   FormItem,
   FormMessage,
 } from '@/components/ui/form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { toast } from 'sonner';
-import { z } from 'zod';
-import { useForm } from 'react-hook-form';
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
 } from '@/components/ui/input-otp';
-import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/auth-context';
-import { maskEmail } from '@/lib/utils';
 import {
   sendVerificationEmailService,
   verifyEmailService,
 } from '@/lib/services';
-import { PageLoader } from '@/components/page-loader';
+import { maskEmail } from '@/lib/utils';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
+import { z } from 'zod';
 
 const FormSchema = z.object({
   pin: z.string().min(6, {

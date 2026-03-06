@@ -1,42 +1,51 @@
 'use client';
 
 import Header from '@/components/header';
+import KidsCard from '@/components/kids-card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import Modal from '@/components/ui/modal';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { countries } from '@/data/countries';
 import { getKidsService, getUserFromStorage } from '@/lib/services';
 import { cn } from '@/lib/utils';
 import avatar from '@/public/avatar-big.png';
-import kid1 from '@/public/kid-3.svg';
-import kid2 from '@/public/kid-4.svg';
-import kid3 from '@/public/kid-3.svg';
-import kid4 from '@/public/kid-4.svg';
-import Image from 'next/image';
-import { useEffect, useState, useRef, useCallback } from 'react';
-import KidsCard from '@/components/kids-card';
-import Modal from '@/components/ui/modal';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
-import { countries } from '@/data/countries';
-import stella from '@/public/stella.png';
 import danny from '@/public/danny.png';
-import oliva from '@/public/oliva.png';
-import henry from '@/public/henry.png';
 import ella from '@/public/ella.png';
+import henry from '@/public/henry.png';
+import kidAvatar1 from '@/public/kid-3.svg';
+import kidAvatar2 from '@/public/kid-4.svg';
 import noah from '@/public/noah.png';
+import oliva from '@/public/oliva.png';
+import stella from '@/public/stella.png';
+import Image from 'next/image';
+import { useCallback, useEffect, useState } from 'react';
+
+interface MappedKid {
+  id: string;
+  name: string;
+  age: string;
+  cstories: string;
+  img: string;
+}
+
+// Default avatar images to use when avatarUrl is null
+const defaultAvatars = [kidAvatar1, kidAvatar2, kidAvatar1, kidAvatar2];
 
 const PersonalSettingsPage = () => {
   const user = getUserFromStorage();
-  const [kids, setKids] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [kids, setKids] = useState<MappedKid[]>([]);
+  const [_loading, setLoading] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
-  const [addKidOpen, setAddKidOpen] = useState(false);
+  const [_addKidOpen, setAddKidOpen] = useState(false);
   const [editKidOpen, setEditKidOpen] = useState(false);
-  const [selectedKid, setSelectedKid] = useState<any | null>(null);
+  const [selectedKid, setSelectedKid] = useState<MappedKid | null>(null);
   const [kidForm, setKidForm] = useState({ name: '', age: '', img: '' });
   const [showAvatarSelector, setShowAvatarSelector] = useState(false);
   const [form, setForm] = useState({
@@ -49,15 +58,12 @@ const PersonalSettingsPage = () => {
   const [showRemoveKidModal, setShowRemoveKidModal] = useState(false);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [showDeleteReasonModal, setShowDeleteReasonModal] = useState(false);
-  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [_showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [deleteReason, setDeleteReason] = useState('');
   const [otherReason, setOtherReason] = useState('');
   const [emailInput, setEmailInput] = useState(user?.email || '');
-  const [deleteStep, setDeleteStep] = useState(1);
+  const [_deleteStep, _setDeleteStep] = useState(1);
   const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false);
-
-  // Default avatar images to use when avatarUrl is null
-  const defaultAvatars = [kid1, kid2, kid3, kid4];
 
   const avatarOptions = [
     { name: 'Stella', avatar: stella },
@@ -111,7 +117,7 @@ const PersonalSettingsPage = () => {
     // Save logic here
   };
 
-  const handleEditKid = (kid: any) => {
+  const handleEditKid = (kid: MappedKid) => {
     setSelectedKid(kid);
     setKidForm({ name: kid.name, age: kid.age, img: kid.img });
     setEditKidOpen(true);
@@ -184,6 +190,7 @@ const PersonalSettingsPage = () => {
           </p>
         </div>
         <button
+          type='button'
           className='bg-[#EC4007] text-white px-[3.12rem] font-abeezee py-4 cursor-pointer hover:scale-105 transition-all duration-300 rounded-[3.125rem] font-semibold'
           onClick={() => setEditOpen(true)}
         >
@@ -259,8 +266,9 @@ const PersonalSettingsPage = () => {
           ))}
         </div>
       </div>
-      <div
-        className='mt-16 flex items-center justify-between cursor-pointer bg-[#EC4007] shadow-[0px_0px_0px_4px_rgba(236,64,7,0.15)] rounded-3xl border-[0.5px] border-solid border-[#F84020] hover:scale-105 transition-all duration-300 py-10 px-8'
+      <button
+        type='button'
+        className='mt-16 flex items-center justify-between cursor-pointer bg-[#EC4007] shadow-[0px_0px_0px_4px_rgba(236,64,7,0.15)] rounded-3xl border-[0.5px] border-solid border-[#F84020] hover:scale-105 transition-all duration-300 py-10 px-8 w-full text-left'
         onClick={handleDeleteAccountClick}
       >
         <div className=''>
@@ -278,6 +286,7 @@ const PersonalSettingsPage = () => {
           viewBox='0 0 6 12'
           fill='none'
         >
+          <title>Navigate to delete account</title>
           <path
             d='M1 1L2.76297 2.74731C4.1689 4.14075 4.87187 4.83747 4.98011 5.68667C5.00663 5.89473 5.00663 6.10527 4.98011 6.31333C4.87187 7.16252 4.1689 7.85925 2.76297 9.25269L1 11'
             stroke='white'
@@ -285,7 +294,7 @@ const PersonalSettingsPage = () => {
             strokeLinecap='round'
           />
         </svg>
-      </div>
+      </button>
       <Modal
         open={editOpen}
         onClose={() => setEditOpen(false)}
@@ -293,14 +302,17 @@ const PersonalSettingsPage = () => {
       >
         <form className='flex flex-col gap-6'>
           <div>
-            <label className='block mb-1 text-[#4A413F] text-sm font-abeezee'>
+            <label
+              htmlFor='edit-title'
+              className='block mb-1 text-[#4A413F] text-sm font-abeezee'
+            >
               Title
             </label>
             <Select
               value={form.title}
               onValueChange={(v) => handleFormChange('title', v)}
             >
-              <SelectTrigger className='w-full'>
+              <SelectTrigger id='edit-title' className='w-full'>
                 <SelectValue placeholder='Select title' />
               </SelectTrigger>
               <SelectContent>
@@ -312,24 +324,31 @@ const PersonalSettingsPage = () => {
             </Select>
           </div>
           <div>
-            <label className='block mb-1 text-[#4A413F] text-sm font-abeezee'>
+            <label
+              htmlFor='edit-fullname'
+              className='block mb-1 text-[#4A413F] text-sm font-abeezee'
+            >
               Full name
             </label>
             <Input
+              id='edit-fullname'
               value={form.name}
               onChange={(e) => handleFormChange('name', e.target.value)}
               placeholder='Enter your full name'
             />
           </div>
           <div>
-            <label className='block mb-1 text-[#4A413F] text-sm font-abeezee'>
+            <label
+              htmlFor='edit-language'
+              className='block mb-1 text-[#4A413F] text-sm font-abeezee'
+            >
               Language
             </label>
             <Select
               value={form.language}
               onValueChange={(v) => handleFormChange('language', v)}
             >
-              <SelectTrigger className='w-full'>
+              <SelectTrigger id='edit-language' className='w-full'>
                 <SelectValue placeholder='Select language' />
               </SelectTrigger>
               <SelectContent>
@@ -340,14 +359,17 @@ const PersonalSettingsPage = () => {
             </Select>
           </div>
           <div>
-            <label className='block mb-1 text-[#4A413F] text-sm font-abeezee'>
+            <label
+              htmlFor='edit-country'
+              className='block mb-1 text-[#4A413F] text-sm font-abeezee'
+            >
               Country
             </label>
             <Select
               value={form.country}
               onValueChange={(v) => handleFormChange('country', v)}
             >
-              <SelectTrigger className='w-full'>
+              <SelectTrigger id='edit-country' className='w-full'>
                 <SelectValue placeholder='Select country' />
               </SelectTrigger>
               <SelectContent>
@@ -360,14 +382,17 @@ const PersonalSettingsPage = () => {
             </Select>
           </div>
           <div>
-            <label className='block mb-1 text-[#4A413F] text-sm font-abeezee'>
+            <label
+              htmlFor='edit-kids'
+              className='block mb-1 text-[#4A413F] text-sm font-abeezee'
+            >
               No of Kids
             </label>
             <Select
               value={form.kids}
               onValueChange={(v) => handleFormChange('kids', v)}
             >
-              <SelectTrigger className='w-full'>
+              <SelectTrigger id='edit-kids' className='w-full'>
                 <SelectValue placeholder='Select number of kids' />
               </SelectTrigger>
               <SelectContent>
@@ -415,10 +440,14 @@ const PersonalSettingsPage = () => {
                     </button>
                   </div>
                   <div>
-                    <label className='block mb-1 text-[#4A413F] text-sm font-abeezee'>
+                    <label
+                      htmlFor='edit-kid-name'
+                      className='block mb-1 text-[#4A413F] text-sm font-abeezee'
+                    >
                       Name
                     </label>
                     <Input
+                      id='edit-kid-name'
                       value={kidForm.name}
                       onChange={(e) =>
                         handleKidFormChange('name', e.target.value)
@@ -427,14 +456,17 @@ const PersonalSettingsPage = () => {
                     />
                   </div>
                   <div>
-                    <label className='block mb-1 text-[#4A413F] text-sm font-abeezee'>
+                    <label
+                      htmlFor='edit-kid-age'
+                      className='block mb-1 text-[#4A413F] text-sm font-abeezee'
+                    >
                       Age
                     </label>
                     <Select
                       value={kidForm.age}
                       onValueChange={(v) => handleKidFormChange('age', v)}
                     >
-                      <SelectTrigger className='w-full'>
+                      <SelectTrigger id='edit-kid-age' className='w-full'>
                         <SelectValue placeholder='Select age range' />
                       </SelectTrigger>
                       <SelectContent>
@@ -530,7 +562,7 @@ const PersonalSettingsPage = () => {
                       accept='image/*'
                       className='hidden'
                       onChange={(e) => {
-                        if (e.target.files && e.target.files[0]) {
+                        if (e.target.files?.[0]) {
                           const url = URL.createObjectURL(e.target.files[0]);
                           setKidForm((prev) => ({ ...prev, img: url }));
                           setShowAvatarSelector(false);
@@ -544,6 +576,7 @@ const PersonalSettingsPage = () => {
                         fill='none'
                         xmlns='http://www.w3.org/2000/svg'
                       >
+                        <title>Upload image</title>
                         <path
                           d='M16 21.333a5.333 5.333 0 1 0 0-10.666 5.333 5.333 0 0 0 0 10.666Z'
                           stroke='#EC4007'
@@ -584,6 +617,7 @@ const PersonalSettingsPage = () => {
         <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/30'>
           <div className='bg-white rounded-2xl shadow-lg p-8 w-full max-w-md mx-4 relative'>
             <button
+              type='button'
               className='absolute top-4 right-4 text-xl text-gray-400 hover:text-gray-600'
               onClick={cancelRemoveKid}
               aria-label='Close'
@@ -621,6 +655,7 @@ const PersonalSettingsPage = () => {
         <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/30'>
           <div className='bg-white rounded-2xl shadow-lg p-8 w-full max-w-md mx-4 relative'>
             <button
+              type='button'
               className='absolute top-4 right-4 text-xl text-gray-400 hover:text-gray-600'
               onClick={handleDeleteAccountCancel}
               aria-label='Close'
@@ -719,6 +754,7 @@ const PersonalSettingsPage = () => {
                 Confirm account deletion
               </h2>
               <button
+                type='button'
                 className='text-xl text-gray-400 hover:text-gray-600'
                 onClick={handleDeleteConfirmCancel}
                 aria-label='Close'

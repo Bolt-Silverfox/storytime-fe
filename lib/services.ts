@@ -113,7 +113,7 @@ const setTokens = (jwt: string, refreshToken: string, userData?: unknown) => {
 
 export const registerService = async (payload: RegisterPayload) => {
   try {
-    const response = await api.post('/auth/register', payload);
+    const response = await api.post('auth/register', payload);
     const { jwt, refreshToken, user } = response.data;
     setTokens(jwt, refreshToken, user);
     return response.data;
@@ -139,7 +139,7 @@ export const registerService = async (payload: RegisterPayload) => {
 
 export const loginService = async (payload: LoginPayload) => {
   try {
-    const response = await api.post('/auth/login', payload);
+    const response = await api.post('auth/login', payload);
     const { jwt, refreshToken, user } = response.data;
     setTokens(jwt, refreshToken, user);
     return response.data;
@@ -165,7 +165,7 @@ export const loginService = async (payload: LoginPayload) => {
 
 export const verifyEmailService = async (token: string) => {
   try {
-    const response = await api.post(`/auth/verify-email?token=${token}`);
+    const response = await api.post(`auth/verify-email?token=${token}`);
     return response.data;
   } catch (error: unknown) {
     if (error instanceof AxiosError) {
@@ -189,7 +189,7 @@ export const verifyEmailService = async (token: string) => {
 
 export const sendVerificationEmailService = async (email: string) => {
   try {
-    const response = await api.post(`/auth/send-verification?email=${email}`);
+    const response = await api.post(`auth/send-verification?email=${email}`);
     return response.data;
   } catch (error: unknown) {
     if (error instanceof AxiosError) {
@@ -215,7 +215,7 @@ export const sendVerificationEmailService = async (email: string) => {
 export const requestPasswordResetService = async (email: string) => {
   try {
     const response = await api.post(
-      `/auth/request-password-reset?email=${encodeURIComponent(email)}`
+      `auth/request-password-reset?email=${encodeURIComponent(email)}`
     );
     return response.data;
   } catch (error: unknown) {
@@ -248,7 +248,7 @@ export const validateResetTokenService = async ({
 }) => {
   try {
     const response = await api.get(
-      `/auth/validate-reset-token?token=${encodeURIComponent(
+      `auth/validate-reset-token?token=${encodeURIComponent(
         token
       )}&email=${encodeURIComponent(email)}`
     );
@@ -283,7 +283,7 @@ export const resetPasswordService = async ({
 }) => {
   try {
     const response = await api.post(
-      `/auth/reset-password?token=${encodeURIComponent(
+      `auth/reset-password?token=${encodeURIComponent(
         token
       )}&newPassword=${encodeURIComponent(newPassword)}`
     );
@@ -310,7 +310,7 @@ export const resetPasswordService = async ({
 
 export const addKidsService = async (kids: KidsPayload[]) => {
   try {
-    const response = await api.post('/auth/kids', kids);
+    const response = await api.post('auth/kids', kids);
     return response.data;
   } catch (error: unknown) {
     if (error instanceof AxiosError) {
@@ -334,7 +334,7 @@ export const addKidsService = async (kids: KidsPayload[]) => {
 
 export const getKidsService = async () => {
   try {
-    const response = await api.get('/auth/kids');
+    const response = await api.get('auth/kids');
     return response.data;
   } catch (error: unknown) {
     if (error instanceof AxiosError) {
@@ -358,7 +358,7 @@ export const getKidsService = async () => {
 
 export const getAvailableVoicesService = async (): Promise<Voice[]> => {
   try {
-    const response = await api.get('/stories/voices/available');
+    const response = await api.get('stories/voices/available');
     return response.data;
   } catch (error: unknown) {
     if (error instanceof AxiosError) {
@@ -383,7 +383,7 @@ export const getAvailableVoicesService = async (): Promise<Voice[]> => {
 
 export const setPreferredVoiceService = async (voiceId: string) => {
   try {
-    const response = await api.patch('/stories/voices/preferred', {
+    const response = await api.patch('stories/voices/preferred', {
       voiceId: voiceId,
     });
     return response.data;
@@ -434,7 +434,7 @@ export const isUserLoggedIn = () => {
 
 export const getStoriesByKidIdService = async (kidId: string) => {
   try {
-    const response = await api.get(`/stories?kidId=${kidId}`);
+    const response = await api.get(`stories?kidId=${kidId}`);
     return response.data;
   } catch (error: unknown) {
     if (error instanceof AxiosError) {
@@ -458,7 +458,7 @@ export const getStoriesByKidIdService = async (kidId: string) => {
 
 export const getStoryCategoriesService = async () => {
   try {
-    const response = await api.get('/stories/categories');
+    const response = await api.get('stories/categories');
     return response.data;
   } catch (error: unknown) {
     if (error instanceof AxiosError) {
@@ -483,7 +483,7 @@ export const getStoryCategoriesService = async () => {
 
 export const getStoryThemesService = async () => {
   try {
-    const response = await api.get('/stories/themes');
+    const response = await api.get('stories/themes');
     return response.data;
   } catch (error: unknown) {
     if (error instanceof AxiosError) {
@@ -508,7 +508,7 @@ export const getStoryThemesService = async () => {
 
 export const getStoryByIdService = async (storyId: string) => {
   try {
-    const response = await api.get(`/stories/${storyId}`);
+    const response = await api.get(`stories/${storyId}`);
     return response.data;
   } catch (error: unknown) {
     if (error instanceof AxiosError) {
@@ -532,7 +532,7 @@ export const getStoryByIdService = async (storyId: string) => {
 
 export const getDailyChallengesService = async (kidId: string) => {
   try {
-    const response = await api.get(`/stories/daily-challenge/kid/${kidId}`);
+    const response = await api.get(`stories/daily-challenge/kid/${kidId}`);
     return response.data;
   } catch (error: unknown) {
     if (error instanceof AxiosError) {
@@ -561,7 +561,7 @@ export const getStoriesByThemeAndKidService = async (
 ) => {
   try {
     const response = await api.get(
-      `/stories?theme=${encodeURIComponent(theme)}&kidId=${kidId}`
+      `stories?theme=${encodeURIComponent(theme)}&kidId=${kidId}`
     );
     return response.data;
   } catch (error: unknown) {
@@ -590,7 +590,7 @@ export const setKidPreferredVoiceService = async (
   voiceType: string
 ) => {
   try {
-    const response = await api.patch(`/user/kids/${kidId}/voice`, {
+    const response = await api.patch(`user/kids/${kidId}/voice`, {
       voiceType,
     });
     return response.data;
@@ -653,7 +653,7 @@ export const getStoryAudioService = async (
 }> => {
   try {
     const response = await api.get(
-      `/stories/story/audio/${storyId}?voiceType=MILO`
+      `stories/story/audio/${storyId}?voiceType=MILO`
     );
     return response.data;
   } catch (error: unknown) {

@@ -1,12 +1,11 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import Image, { StaticImageData } from 'next/image';
-import Link from 'next/link';
-import React, { useState } from 'react';
-import heart from '@/public/not-hearted.svg';
 import heartFilled from '@/public/hearted.svg';
+import heart from '@/public/not-hearted.svg';
+import Image, { type StaticImageData } from 'next/image';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 
 interface StoryCardProps {
   img: string | StaticImageData;
@@ -23,7 +22,6 @@ const StoryCard = ({
   title,
   desc,
   link,
-  author,
   dynamic,
   setModal,
 }: StoryCardProps) => {
@@ -37,6 +35,17 @@ const StoryCard = ({
         }
         if (setModal) {
           setModal(true);
+        }
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          if (link) {
+            router.push(link);
+          }
+          if (setModal) {
+            setModal(true);
+          }
         }
       }}
       className='border border-stone-100 shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] rounded-3xl border-solid hover:scale-105 transition-all duration-300 cursor-pointer relative'

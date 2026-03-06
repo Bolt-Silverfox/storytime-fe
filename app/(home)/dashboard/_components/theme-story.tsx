@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import StoryCard from '@/components/story-card';
 import { getStoryThemesService } from '@/lib/services';
+import { useEffect, useState } from 'react';
 
 // Import theme images
 import adventure from '@/public/theme/Adventure.jpg';
@@ -16,7 +16,6 @@ import freedomAndAdventure from '@/public/theme/Freedom-and-adventure.jpg';
 import friendshipAndBelonging from '@/public/theme/Freindship-and-belonging.jpg';
 import goodVsEvil from '@/public/theme/Good-vs-evil.jpg';
 import greedVsGenerosity from '@/public/theme/Greed-vs-generosity.jpg';
-import healingAndForgiveness from '@/public/theme/healing-andforgiveness.jpg';
 import honestyAndPerseverance from '@/public/theme/Hoensty-and-perseverance.jpg';
 import hopeAndPerseverance from '@/public/theme/Hope-and-perseverance.jpg';
 import identityAndSelfDiscovery from '@/public/theme/Identity-and-self-discovery.jpg';
@@ -24,6 +23,7 @@ import justiceAndFairness from '@/public/theme/Justice-and-fairness.jpg';
 import loveAndFamily from '@/public/theme/Love-and-family.jpg';
 import sciFi from '@/public/theme/Sci-fi.jpg';
 import trustAndLoyalty from '@/public/theme/Trust-and-loyalty.jpg';
+import healingAndForgiveness from '@/public/theme/healing-andforgiveness.jpg';
 
 interface Theme {
   id: string;
@@ -32,33 +32,33 @@ interface Theme {
   description: string;
 }
 
+// Theme name to image mapping
+const themeImageMap: Record<string, typeof adventure> = {
+  Adventure: adventure,
+  'Betrayal & Redemption': betrayalAndRedemption,
+  'Change & Transformation': changeAndTransformation,
+  'Coming of Age': comingOfAge,
+  'Courage / Bravery': courageAndBravery,
+  Emotional: emotional,
+  Fantasy: fantasy,
+  'Freedom & Adventure': freedomAndAdventure,
+  'Friendship & Belonging': friendshipAndBelonging,
+  'Good vs. Evil': goodVsEvil,
+  'Greed vs. Generosity': greedVsGenerosity,
+  'Healing & Forgiveness': healingAndForgiveness,
+  'Honesty & Integrity': honestyAndPerseverance,
+  'Hope & Perseverance': hopeAndPerseverance,
+  'Identity & Self-Discovery': identityAndSelfDiscovery,
+  'Justice & Fairness': justiceAndFairness,
+  'Love & Family': loveAndFamily,
+  'Sci-Fi': sciFi,
+  'Trust & Loyalty': trustAndLoyalty,
+};
+
 const ThemeStory = () => {
   const [themes, setThemes] = useState<Theme[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
-  // Theme name to image mapping
-  const themeImageMap: { [key: string]: any } = {
-    Adventure: adventure,
-    'Betrayal & Redemption': betrayalAndRedemption,
-    'Change & Transformation': changeAndTransformation,
-    'Coming of Age': comingOfAge,
-    'Courage / Bravery': courageAndBravery,
-    Emotional: emotional,
-    Fantasy: fantasy,
-    'Freedom & Adventure': freedomAndAdventure,
-    'Friendship & Belonging': friendshipAndBelonging,
-    'Good vs. Evil': goodVsEvil,
-    'Greed vs. Generosity': greedVsGenerosity,
-    'Healing & Forgiveness': healingAndForgiveness,
-    'Honesty & Integrity': honestyAndPerseverance,
-    'Hope & Perseverance': hopeAndPerseverance,
-    'Identity & Self-Discovery': identityAndSelfDiscovery,
-    'Justice & Fairness': justiceAndFairness,
-    'Love & Family': loveAndFamily,
-    'Sci-Fi': sciFi,
-    'Trust & Loyalty': trustAndLoyalty,
-  };
 
   useEffect(() => {
     const fetchThemes = async () => {
@@ -72,8 +72,8 @@ const ThemeStory = () => {
           image: themeImageMap[theme.name] || theme.image, // Fallback to API image if not found
         }));
         setThemes(mappedThemes);
-      } catch (err: any) {
-        setError(err.message || 'Error fetching themes');
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Error fetching themes');
         setThemes([]);
       } finally {
         setLoading(false);

@@ -1,13 +1,13 @@
 'use client';
 
-import heart from '@/public/heart.svg';
-import avatar from '@/public/avatar.svg';
-import arrow_down from '@/public/arrow-down.svg';
-import Image from 'next/image';
+import { getUserFromStorage } from '@/lib/services';
 import { cn } from '@/lib/utils';
+import arrow_down from '@/public/arrow-down.svg';
+import avatar from '@/public/avatar.svg';
+import heart from '@/public/heart.svg';
+import Image from 'next/image';
 import { useState } from 'react';
 import ProfileDropdown from './ui/profile-dropdown';
-import { getUserFromStorage } from '@/lib/services';
 
 const Header = ({ white = false }: { white?: boolean }) => {
   const user = getUserFromStorage();
@@ -37,7 +37,17 @@ const Header = ({ white = false }: { white?: boolean }) => {
             <div
               className='border-stone-100 bg-white shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] p-1.5 rounded-[2.25rem] border-[0.5px] border-solid flex items-center justify-between w-[11rem] cursor-pointer'
               onClick={() => {
-                if (!dropdownOpen) setDropdownOpen(true);
+                if (!dropdownOpen) {
+                  setDropdownOpen(true);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  if (!dropdownOpen) {
+                    setDropdownOpen(true);
+                  }
+                }
               }}
             >
               <div className='flex items-center gap-2'>

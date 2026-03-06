@@ -1,5 +1,6 @@
 'use client';
 
+import { FormControl, FormField, FormItem } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -9,13 +10,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ageRangesOptions } from '@/lib/utils';
-import { KidsAvatarSheet } from './kids-avatar-sheet';
 import { useFormContext, useWatch } from 'react-hook-form';
-import {
-  FormField,
-  FormItem,
-  FormControl,
-} from '@/components/ui/form';
+import { KidsAvatarSheet } from './kids-avatar-sheet';
 
 type KidsInformationCardProps = {
   index: number;

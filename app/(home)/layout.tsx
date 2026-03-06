@@ -1,8 +1,6 @@
-import Header from '@/components/header';
 import localFont from 'next/font/local';
-import { cn } from '@/lib/utils';
 
-const qilka = localFont({
+const _qilka = localFont({
   src: '../Qilka.otf',
   variable: '--font-qilka',
 });

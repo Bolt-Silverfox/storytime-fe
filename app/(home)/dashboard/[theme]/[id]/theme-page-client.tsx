@@ -1,18 +1,16 @@
 'use client';
 
 import Header from '@/components/header';
-import arrow from '@/public/arrow-left.svg';
-import Image from 'next/image';
-import kid from '@/public/kid-1.png';
-import search from '@/public/search.svg';
+import ModeSelector from '@/components/mode-selector';
 import RecommendedCard from '@/components/recommended-card';
 import StoryCard from '@/components/story-card';
-import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import StoryReader from '@/components/story-reader';
 import Modal from '@/components/ui/modal';
 import VoiceSelector from '@/components/voice-selector';
-import ModeSelector from '@/components/mode-selector';
-import StoryReader from '@/components/story-reader';
+import { getStoriesByThemeAndKidService } from '@/lib/services';
+import arrow from '@/public/arrow-left.svg';
+import kid from '@/public/kid-1.png';
+import search from '@/public/search.svg';
 import story2 from '@/public/story-2.png';
 // Import theme images
 import adventure from '@/public/theme/Adventure.jpg';
@@ -26,7 +24,6 @@ import freedomAndAdventure from '@/public/theme/Freedom-and-adventure.jpg';
 import friendshipAndBelonging from '@/public/theme/Freindship-and-belonging.jpg';
 import goodVsEvil from '@/public/theme/Good-vs-evil.jpg';
 import greedVsGenerosity from '@/public/theme/Greed-vs-generosity.jpg';
-import healingAndForgiveness from '@/public/theme/healing-andforgiveness.jpg';
 import honestyAndPerseverance from '@/public/theme/Hoensty-and-perseverance.jpg';
 import hopeAndPerseverance from '@/public/theme/Hope-and-perseverance.jpg';
 import identityAndSelfDiscovery from '@/public/theme/Identity-and-self-discovery.jpg';
@@ -34,10 +31,10 @@ import justiceAndFairness from '@/public/theme/Justice-and-fairness.jpg';
 import loveAndFamily from '@/public/theme/Love-and-family.jpg';
 import sciFi from '@/public/theme/Sci-fi.jpg';
 import trustAndLoyalty from '@/public/theme/Trust-and-loyalty.jpg';
-import {
-  getStoriesByThemeAndKidService,
-  getStoryByIdService,
-} from '@/lib/services';
+import healingAndForgiveness from '@/public/theme/healing-andforgiveness.jpg';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 interface ThemePageClientProps {
   theme: string;
@@ -48,7 +45,7 @@ interface Story {
   title: string;
   description: string;
   coverImageUrl: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 const ThemePageClient = ({ theme }: ThemePageClientProps) => {
@@ -59,14 +56,17 @@ const ThemePageClient = ({ theme }: ThemePageClientProps) => {
   const [selectedMode, setSelectedMode] = useState<string | null>(null);
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
   const [themeStories, setThemeStories] = useState<Story[]>([]);
-  const [story, setStory] = useState<Story | null>(null);
+  const [_story, _setStory] = useState<Story | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [recommendedStories, setRecommendedStories] = useState<Story[]>([]);
-  const [selectedKid, setSelectedKid] = useState<any>(null);
+  const [selectedKid, setSelectedKid] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   // Theme name to image mapping
-  const themeImageMap: { [key: string]: any } = {
+  const themeImageMap: Record<string, typeof adventure> = {
     Adventure: adventure,
     'Betrayal & Redemption': betrayalAndRedemption,
     'Change & Transformation': changeAndTransformation,
@@ -192,7 +192,7 @@ const ThemePageClient = ({ theme }: ThemePageClientProps) => {
           <div className='flex items-center gap-2'>
             <Image src={kid} alt='kid' />
             <p className='text-white text-base not-italic font-normal leading-5 font-abeezee'>
-              {selectedKid.name}
+              {selectedKid?.name}
             </p>
           </div>
         </div>
@@ -218,7 +218,7 @@ const ThemePageClient = ({ theme }: ThemePageClientProps) => {
                 title={item.title}
                 description={item.description}
                 setModal={() => handleStorySelect(item.id)}
-                author={item.author}
+                author={item.author as string}
               />
             ))}
           </div>
@@ -231,7 +231,7 @@ const ThemePageClient = ({ theme }: ThemePageClientProps) => {
                 img={item.coverImageUrl}
                 title={item.title}
                 desc={item.description}
-                author={item.author}
+                author={item.author as string}
                 dynamic={true}
                 setModal={() => handleStorySelect(item.id)}
               />
@@ -262,7 +262,6 @@ const ThemePageClient = ({ theme }: ThemePageClientProps) => {
             voice='Nimbus'
             img={story2.src}
             setStep={setStep}
-            expand={expand}
             mode={selectedMode}
             storyId={selectedStoryId}
           />

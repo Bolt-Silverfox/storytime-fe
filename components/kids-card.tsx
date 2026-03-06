@@ -1,9 +1,9 @@
 'use client';
 
 import { cn } from '@/lib/utils';
+import editIcon from '@/public/edit-icon.svg';
 import Image from 'next/image';
 import { useState } from 'react';
-import edit from '@/public/edit-icon.svg';
 
 interface KidsCardProps {
   img: string;
@@ -22,7 +22,7 @@ const KidsCard = ({
   age,
   cstories,
   active: initialActive = false,
-  edit: initialEdit = false,
+  edit = false,
   handleEdit,
   stories = false,
 }: KidsCardProps) => {
@@ -35,6 +35,12 @@ const KidsCard = ({
   return (
     <div
       onClick={handleClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleClick();
+        }
+      }}
       className={cn(
         'border-stone-100 bg-white shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] px-4 py-3 rounded-3xl border-[0.5px] border-solid flex items-center justify-between gap-3 cursor-pointer transition-all duration-200 w-full',
         isActive &&
@@ -74,7 +80,7 @@ const KidsCard = ({
       </div>
       {edit && (
         <Image
-          src={edit}
+          src={editIcon}
           alt='edit'
           onClick={handleEdit}
           className='cursor-pointer'

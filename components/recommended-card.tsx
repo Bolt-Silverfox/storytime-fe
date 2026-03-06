@@ -1,8 +1,8 @@
 'use client';
 
-import Image, { StaticImageData } from 'next/image';
-import heart from '@/public/heart-plain.svg';
 import heartFilled from '@/public/heart-filled.svg';
+import heart from '@/public/heart-plain.svg';
+import Image, { type StaticImageData } from 'next/image';
 import { useState } from 'react';
 
 interface RecommendedCardProps {
@@ -22,7 +22,6 @@ const RecommendedCard = ({
   author,
   favorite,
   setModal,
-  mode,
 }: RecommendedCardProps) => {
   const [isFavorite, setIsFavorite] = useState(favorite);
 
@@ -36,6 +35,12 @@ const RecommendedCard = ({
     <div
       className='border-stone-100 bg-white shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)]  pr-6 rounded-3xl border-[0.5px] border-solid hover:scale-105 transition-all duration-300 cursor-pointer'
       onClick={handleClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleClick();
+        }
+      }}
     >
       <div className='flex gap-4 h-full'>
         <div className=''>

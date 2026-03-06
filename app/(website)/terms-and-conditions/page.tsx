@@ -1,7 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern';
 import { termsSections } from '@/lib/data';
-import React from 'react';
 
 const Page = () => {
   return (
@@ -21,9 +20,9 @@ const Page = () => {
       <section className='max-w-[1128px] mx-auto'>
         <Card className='w-full border-none bg-transparent shadow-none'>
           <CardContent className='flex flex-col items-start gap-[42px] p-0'>
-            {termsSections.map((section, index) => (
+            {termsSections.map((section) => (
               <div
-                key={index}
+                key={`terms-${section.title}`}
                 className='flex flex-col items-start gap-3 w-full'
               >
                 <h2 className='w-full text-xl text-[#221D1D] font-bold font-qilka'>
@@ -36,9 +35,9 @@ const Page = () => {
 
                 {section.bulletPoints && (
                   <ul className='flex flex-col items-start gap-3 list-disc pl-6 w-full mt-3'>
-                    {section.bulletPoints.map((point, idx) => (
+                    {section.bulletPoints.map((point) => (
                       <li
-                        key={idx}
+                        key={point}
                         className='w-full font-abeezee text-xl text-[#4A413F]'
                       >
                         {point}

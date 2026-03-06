@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useEffect, useRef } from 'react';
 
 interface ProfileDropdownProps {
   open: boolean;

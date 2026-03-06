@@ -1,10 +1,7 @@
 'use client';
 
-import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Mail, Users } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Form,
   FormControl,
@@ -13,14 +10,17 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { toast } from 'sonner';
-import { Card, CardContent } from '@/components/ui/card';
-import Image from 'next/image';
+import { Input } from '@/components/ui/input';
+import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Mail, Users } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
+import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
+import { z } from 'zod';
 
 const contactSchema = z.object({
   fullname: z.string({ required_error: 'Full name is required' }).min(2, ''),

@@ -2,10 +2,10 @@
 import { cn } from '@/lib/utils';
 import { IconMenu2, IconX } from '@tabler/icons-react';
 import {
-  motion,
   AnimatePresence,
-  useScroll,
+  motion,
   useMotionValueEvent,
+  useScroll,
 } from 'motion/react';
 
 import React, { useRef, useState } from 'react';
@@ -128,7 +128,7 @@ export const NavItems = ({ items, className, onItemClick }: NavItemsProps) => {
           onMouseEnter={() => setHovered(idx)}
           onClick={onItemClick}
           className='relative px-4 py-2 text-neutral-600 dark:text-neutral-300'
-          key={`link-${idx}`}
+          key={item.link}
           href={item.link}
         >
           {hovered === idx && (
@@ -194,7 +194,6 @@ export const MobileNavMenu = ({
   children,
   className,
   isOpen,
-  onClose,
 }: MobileNavMenuProps) => {
   return (
     <AnimatePresence>
@@ -232,7 +231,7 @@ export const MobileNavToggle = ({
 export const NavbarLogo = () => {
   return (
     <a
-      href='#'
+      href='/'
       className='relative z-20 mr-4 flex items-center space-x-2 px-2 py-1 text-sm font-normal text-black'
     >
       <img

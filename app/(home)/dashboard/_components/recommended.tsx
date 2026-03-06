@@ -1,20 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import RecommendedCard from '@/components/recommended-card';
-import Modal from '@/components/ui/modal';
 import ModeSelector from '@/components/mode-selector';
-import VoiceSelector from '@/components/voice-selector';
+import RecommendedCard from '@/components/recommended-card';
 import StoryReader from '@/components/story-reader';
-import story2 from '@/public/story-2.png';
+import Modal from '@/components/ui/modal';
+import VoiceSelector from '@/components/voice-selector';
 import { getStoriesByKidIdService } from '@/lib/services';
+import story2 from '@/public/story-2.png';
+import { useEffect, useState } from 'react';
 
 interface Story {
   id: string;
   title: string;
   description: string;
   coverImageUrl: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 const Recommended = () => {
@@ -115,7 +115,6 @@ const Recommended = () => {
             voice='Nimbus'
             img={story2.src}
             setStep={setStep}
-            expand={expand}
             mode={selectedMode}
             storyId={selectedStoryId}
           />

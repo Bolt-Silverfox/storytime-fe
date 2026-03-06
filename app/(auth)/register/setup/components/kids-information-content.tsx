@@ -1,8 +1,8 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { useFieldArray, useFormContext, useWatch } from 'react-hook-form';
 import { KidsInformationCard } from './kids-information-card';
-import { useEffect, useRef } from 'react';
 
 export const KidsInformationContent = () => {
   const { control } = useFormContext();
@@ -12,7 +12,7 @@ export const KidsInformationContent = () => {
   });
 
   const kidsAmount = useWatch({ name: 'kids', control });
-  const prevSyncedCountRef = useRef(0); 
+  const prevSyncedCountRef = useRef(0);
 
   useEffect(() => {
     const parsedAmount = Number.parseInt(kidsAmount || '0', 10);

@@ -5,7 +5,7 @@ const ThemePage = async ({
 }: {
   params: Promise<{ theme: string; id: string }>;
 }) => {
-  const { theme, id } = await params;
+  const { theme } = await params;
 
   return <ThemePageClient theme={theme} />;
 };

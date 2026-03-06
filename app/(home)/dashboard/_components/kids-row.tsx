@@ -1,19 +1,21 @@
 'use client';
-import { getKidsService } from '@/lib/services';
 import KidsCard from '@/components/kids-card';
+import { getKidsService } from '@/lib/services';
+import kid1 from '@/public/kid-3.svg';
+import kid3 from '@/public/kid-3.svg';
+import kid2 from '@/public/kid-4.svg';
+import kid4 from '@/public/kid-4.svg';
 import { motion as m } from 'framer-motion';
 import { useEffect, useState } from 'react';
-import kid1 from '@/public/kid-3.svg';
-import kid2 from '@/public/kid-4.svg';
-import kid3 from '@/public/kid-3.svg';
-import kid4 from '@/public/kid-4.svg';
+
+// Default avatar images to use when avatarUrl is null
+const defaultAvatars = [kid1, kid2, kid3, kid4];
 
 const KidsRow = () => {
-  const [kids, setKids] = useState<any[]>([]);
+  const [kids, setKids] = useState<
+    { id: string; name: string; age: string; cstories: string; img: string }[]
+  >([]);
   const [loading, setLoading] = useState(true);
-
-  // Default avatar images to use when avatarUrl is null
-  const defaultAvatars = [kid1, kid2, kid3, kid4];
 
   useEffect(() => {
     const fetchKids = async () => {
@@ -47,7 +49,7 @@ const KidsRow = () => {
         <div className='grid grid-cols-4 gap-4'>
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className='animate-pulse'>
-              <div className='border-stone-100 bg-gray-200 px-4 py-3 rounded-3xl border-[0.5px] border-solid flex items-center gap-3 h-20'></div>
+              <div className='border-stone-100 bg-gray-200 px-4 py-3 rounded-3xl border-[0.5px] border-solid flex items-center gap-3 h-20' />
             </div>
           ))}
         </div>

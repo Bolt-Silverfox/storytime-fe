@@ -1,7 +1,7 @@
-import * as React from 'react';
 import { Slot } from '@radix-ui/react-slot';
-import { cva, type VariantProps } from 'class-variance-authority';
+import { type VariantProps, cva } from 'class-variance-authority';
 import Link from 'next/link'; // Add this import
+import * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
@@ -61,7 +61,7 @@ const Button = React.forwardRef<
     );
   }
 
-  const Comp = asChild ? Slot : 'button';
+  const _Comp = asChild ? Slot : 'button';
 
   // If rendering a button, ensure type is correct
   if (!asChild) {

@@ -1,8 +1,9 @@
-import React, { useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import close from '@/public/close.svg';
 import expandIcon from '@/public/expand.svg';
+import { AnimatePresence, motion } from 'framer-motion';
 import Image from 'next/image';
+import type React from 'react';
+import { useEffect } from 'react';
 
 interface ModalProps {
   open: boolean;
@@ -24,9 +25,13 @@ const Modal: React.FC<ModalProps> = ({
   expand,
 }) => {
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      return;
+    }
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        onClose();
+      }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
@@ -43,6 +48,7 @@ const Modal: React.FC<ModalProps> = ({
           transition={{ duration: 0.3 }}
           onClick={onClose}
           aria-modal='true'
+          // biome-ignore lint/a11y/useSemanticElements: motion.div is used for animation; native <dialog> is not compatible with framer-motion AnimatePresence
           role='dialog'
         >
           <motion.div
@@ -68,7 +74,8 @@ const Modal: React.FC<ModalProps> = ({
               )}
               <div className='flex justify-between items-center gap-8'>
                 {expandable && (
-                  <div
+                  <button
+                    type='button'
                     onClick={() => setExpand?.(!expand)}
                     className='border-stone-100 cursor-pointer hover:scale-105 transition-all duration-300 bg-white shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] p-2 px-3 rounded-[3.125rem] border-[0.5px] border-solid flex items-center gap-2'
                   >
@@ -76,7 +83,7 @@ const Modal: React.FC<ModalProps> = ({
                     <p className='text-[#221D1D] text-base not-italic font-normal leading-5'>
                       Expand
                     </p>
-                  </div>
+                  </button>
                 )}
                 <Image
                   src={close}

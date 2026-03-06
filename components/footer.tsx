@@ -1,8 +1,7 @@
-import React from 'react';
-import { Logo } from './logo';
 import { footerLinks } from '@/lib/data';
-import Link from 'next/link';
 import Image from 'next/image';
+import Link from 'next/link';
+import { Logo } from './logo';
 
 export const Footer = () => {
   return (
@@ -18,9 +17,9 @@ export const Footer = () => {
         </p>
       </div>
       <div className='flex flex-col items-start gap-5'>
-        {footerLinks.slice(0, 3).map((link, index) => (
+        {footerLinks.slice(0, 3).map((link) => (
           <Link
-            key={`footer-link-1-${index}`}
+            key={`footer-link-${link.title}`}
             href={link.url}
             className='w-full font-abeezee text-[#F5F5F4] hover:underline'
           >
@@ -29,9 +28,9 @@ export const Footer = () => {
         ))}
       </div>
       <div className='flex flex-col md:items-start items-center w-full gap-5'>
-        {footerLinks.slice(3).map((link, index) => (
+        {footerLinks.slice(3).map((link) => (
           <Link
-            key={`footer-link-1-${index}`}
+            key={`footer-link-${link.title}`}
             href={link.url}
             className='w-full font-abeezee text-[#F5F5F4] hover:underline'
           >

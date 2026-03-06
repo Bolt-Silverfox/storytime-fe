@@ -1,19 +1,13 @@
 // todo: complete context setup for storing user data
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import { createContext, useContext, useMemo } from 'react';
 
-type GlobalContextValue = {};
+type GlobalContextValue = Record<string, never>;
 
 const GlobalContext = createContext<GlobalContextValue | null>(null);
 
-const storageKey = 'root:global';
+// Storage key for future persistence
+// const storageKey = 'root:global';
 
 const GlobalContextProvider = ({ children }: { children: React.ReactNode }) => {
   const value = useMemo(() => ({}), []);
@@ -23,11 +17,10 @@ const GlobalContextProvider = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-
 export const useGlobal = () => {
   const ctx = useContext(GlobalContext);
   if (!ctx) {
-	throw new Error('useGlobal must be used within an AuthContextProvider');
+    throw new Error('useGlobal must be used within an AuthContextProvider');
   }
   return ctx;
 };

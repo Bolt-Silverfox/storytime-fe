@@ -1,8 +1,8 @@
+import { faker } from '@faker-js/faker';
 import { type ClassValue, clsx } from 'clsx';
+import ISO6391 from 'iso-639-1';
 import { twMerge } from 'tailwind-merge';
 import countries from 'world-countries';
-import ISO6391 from 'iso-639-1';
-import { faker } from '@faker-js/faker';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -29,8 +29,8 @@ export function getFirstName(fullName?: string | null): string {
 export const countryOptions = [
   { value: 'US', label: 'United States' },
   ...countries
-    .filter((c: any) => c.cca2 !== 'US')
-    .map((c: any) => ({
+    .filter((c) => c.cca2 !== 'US')
+    .map((c) => ({
       value: c.cca2,
       label: c.name.common,
     })),

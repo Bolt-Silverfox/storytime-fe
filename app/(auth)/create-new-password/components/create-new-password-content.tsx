@@ -1,7 +1,7 @@
 'use client';
 
+import { PageLoader } from '@/components/page-loader';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   Form,
   FormControl,
@@ -9,16 +9,16 @@ import {
   FormItem,
   FormMessage,
 } from '@/components/ui/form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { toast } from 'sonner';
-import { z } from 'zod';
-import { useForm } from 'react-hook-form';
+import { Input } from '@/components/ui/input';
+import { resetPasswordService } from '@/lib/services';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { EyeIcon, EyeOff } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { resetPasswordService } from '@/lib/services';
-import { PageLoader } from '@/components/page-loader';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
+import { z } from 'zod';
 
 const FormSchema = z
   .object({

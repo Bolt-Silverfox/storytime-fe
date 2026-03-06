@@ -1,7 +1,7 @@
 'use client';
 
+import { PageLoader } from '@/components/page-loader';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   Form,
   FormControl,
@@ -9,18 +9,18 @@ import {
   FormItem,
   FormMessage,
 } from '@/components/ui/form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { toast } from 'sonner';
-import { z } from 'zod';
-import { useForm } from 'react-hook-form';
-import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/auth-context';
-import { useState } from 'react';
+import { loginService } from '@/lib/services';
+import { cn } from '@/lib/utils';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { EyeIcon, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { loginService } from '@/lib/services';
-import { PageLoader } from '@/components/page-loader';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
+import { z } from 'zod';
 
 const FormSchema = z.object({
   email: z
@@ -49,7 +49,7 @@ const Page = () => {
     setIsLoading(true);
     try {
       // todo: set user to global context
-      const response = await loginService(data);
+      const _response = await loginService(data);
 
       toast.success('Login successful!');
 

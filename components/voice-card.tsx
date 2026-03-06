@@ -1,6 +1,6 @@
-import Image from 'next/image';
-import volume from '@/public/volume.svg';
 import volumeActive from '@/public/volume-light.svg';
+import volume from '@/public/volume.svg';
+import Image from 'next/image';
 
 const VoiceCard = ({
   name,
@@ -22,6 +22,12 @@ const VoiceCard = ({
         : 'bg-white shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] border-stone-100 '
     }`}
     onClick={onClick}
+    onKeyDown={(e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        onClick?.();
+      }
+    }}
   >
     <h2
       className={`text-center text-xl not-italic font-bold leading-6 font-qilka ${
@@ -46,6 +52,13 @@ const VoiceCard = ({
       onClick={(e) => {
         onListen(e);
         onClick?.();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onListen(e as unknown as React.MouseEvent);
+          onClick?.();
+        }
       }}
     >
       <Image src={active ? volumeActive : volume} alt='volume' />

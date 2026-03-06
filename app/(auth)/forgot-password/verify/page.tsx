@@ -1,5 +1,6 @@
 'use client';
 
+import { PageLoader } from '@/components/page-loader';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -8,26 +9,25 @@ import {
   FormItem,
   FormMessage,
 } from '@/components/ui/form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { toast } from 'sonner';
-import { z } from 'zod';
-import { useForm } from 'react-hook-form';
-import { useAuth } from '@/context/auth-context';
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
 } from '@/components/ui/input-otp';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { StepBackButton } from '../../register/components/step-back';
-import { maskEmail } from '@/lib/utils';
-import { useEffect, useState } from 'react';
+import { useAuth } from '@/context/auth-context';
 import {
   sendVerificationEmailService,
   validateResetTokenService,
 } from '@/lib/services';
-import { PageLoader } from '@/components/page-loader';
+import { maskEmail } from '@/lib/utils';
+import { zodResolver } from '@hookform/resolvers/zod';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
+import { z } from 'zod';
+import { StepBackButton } from '../../register/components/step-back';
 
 const FormSchema = z.object({
   pin: z.string().min(6, {

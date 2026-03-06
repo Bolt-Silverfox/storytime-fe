@@ -12,7 +12,7 @@ module.exports = {
         NODE_ENV: 'development',
         PORT: 3674,
       },
-      env: {
+      env_staging: {
         NODE_ENV: 'staging',
         PORT: 3675,
       },

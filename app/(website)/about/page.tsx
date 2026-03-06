@@ -1,8 +1,8 @@
-import { Button, buttonVariants } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Icons } from '@/components/ui/icons';
 import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern';
-import { featureCard2, featureCards } from '@/lib/data';
+import { featureCard2 } from '@/lib/data';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -92,9 +92,9 @@ const Page = () => {
         </div>
 
         <div className='grid md:grid-cols-2 gap-6 w-full'>
-          {featureCard2.map((card, index) => (
+          {featureCard2.map((card) => (
             <Card
-              key={`feature-card-top-${index}`}
+              key={`feature-card-${card.title}`}
               className='border-[0.5px] border-solid shadow-none border-stone-100 rounded-[21px] bg-white'
             >
               <CardContent className='flex flex-col items-start gap-2.5 p-8'>

@@ -23,10 +23,10 @@ const faq = () => {
           <p className='font-abeezee text-xl text-[#4A413F] pb-8'>
             General questions
           </p>
-          {faqPageItems.slice(0, 3).map((item, index) => (
+          {faqPageItems.slice(0, 3).map((item) => (
             <AccordionItem
-              key={`faq-${index}`}
-              value={`item-${index}`}
+              key={`faq-${item.question}`}
+              value={`item-${item.question}`}
               className='mb-4 bg-white rounded-[27px] border-[0.5px] border-solid border-stone-100'
             >
               <AccordionTrigger className='px-8 py-6 text-xl hover:no-underline'>
@@ -42,10 +42,10 @@ const faq = () => {
           <p className='font-abeezee text-xl text-[#4A413F] pb-8'>
             Parent control & safety
           </p>
-          {faqPageItems.slice(3, 6).map((item, index) => (
+          {faqPageItems.slice(3, 6).map((item) => (
             <AccordionItem
-              key={`faq-${index}`}
-              value={`item-${index}`}
+              key={`faq-${item.question}`}
+              value={`item-${item.question}`}
               className='mb-4 bg-white rounded-[27px] border-[0.5px] border-solid border-stone-100'
             >
               <AccordionTrigger className='px-8 py-6 text-xl hover:no-underline'>
@@ -61,10 +61,10 @@ const faq = () => {
           <p className='font-abeezee text-xl text-[#4A413F] pb-8'>
             Story features
           </p>
-          {faqPageItems.slice(6, 9).map((item, index) => (
+          {faqPageItems.slice(6, 9).map((item) => (
             <AccordionItem
-              key={`faq-${index}`}
-              value={`item-${index}`}
+              key={`faq-${item.question}`}
+              value={`item-${item.question}`}
               className='mb-4 bg-white rounded-[27px] border-[0.5px] border-solid border-stone-100'
             >
               <AccordionTrigger className='px-8 py-6 text-xl hover:no-underline'>
@@ -80,10 +80,10 @@ const faq = () => {
           <p className='font-abeezee text-xl text-[#4A413F] pb-8'>
             Account & payments
           </p>
-          {faqPageItems.slice(6, 9).map((item, index) => (
+          {faqPageItems.slice(6, 9).map((item) => (
             <AccordionItem
-              key={`faq-${index}`}
-              value={`item-${index}`}
+              key={`faq-${item.question}`}
+              value={`item-${item.question}`}
               className='mb-4 bg-white rounded-[27px] border-[0.5px] border-solid border-stone-100'
             >
               <AccordionTrigger className='px-8 py-6 text-xl hover:no-underline'>
@@ -99,10 +99,10 @@ const faq = () => {
           <p className='font-abeezee text-xl text-[#4A413F] pb-8'>
             Language & accessibility
           </p>
-          {faqPageItems.slice(9, 12).map((item, index) => (
+          {faqPageItems.slice(9, 12).map((item) => (
             <AccordionItem
-              key={`faq-${index}`}
-              value={`item-${index}`}
+              key={`faq-${item.question}`}
+              value={`item-${item.question}`}
               className='mb-4 bg-white rounded-[27px] border-[0.5px] border-solid border-stone-100'
             >
               <AccordionTrigger className='px-8 py-6 text-xl hover:no-underline'>

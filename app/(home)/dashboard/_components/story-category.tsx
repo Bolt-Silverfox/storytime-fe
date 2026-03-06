@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import StoryCard from '@/components/story-card';
 import { getStoryCategoriesService } from '@/lib/services';
+import { useEffect, useState } from 'react';
 
 // Import category images
 import adventureAndAction from '@/public/category/Adventure-and-action.jpg';
@@ -26,33 +26,33 @@ interface Category {
   description: string;
 }
 
+// Category name to image mapping
+const categoryImageMap: Record<string, typeof adventureAndAction> = {
+  'Adventure & Action': adventureAndAction,
+  'Bedtime Stories': bedtimeStories,
+  'Cultural & Folklore Stories': mythsAndLegends, // Using myths-and-legends as closest match
+  'Drama & Family Stories': dramaAndFamilyStories,
+  'Educational & Learning Stories': nature, // Using nature as closest match
+  'Fairy Tales': mythsAndLegends, // Using myths-and-legends as closest match
+  'Fables & Morality Stories': nature, // Using nature as closest match
+  'Fantasy & Magic': mythsAndLegends, // Using myths-and-legends as closest match
+  'Historical Fiction': historicalFiction,
+  'Holiday / Seasonal Stories': nature, // Using nature as closest match
+  'Horror & Ghost Stories': horrorAndGhostStories,
+  'Humor & Satire': humorAndSatire,
+  'Myths & Legends': mythsAndLegends,
+  Nature: nature,
+  Ocean: ocean,
+  'Mystery & Detective Stories': mysteryAndDetective,
+  Robots: robots,
+  'Romance & Love Stories': romanceAndLoveStories,
+  'Science Fiction & Space': scienceFictionAndSpace,
+};
+
 const StoryCategory = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
-  // Category name to image mapping
-  const categoryImageMap: { [key: string]: any } = {
-    'Adventure & Action': adventureAndAction,
-    'Bedtime Stories': bedtimeStories,
-    'Cultural & Folklore Stories': mythsAndLegends, // Using myths-and-legends as closest match
-    'Drama & Family Stories': dramaAndFamilyStories,
-    'Educational & Learning Stories': nature, // Using nature as closest match
-    'Fairy Tales': mythsAndLegends, // Using myths-and-legends as closest match
-    'Fables & Morality Stories': nature, // Using nature as closest match
-    'Fantasy & Magic': mythsAndLegends, // Using myths-and-legends as closest match
-    'Historical Fiction': historicalFiction,
-    'Holiday / Seasonal Stories': nature, // Using nature as closest match
-    'Horror & Ghost Stories': horrorAndGhostStories,
-    'Humor & Satire': humorAndSatire,
-    'Myths & Legends': mythsAndLegends,
-    Nature: nature,
-    Ocean: ocean,
-    'Mystery & Detective Stories': mysteryAndDetective,
-    Robots: robots,
-    'Romance & Love Stories': romanceAndLoveStories,
-    'Science Fiction & Space': scienceFictionAndSpace,
-  };
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -66,8 +66,10 @@ const StoryCategory = () => {
           image: categoryImageMap[category.name] || category.image, // Fallback to API image if not found
         }));
         setCategories(mappedCategories);
-      } catch (err: any) {
-        setError(err.message || 'Error fetching categories');
+      } catch (err: unknown) {
+        setError(
+          err instanceof Error ? err.message : 'Error fetching categories'
+        );
         setCategories([]);
       } finally {
         setLoading(false);

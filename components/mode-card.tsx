@@ -1,4 +1,4 @@
-import Image, { StaticImageData } from 'next/image';
+import Image, { type StaticImageData } from 'next/image';
 
 const ModeCard = ({
   title,
@@ -21,6 +21,12 @@ const ModeCard = ({
           : 'bg-white shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] border-stone-100'
       }`}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
     >
       <Image src={img} alt='background' />
       <div className='p-6'>

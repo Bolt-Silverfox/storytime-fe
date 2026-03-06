@@ -1,10 +1,10 @@
 'use client';
 
+import { cancelFrame, frame } from 'framer-motion';
 import { ReactLenis } from 'lenis/react';
 import type { LenisRef } from 'lenis/react';
-import { frame, cancelFrame } from 'framer-motion';
-import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 
 export function LenisProvider({ children }: { children: React.ReactNode }) {
   const lenisRef = useRef<LenisRef>(null);
@@ -17,7 +17,9 @@ export function LenisProvider({ children }: { children: React.ReactNode }) {
 
   // Framer Motion의 단일 RAF 루프에 Lenis.raf() 훅킹
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     const unsubscribe = frame.update(({ timestamp }) => {
       lenisRef.current?.lenis?.raf(timestamp);
     }, /* immediate */ true);
@@ -27,13 +29,18 @@ export function LenisProvider({ children }: { children: React.ReactNode }) {
   }, [mounted]);
 
   // 경로 변경 시 스크롤 최상단으로 리셋
+  // biome-ignore lint/correctness/useExhaustiveDependencies: pathname is intentionally used as a trigger to scroll to top on route change
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     lenisRef.current?.lenis?.scrollTo(0, { immediate: true });
   }, [pathname, mounted]);
 
   // SSR 시엔 Lenis 감싸지 않고 바로 렌더
-  if (!mounted) return <>{children}</>;
+  if (!mounted) {
+    return <>{children}</>;
+  }
 
   return (
     <ReactLenis

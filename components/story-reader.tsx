@@ -1,11 +1,11 @@
-import movement from '@/public/movement.png';
-import movementSmall from '@/public/movement-small.png';
+import { getStoryAudioService, getStoryByIdService } from '@/lib/services';
 import edit from '@/public/edit.svg';
+import movementSmall from '@/public/movement-small.png';
+import movement from '@/public/movement.png';
 import play from '@/public/play.svg';
 import Image from 'next/image';
+import { useEffect, useRef, useState } from 'react';
 import { Switch } from './ui/switch';
-import { useState, useEffect, useRef } from 'react';
-import { getStoryByIdService, getStoryAudioService } from '@/lib/services';
 
 interface Question {
   id: string;
@@ -23,7 +23,7 @@ interface Story {
   textContent?: string;
   isInteractive?: boolean;
   questions?: Question[];
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface AudioResponse {
@@ -39,7 +39,6 @@ const StoryReader = ({
   description,
   voice,
   setStep,
-  expand,
   mode,
   storyId,
 }: {
@@ -48,7 +47,6 @@ const StoryReader = ({
   description: string;
   voice: string;
   setStep: (step: number) => void;
-  expand: boolean;
   mode?: string | null;
   storyId?: string | null;
 }) => {
@@ -71,7 +69,9 @@ const StoryReader = ({
 
   useEffect(() => {
     const fetchStory = async () => {
-      if (!storyId) return;
+      if (!storyId) {
+        return;
+      }
 
       setLoading(true);
       setError(null);
@@ -91,7 +91,9 @@ const StoryReader = ({
 
   useEffect(() => {
     const fetchAudio = async () => {
-      if (!storyId) return;
+      if (!storyId) {
+        return;
+      }
 
       setAudioLoading(true);
       setAudioError(null);
@@ -115,7 +117,9 @@ const StoryReader = ({
 
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!audio) {
+      return;
+    }
 
     const updateTime = () => setCurrentTime(audio.currentTime);
     const updateDuration = () => setDuration(audio.duration);
@@ -165,7 +169,9 @@ const StoryReader = ({
   };
 
   const handlePlayPause = () => {
-    if (!audioRef.current || !audioUrl) return;
+    if (!(audioRef.current && audioUrl)) {
+      return;
+    }
 
     if (isPlaying) {
       audioRef.current.pause();
@@ -220,7 +226,9 @@ const StoryReader = ({
           src={audioUrl}
           preload='metadata'
           onError={() => setAudioError('Failed to load audio')}
-        />
+        >
+          <track kind='captions' />
+        </audio>
       )}
 
       <div className='mb-16'>
@@ -262,8 +270,8 @@ const StoryReader = ({
               {audioError
                 ? 'Audio unavailable'
                 : audioLoading
-                ? 'Loading audio...'
-                : `${formatTime(currentTime)} / ${formatTime(duration)}`}
+                  ? 'Loading audio...'
+                  : `${formatTime(currentTime)} / ${formatTime(duration)}`}
             </small>
           </div>
         ) : (
@@ -274,8 +282,8 @@ const StoryReader = ({
                 {audioError
                   ? 'Audio unavailable'
                   : audioLoading
-                  ? 'Loading audio...'
-                  : `${formatTime(currentTime)} / ${formatTime(duration)}`}
+                    ? 'Loading audio...'
+                    : `${formatTime(currentTime)} / ${formatTime(duration)}`}
               </small>
             </div>
             <div className='bg-white flex justify-center items-center gap-3 shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] px-6 py-2.5 rounded-[3.125rem] border-[0.5px] border-solid border-[#FAF4F2] font-qilka'>
@@ -319,7 +327,8 @@ const StoryReader = ({
                 <div className='space-y-3'>
                   {currentQuestion?.options.map((option, index) => (
                     <button
-                      key={index}
+                      type='button'
+                      key={`option-${option}`}
                       onClick={() => handleAnswerSelect(index)}
                       disabled={showAnswer}
                       className={`w-full p-4 text-left rounded-lg border-2 transition-all ${
@@ -357,6 +366,7 @@ const StoryReader = ({
                     <div className='flex justify-center gap-4'>
                       {currentQuestionIndex > 0 && (
                         <button
+                          type='button'
                           onClick={handlePreviousQuestion}
                           className='px-4 py-2 bg-[#83E9FB] text-[#221D1D] rounded-lg font-abeezee'
                         >
@@ -366,6 +376,7 @@ const StoryReader = ({
                       {currentQuestionIndex <
                       (story.questions?.length || 0) - 1 ? (
                         <button
+                          type='button'
                           onClick={handleNextQuestion}
                           className='px-4 py-2 bg-[#83E9FB] text-[#221D1D] rounded-lg font-abeezee'
                         >
@@ -388,6 +399,7 @@ const StoryReader = ({
           </div>
         )}
         <button
+          type='button'
           onClick={handlePlayPause}
           disabled={!audioUrl || audioLoading || !!audioError}
           className={`mt-12 ${

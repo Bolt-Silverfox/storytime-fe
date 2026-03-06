@@ -1,9 +1,9 @@
 'use client';
 
-import AuthContextProvider from '@/context/auth-context';
-import { AuthNav } from './register/components/auth-nav';
-import { Suspense } from 'react';
 import { PageLoader } from '@/components/page-loader';
+import AuthContextProvider from '@/context/auth-context';
+import { Suspense } from 'react';
+import { AuthNav } from './register/components/auth-nav';
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
   return (

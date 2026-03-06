@@ -1,29 +1,17 @@
 'use client';
 
+import { PageLoader } from '@/components/page-loader';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { Icons } from '@/components/ui/icons';
-import Image from 'next/image';
 import {
-  Sheet,
-  SheetContent,
-  SheetFooter,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet';
-import { Separator } from '@/components/ui/separator';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { avatarOptions, cn } from '@/lib/utils';
-import {
-  Dropzone,
   DropZoneArea,
+  Dropzone,
   DropzoneFileList,
   DropzoneFileListItem,
-  DropzoneTrigger,
   DropzoneMessage,
   DropzoneRemoveFile,
+  DropzoneTrigger,
   useDropzone,
 } from '@/components/ui/dropzone';
-import { Trash2Icon } from 'lucide-react';
 import {
   Form,
   FormControl,
@@ -32,12 +20,24 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import { Icons } from '@/components/ui/icons';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Separator } from '@/components/ui/separator';
+import {
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
+import { avatarOptions, cn } from '@/lib/utils';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Trash2Icon } from 'lucide-react';
+import Image from 'next/image';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { useState } from 'react';
-import { PageLoader } from '@/components/page-loader';
 
 const FormSchema = z.object({
   avatar: z.string({

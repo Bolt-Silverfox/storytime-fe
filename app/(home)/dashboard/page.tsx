@@ -1,14 +1,13 @@
 'use client';
 
+import Header from '@/components/header';
+import KidPicker from '@/components/kid-picker';
+import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
-import KidsRow from './_components/kids-row';
 import DailyChallenge from './_components/daily-challenge';
 import Recommended from './_components/recommended';
-import ThemeStory from './_components/theme-story';
 import StoryCategory from './_components/story-category';
-import Header from '@/components/header';
-import { cn } from '@/lib/utils';
-import KidPicker from '@/components/kid-picker';
+import ThemeStory from './_components/theme-story';
 
 const DashboardPage = () => {
   const [selectedKidId, setSelectedKidId] = useState<string | null>(null);

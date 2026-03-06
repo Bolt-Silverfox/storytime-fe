@@ -122,7 +122,7 @@ jobs:
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
             nvm use 20
-            pm2 restart ecosystem.config.js --env development --update-env || pm2 start ecosystem.config.js --env development
+            npx pm2 restart ecosystem.config.js --env development --update-env || npx pm2 start ecosystem.config.js --env development
           EOF
 
       - name: Cleanup SSH key

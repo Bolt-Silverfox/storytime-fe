@@ -8,7 +8,7 @@ module.exports = {
       autorestart: true,
       watch: false,
       max_memory_restart: '512M',
-      env: {
+      env_development: {
         NODE_ENV: 'development',
         PORT: 3674,
       },

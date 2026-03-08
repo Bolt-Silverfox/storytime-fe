@@ -103,8 +103,7 @@ jobs:
 
       - name: Prepare deployment bundle
         run: |
-          mkdir -p deploy_bundle/.next
-          cp -r .next/standalone/* deploy_bundle/
+          cp -r .next/standalone/. deploy_bundle/
           cp -r .next/static deploy_bundle/.next/
           cp -r public deploy_bundle/
           cp ecosystem.config.js .env deploy_bundle/

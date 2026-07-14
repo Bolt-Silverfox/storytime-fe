@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { ageLabel, coverOf, getStory } from './get-story';
 import {
   APP_STORE_URL,
   PLAY_STORE_URL,
@@ -6,63 +7,12 @@ import {
   makeStoryDeepLink,
 } from './story-links';
 
-type SharedStory = {
-  id: string;
-  title: string;
-  description?: string | null;
-  coverImageUrl?: string | null;
-  imageUrl?: string | null;
-  ageMin?: number | null;
-  ageMax?: number | null;
-};
-
 const FALLBACK_DESCRIPTION =
   'Listen, read, and explore stories crafted just for kids on Storytime.';
-const FALLBACK_OG_IMAGE = `${SITE_URL}/og-default.png`;
 
-const coverOf = (story: SharedStory) =>
-  story.coverImageUrl || story.imageUrl || null;
-
-// Server-side fetch of the shareable story metadata. The backend's GET
-// /stories/:id is @OptionalAuth and only quota-guards authenticated requests,
-// so an anonymous server request returns the story. Returns null on any error
-// so the page can degrade gracefully instead of hard-failing.
-async function getStory(id: string): Promise<SharedStory | null> {
-  const base = process.env.NEXT_PUBLIC_API_URL;
-  if (!base) {
-    return null;
-  }
-  try {
-    const res = await fetch(`${base}/api/v1/stories/${id}`, {
-      headers: { Accept: 'application/json' },
-      // Cache the preview; stories rarely change and this is public metadata.
-      next: { revalidate: 3600 },
-    });
-    if (!res.ok) {
-      return null;
-    }
-    const body = await res.json();
-    const story = (body?.data ?? body) as SharedStory | undefined;
-    if (!story?.id) {
-      return null;
-    }
-    return story;
-  } catch {
-    return null;
-  }
-}
-
-const ageLabel = (story: SharedStory): string | null => {
-  const { ageMin, ageMax } = story;
-  if (typeof ageMin === 'number' && typeof ageMax === 'number') {
-    return `Ages ${ageMin}–${ageMax}`;
-  }
-  if (typeof ageMin === 'number') {
-    return `Ages ${ageMin}+`;
-  }
-  return null;
-};
-
+// og:image / twitter:image are supplied automatically by the sibling
+// opengraph-image.tsx (a dynamically generated 1200×630 card with the story
+// title), so metadata below only sets text fields.
 export async function generateMetadata({
   params,
 }: {
@@ -70,6 +20,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params;
   const story = await getStory(id);
+  const url = `${SITE_URL}/story/${id}`;
 
   if (!story) {
     return {
@@ -79,24 +30,20 @@ export async function generateMetadata({
       openGraph: {
         title: 'Storytime',
         description: FALLBACK_DESCRIPTION,
-        url: `${SITE_URL}/story/${id}`,
+        url,
         siteName: 'Storytime',
-        images: [FALLBACK_OG_IMAGE],
         type: 'website',
       },
       twitter: {
         card: 'summary_large_image',
         title: 'Storytime',
         description: FALLBACK_DESCRIPTION,
-        images: [FALLBACK_OG_IMAGE],
       },
     };
   }
 
   const description = story.description?.trim() || FALLBACK_DESCRIPTION;
-  const image = coverOf(story) || FALLBACK_OG_IMAGE;
   const title = `${story.title} · Storytime`;
-  const url = `${SITE_URL}/story/${story.id}`;
 
   return {
     metadataBase: new URL(SITE_URL),
@@ -108,14 +55,12 @@ export async function generateMetadata({
       description,
       url,
       siteName: 'Storytime',
-      images: [{ url: image, alt: story.title }],
       type: 'article',
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
-      images: [image],
     },
   };
 }

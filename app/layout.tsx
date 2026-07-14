@@ -18,8 +18,21 @@ const qilka = localFont({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://www.storytimeapp.me'),
   title: 'Storytime',
   description: 'Storytime is a platform for children to read stories.',
+  openGraph: {
+    title: 'Storytime',
+    description: 'Listen, read, and explore stories crafted just for kids.',
+    siteName: 'Storytime',
+    url: 'https://www.storytimeapp.me',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Storytime',
+    description: 'Listen, read, and explore stories crafted just for kids.',
+  },
 };
 
 export default function RootLayout({

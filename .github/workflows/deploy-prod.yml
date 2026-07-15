@@ -6,7 +6,7 @@ on:
       - main
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '24'
 
 jobs:
   lint:
@@ -82,7 +82,7 @@ jobs:
             cd ${{ secrets.DEPLOY_PATH }}
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
-            nvm use 20
+            nvm use 24
             npx pm2 startOrReload ecosystem.config.js --only storytime-fe-prod --update-env
             npx pm2 save
           EOF

@@ -23,10 +23,11 @@ const processQueue = (error: any, token: string | null = null) => {
   failedQueue = [];
 };
 
+const API_ORIGIN =
+  process.env.NEXT_PUBLIC_API_URL || 'https://dev.api.storytimeapp.me';
+
 const api = axios.create({
-  baseURL:
-    `${process.env.NEXT_PUBLIC_API_URL}/api/v1/` ||
-    'https://dev.api.storytime.it.com/api/v1/',
+  baseURL: `${API_ORIGIN}/api/v1/`,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -42,7 +43,20 @@ api.interceptors.request.use((config) => {
 });
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // The backend wraps every success in { statusCode, success, data, message }.
+    // Unwrap it here so callers receive the actual payload as response.data.
+    const body = response.data;
+    if (
+      body &&
+      typeof body === 'object' &&
+      'success' in body &&
+      'data' in body
+    ) {
+      response.data = body.data;
+    }
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
 
@@ -66,16 +80,19 @@ api.interceptors.response.use(
       const refreshToken = Cookies.get('refreshToken');
 
       try {
-        const { data } = await axios.post(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/refresh-token`,
-          { refreshToken }
-        );
+        // Backend route is POST /auth/refresh with body { token }, and the
+        // response is enveloped. It returns a new jwt only (no rotated refresh
+        // token), so we keep the existing refreshToken cookie.
+        const { data } = await axios.post(`${API_ORIGIN}/api/v1/auth/refresh`, {
+          token: refreshToken,
+        });
 
-        const newAccessToken = data.jwt;
-        const newRefreshToken = data.refreshToken;
+        const newAccessToken = data?.data?.jwt;
+        if (!newAccessToken) {
+          throw new Error('Refresh response missing jwt');
+        }
 
         Cookies.set('accessToken', newAccessToken, { expires: 1 / 24 });
-        Cookies.set('refreshToken', newRefreshToken, { expires: 7 });
 
         processQueue(null, newAccessToken);
 

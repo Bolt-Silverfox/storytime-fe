@@ -1,4 +1,9 @@
-import { addKidsService, getKidsService } from '@/lib/services';
+import {
+  type SystemAvatar,
+  addKidsService,
+  getKidsService,
+  getSystemAvatarsService,
+} from '@/lib/services';
 import kid1 from '@/public/kid-3.svg';
 import kid3 from '@/public/kid-3.svg';
 import kid2 from '@/public/kid-4.svg';
@@ -31,15 +36,23 @@ const KidPicker = ({
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState({
     name: '',
+    avatarId: '',
     avatarUrl: '',
     ageRange: '',
   });
+  const [systemAvatars, setSystemAvatars] = useState<SystemAvatar[]>([]);
   const [formLoading, setFormLoading] = useState(false);
   const [_formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchKids();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    getSystemAvatarsService()
+      .then(setSystemAvatars)
+      .catch(() => setSystemAvatars([]));
   }, []);
 
   const fetchKids = async () => {
@@ -82,29 +95,17 @@ const KidPicker = ({
       await addKidsService([
         {
           name: form.name,
-          avatarUrl: form.avatarUrl,
           ageRange: form.ageRange,
+          ...(form.avatarId ? { avatarId: form.avatarId } : {}),
         },
       ]);
       setModalOpen(false);
-      setForm({ name: '', avatarUrl: '', ageRange: '' });
+      setForm({ name: '', avatarId: '', avatarUrl: '', ageRange: '' });
       fetchKids();
     } catch (err: unknown) {
       setFormError(err instanceof Error ? err.message : 'Failed to add child');
     } finally {
       setFormLoading(false);
-    }
-  };
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (files && files.length > 0) {
-      const selectedFile = files[0];
-      const url = URL.createObjectURL(selectedFile);
-      setForm((prevForm) => ({
-        ...prevForm,
-        avatarUrl: url,
-      }));
     }
   };
 
@@ -175,42 +176,47 @@ const KidPicker = ({
       >
         <div className='flex flex-col gap-6 min-h-[80vh] justify-between'>
           <div>
-            <div className='flex gap-4 items-center mb-6 mt-2'>
-              <div className='w-16 h-16 rounded-full bg-[#FFF6F3] flex items-center justify-center mb-2'>
-                {/* Avatar image or fallback icon */}
-                {form.avatarUrl ? (
-                  <img
-                    src={form.avatarUrl}
-                    alt='avatar'
-                    className='w-16 h-16 rounded-full object-cover'
-                  />
+            <div className='mb-6 mt-2'>
+              <p className='mb-2 text-[#4A413F] text-sm font-abeezee'>
+                Choose an avatar
+              </p>
+              <div className='flex flex-wrap gap-3'>
+                {systemAvatars.length === 0 ? (
+                  <p className='text-[#4A413F] text-sm font-abeezee'>
+                    Loading avatars…
+                  </p>
                 ) : (
-                  <svg width='68' height='68' viewBox='0 0 48 48' fill='none'>
-                    <title>Default avatar</title>
-                    <circle
-                      cx='24'
-                      cy='24'
-                      r='24'
-                      fill='#EC4007'
-                      fillOpacity='0.15'
-                    />
-                    <circle cx='24' cy='20' r='8' fill='#EC4007' />
-                    <ellipse cx='24' cy='34' rx='12' ry='7' fill='#EC4007' />
-                  </svg>
+                  systemAvatars.map((avatar) => {
+                    const isSelected = form.avatarId === avatar.id;
+                    const label = avatar.displayName || avatar.name || 'avatar';
+                    return (
+                      <button
+                        key={avatar.id}
+                        type='button'
+                        aria-label={`Select ${label}`}
+                        aria-pressed={isSelected}
+                        onClick={() =>
+                          setForm((f) => ({
+                            ...f,
+                            avatarId: avatar.id,
+                            avatarUrl: avatar.url,
+                          }))
+                        }
+                        className={`h-16 w-16 overflow-hidden rounded-full border-2 transition ${
+                          isSelected
+                            ? 'border-[#EC4007]'
+                            : 'border-transparent hover:border-[#F8C6B8]'
+                        }`}
+                      >
+                        <img
+                          src={avatar.url}
+                          alt={label}
+                          className='h-full w-full object-cover'
+                        />
+                      </button>
+                    );
+                  })
                 )}
-              </div>
-              <div className='relative'>
-                <input
-                  type='file'
-                  className='absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer'
-                  onChange={handleFileChange}
-                />
-                <button
-                  type='button'
-                  className='text-[#0731EC] text-sm font-abeezee cursor-pointer'
-                >
-                  Change image
-                </button>
               </div>
             </div>
 

@@ -83,7 +83,11 @@ const Page = () => {
       const response = await validateResetTokenService({ token, email });
 
       toast.success(response.message);
-      router.push(`/create-new-password?token=${data.pin}`);
+      router.push(
+        `/create-new-password?token=${encodeURIComponent(
+          data.pin
+        )}&email=${encodeURIComponent(email)}`
+      );
       // biome-ignore lint/suspicious/noExplicitAny: <explanation>
     } catch (error: any) {
       toast.error('OTP verification failed', {

@@ -59,6 +59,7 @@ export const CreateNewPasswordContent = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
+  const email = searchParams.get('email');
   const [passwordType, setPasswordType] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -70,8 +71,10 @@ export const CreateNewPasswordContent = () => {
   });
 
   async function onSubmit(data: z.infer<typeof FormSchema>) {
-    if (!token) {
-      toast.error('Token is missing from the URL');
+    if (!(token && email)) {
+      toast.error(
+        'Reset link is missing information. Please request a new one.'
+      );
       return;
     }
     setIsLoading(true);
@@ -79,6 +82,7 @@ export const CreateNewPasswordContent = () => {
     try {
       const response = await resetPasswordService({
         token,
+        email,
         newPassword: data.password,
       });
 

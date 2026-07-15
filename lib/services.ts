@@ -17,6 +17,9 @@ interface LoginPayload {
 interface KidsPayload {
   name: string;
   ageRange: string;
+  // Backend avatar id (from the avatar module). The old avatar/avatarUrl fields
+  // are not whitelisted by CreateKidDto and are stripped before sending.
+  avatarId?: string;
   avatar?: string;
   avatarUrl?: string;
 }
@@ -165,7 +168,7 @@ export const loginService = async (payload: LoginPayload) => {
 
 export const verifyEmailService = async (token: string) => {
   try {
-    const response = await api.post(`auth/verify-email?token=${token}`);
+    const response = await api.post('auth/verify-email', { token });
     return response.data;
   } catch (error: unknown) {
     if (error instanceof AxiosError) {
@@ -189,7 +192,7 @@ export const verifyEmailService = async (token: string) => {
 
 export const sendVerificationEmailService = async (email: string) => {
   try {
-    const response = await api.post(`auth/send-verification?email=${email}`);
+    const response = await api.post('auth/send-verification', { email });
     return response.data;
   } catch (error: unknown) {
     if (error instanceof AxiosError) {
@@ -214,9 +217,7 @@ export const sendVerificationEmailService = async (email: string) => {
 
 export const requestPasswordResetService = async (email: string) => {
   try {
-    const response = await api.post(
-      `auth/request-password-reset?email=${encodeURIComponent(email)}`
-    );
+    const response = await api.post('auth/request-password-reset', { email });
     return response.data;
   } catch (error: unknown) {
     if (error instanceof AxiosError) {
@@ -247,11 +248,10 @@ export const validateResetTokenService = async ({
   email: string;
 }) => {
   try {
-    const response = await api.get(
-      `auth/validate-reset-token?token=${encodeURIComponent(
-        token
-      )}&email=${encodeURIComponent(email)}`
-    );
+    const response = await api.post('auth/validate-reset-token', {
+      token,
+      email,
+    });
     return response.data;
   } catch (error: unknown) {
     if (error instanceof AxiosError) {
@@ -276,17 +276,19 @@ export const validateResetTokenService = async ({
 
 export const resetPasswordService = async ({
   token,
+  email,
   newPassword,
 }: {
   token: string;
+  email: string;
   newPassword: string;
 }) => {
   try {
-    const response = await api.post(
-      `auth/reset-password?token=${encodeURIComponent(
-        token
-      )}&newPassword=${encodeURIComponent(newPassword)}`
-    );
+    const response = await api.post('auth/reset-password', {
+      token,
+      email,
+      newPassword,
+    });
     return response.data;
   } catch (error: unknown) {
     if (error instanceof AxiosError) {
@@ -308,9 +310,43 @@ export const resetPasswordService = async ({
   }
 };
 
+export interface SystemAvatar {
+  id: string;
+  name?: string | null;
+  displayName?: string | null;
+  url: string;
+}
+
+// Public list of selectable system avatars (GET /avatars/system).
+export const getSystemAvatarsService = async (): Promise<SystemAvatar[]> => {
+  try {
+    const response = await api.get('avatars/system');
+    return Array.isArray(response.data) ? response.data : [];
+  } catch (error: unknown) {
+    if (error instanceof AxiosError && error.response) {
+      throw {
+        message: error.response.data?.message || 'Failed to fetch avatars',
+        status: error.response.status,
+        data: error.response.data,
+      };
+    }
+    throw {
+      message: error instanceof Error ? error.message : 'Unexpected error',
+      status: null,
+    };
+  }
+};
+
 export const addKidsService = async (kids: KidsPayload[]) => {
   try {
-    const response = await api.post('auth/kids', kids);
+    // CreateKidDto only whitelists name/ageRange/avatarId (forbidNonWhitelisted
+    // rejects avatar/avatarUrl). Strip to the accepted fields.
+    const payload = kids.map(({ name, ageRange, avatarId }) => ({
+      name,
+      ageRange,
+      ...(avatarId ? { avatarId } : {}),
+    }));
+    const response = await api.post('auth/kids', payload);
     return response.data;
   } catch (error: unknown) {
     if (error instanceof AxiosError) {
@@ -358,7 +394,7 @@ export const getKidsService = async () => {
 
 export const getAvailableVoicesService = async (): Promise<Voice[]> => {
   try {
-    const response = await api.get('stories/voices/available');
+    const response = await api.get('voice/available');
     return response.data;
   } catch (error: unknown) {
     if (error instanceof AxiosError) {
@@ -383,7 +419,7 @@ export const getAvailableVoicesService = async (): Promise<Voice[]> => {
 
 export const setPreferredVoiceService = async (voiceId: string) => {
   try {
-    const response = await api.patch('stories/voices/preferred', {
+    const response = await api.patch('voice/preferred', {
       voiceId: voiceId,
     });
     return response.data;
@@ -587,11 +623,12 @@ export const getStoriesByThemeAndKidService = async (
 
 export const setKidPreferredVoiceService = async (
   kidId: string,
-  voiceType: string
+  preferredVoiceId: string
 ) => {
   try {
-    const response = await api.patch(`user/kids/${kidId}/voice`, {
-      voiceType,
+    // Kid voice preference is updated via the kid-update endpoint.
+    const response = await api.put(`auth/kids/${kidId}`, {
+      preferredVoiceId,
     });
     return response.data;
   } catch (error: unknown) {
@@ -643,32 +680,75 @@ export const clearSelectedModeFromStorage = () => {
   }
 };
 
-export const getStoryAudioService = async (
-  storyId: string
-): Promise<{
-  message: string;
+export interface StoryAudioParagraph {
+  index: number;
   audioUrl: string;
-  voiceType: string;
-  statusCode: number;
-}> => {
+}
+
+export interface StoryAudioBatch {
+  // e.g. 'queued' | 'processing' | 'completed' | 'partial' | 'failed'
+  status: string;
+  completedParagraphs: StoryAudioParagraph[];
+  totalQueued?: number;
+  // Present when there is more audio still generating in the background.
+  batchJobId?: string;
+}
+
+const normalizeAudioBatch = (raw: unknown): StoryAudioBatch => {
+  const data = (raw ?? {}) as Partial<StoryAudioBatch>;
+  return {
+    status: data.status ?? 'unknown',
+    completedParagraphs: Array.isArray(data.completedParagraphs)
+      ? data.completedParagraphs
+      : [],
+    totalQueued: data.totalQueued,
+    batchJobId: data.batchJobId,
+  };
+};
+
+// Kick off background TTS for a whole story. Returns any paragraphs that were
+// generated eagerly plus a batchJobId to poll for the rest.
+export const startStoryAudioBatchService = async (
+  storyId: string,
+  voiceId?: string
+): Promise<StoryAudioBatch> => {
+  try {
+    const response = await api.post('voice/story/audio/batch', {
+      storyId,
+      ...(voiceId ? { voiceId } : {}),
+    });
+    return normalizeAudioBatch(response.data);
+  } catch (error: unknown) {
+    if (error instanceof AxiosError && error.response) {
+      throw {
+        message: error.response.data?.message || 'Failed to start story audio',
+        status: error.response.status,
+        data: error.response.data,
+      };
+    }
+    throw {
+      message: error instanceof Error ? error.message : 'Unexpected error',
+      status: null,
+    };
+  }
+};
+
+// Poll a running batch for newly completed paragraphs.
+export const getStoryAudioBatchStatusService = async (
+  batchJobId: string
+): Promise<StoryAudioBatch> => {
   try {
     const response = await api.get(
-      `stories/story/audio/${storyId}?voiceType=MILO`
+      `voice/story/audio/batch/status/${batchJobId}`
     );
-    return response.data;
+    return normalizeAudioBatch(response.data);
   } catch (error: unknown) {
-    if (error instanceof AxiosError) {
-      if (error.response) {
-        throw {
-          message:
-            error.response.data?.message || 'Failed to fetch story audio',
-          status: error.response.status,
-          data: error.response.data,
-        };
-      }
-      if (error.request) {
-        throw { message: 'No response from server', status: null };
-      }
+    if (error instanceof AxiosError && error.response) {
+      throw {
+        message: error.response.data?.message || 'Failed to fetch audio status',
+        status: error.response.status,
+        data: error.response.data,
+      };
     }
     throw {
       message: error instanceof Error ? error.message : 'Unexpected error',

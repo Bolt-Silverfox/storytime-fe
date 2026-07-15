@@ -72,7 +72,7 @@ jobs:
 
       - name: Deploy with rsync
         run: |
-          rsync -avz --delete \
+          rsync -avz --delete-after \
             deploy_bundle/ \
             ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.DEPLOY_PATH }}/
 

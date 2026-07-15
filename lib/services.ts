@@ -368,6 +368,38 @@ export const addKidsService = async (kids: KidsPayload[]) => {
   }
 };
 
+// Update the parent's own profile (PATCH /user/me).
+export const updateParentProfileService = async (payload: {
+  name?: string;
+  language?: string;
+  country?: string;
+  biometricsEnabled?: boolean;
+  preferredCategoryIds?: string[];
+}) => {
+  const response = await api.patch('user/me', payload);
+  return response.data;
+};
+
+// Update a kid (PUT /auth/kids/:id).
+export const updateKidService = async (
+  kidId: string,
+  payload: {
+    name?: string;
+    ageRange?: string;
+    avatarId?: string;
+    preferredVoiceId?: string;
+  }
+) => {
+  const response = await api.put(`auth/kids/${kidId}`, payload);
+  return response.data;
+};
+
+// Delete a kid (DELETE /auth/kids/:id).
+export const deleteKidService = async (kidId: string) => {
+  const response = await api.delete(`auth/kids/${kidId}`);
+  return response.data;
+};
+
 export const getKidsService = async () => {
   try {
     const response = await api.get('auth/kids');

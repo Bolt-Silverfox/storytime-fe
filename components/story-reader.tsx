@@ -1,4 +1,8 @@
-import { getStoryAudioService, getStoryByIdService } from '@/lib/services';
+import {
+  getStoryAudioBatchStatusService,
+  getStoryByIdService,
+  startStoryAudioBatchService,
+} from '@/lib/services';
 import edit from '@/public/edit.svg';
 import movementSmall from '@/public/movement-small.png';
 import movement from '@/public/movement.png';
@@ -24,13 +28,6 @@ interface Story {
   isInteractive?: boolean;
   questions?: Question[];
   [key: string]: unknown;
-}
-
-interface AudioResponse {
-  message: string;
-  audioUrl: string;
-  voiceType: string;
-  statusCode: number;
 }
 
 const StoryReader = ({
@@ -66,6 +63,10 @@ const StoryReader = ({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Story audio is generated per-paragraph; we play the clips in sequence.
+  const playlistRef = useRef<string[]>([]);
+  const clipIndexRef = useRef(0);
+  const isPlayingRef = useRef(false);
 
   useEffect(() => {
     const fetchStory = async () => {
@@ -90,6 +91,11 @@ const StoryReader = ({
   }, [storyId]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    const buildPlaylist = (paras: { index: number; audioUrl: string }[]) =>
+      [...paras].sort((a, b) => a.index - b.index).map((p) => p.audioUrl);
+
     const fetchAudio = async () => {
       if (!storyId) {
         return;
@@ -98,22 +104,58 @@ const StoryReader = ({
       setAudioLoading(true);
       setAudioError(null);
       try {
-        const audioData: AudioResponse = await getStoryAudioService(storyId);
-        if (audioData.audioUrl) {
-          setAudioUrl(audioData.audioUrl);
-        } else {
-          setAudioError('No audio URL received from server');
+        let batch = await startStoryAudioBatchService(storyId);
+        // Poll until background generation finishes (or we hit the cap).
+        let attempts = 0;
+        while (
+          !cancelled &&
+          batch.batchJobId &&
+          batch.status !== 'completed' &&
+          batch.status !== 'failed' &&
+          attempts < 30
+        ) {
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          attempts += 1;
+          batch = await getStoryAudioBatchStatusService(batch.batchJobId);
         }
+        if (cancelled) {
+          return;
+        }
+
+        const playlist = buildPlaylist(batch.completedParagraphs);
+        if (playlist.length === 0) {
+          setAudioError(
+            'Audio is still being prepared. Please try again shortly.'
+          );
+          return;
+        }
+        playlistRef.current = playlist;
+        clipIndexRef.current = 0;
+        setAudioUrl(playlist[0]);
       } catch (error) {
+        if (cancelled) {
+          return;
+        }
         console.error('Failed to fetch audio:', error);
         setAudioError('Failed to load audio');
       } finally {
-        setAudioLoading(false);
+        if (!cancelled) {
+          setAudioLoading(false);
+        }
       }
     };
 
     fetchAudio();
+    return () => {
+      cancelled = true;
+    };
   }, [storyId]);
+
+  // Keep a ref of isPlaying so the audio-element listeners (mounted once) can
+  // read the latest value without stale closures.
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -123,7 +165,18 @@ const StoryReader = ({
 
     const updateTime = () => setCurrentTime(audio.currentTime);
     const updateDuration = () => setDuration(audio.duration);
-    const handleEnded = () => setIsPlaying(false);
+    // At clip end, advance to the next paragraph; stop (and reset) at the end.
+    const handleEnded = () => {
+      const next = clipIndexRef.current + 1;
+      if (next < playlistRef.current.length) {
+        clipIndexRef.current = next;
+        setAudioUrl(playlistRef.current[next]);
+      } else {
+        setIsPlaying(false);
+        clipIndexRef.current = 0;
+        setAudioUrl(playlistRef.current[0] ?? null);
+      }
+    };
 
     audio.addEventListener('timeupdate', updateTime);
     audio.addEventListener('loadedmetadata', updateDuration);
@@ -135,6 +188,16 @@ const StoryReader = ({
       audio.removeEventListener('ended', handleEnded);
     };
   }, []);
+
+  // When the current clip changes (next paragraph), resume playback if we were
+  // already playing.
+  useEffect(() => {
+    if (audioUrl && isPlayingRef.current && audioRef.current) {
+      audioRef.current.play().catch(() => {
+        setAudioError('Failed to play audio');
+      });
+    }
+  }, [audioUrl]);
 
   const getModeDescription = () => {
     switch (mode) {

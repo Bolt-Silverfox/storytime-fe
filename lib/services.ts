@@ -310,6 +310,33 @@ export const resetPasswordService = async ({
   }
 };
 
+export interface SystemAvatar {
+  id: string;
+  name?: string | null;
+  displayName?: string | null;
+  url: string;
+}
+
+// Public list of selectable system avatars (GET /avatars/system).
+export const getSystemAvatarsService = async (): Promise<SystemAvatar[]> => {
+  try {
+    const response = await api.get('avatars/system');
+    return Array.isArray(response.data) ? response.data : [];
+  } catch (error: unknown) {
+    if (error instanceof AxiosError && error.response) {
+      throw {
+        message: error.response.data?.message || 'Failed to fetch avatars',
+        status: error.response.status,
+        data: error.response.data,
+      };
+    }
+    throw {
+      message: error instanceof Error ? error.message : 'Unexpected error',
+      status: null,
+    };
+  }
+};
+
 export const addKidsService = async (kids: KidsPayload[]) => {
   try {
     // CreateKidDto only whitelists name/ageRange/avatarId (forbidNonWhitelisted

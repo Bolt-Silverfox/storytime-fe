@@ -1,19 +1,35 @@
 'use client';
 
-import { type StoryListItem, listStoriesService } from '@/lib/services';
+import {
+  type StoryCategory,
+  type StoryListItem,
+  listCategoriesService,
+  listStoriesService,
+} from '@/lib/services';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
+const ALL = 'All';
+
 export default function StoriesBrowsePage() {
   const [stories, setStories] = useState<StoryListItem[]>([]);
+  const [categories, setCategories] = useState<StoryCategory[]>([]);
+  const [selected, setSelected] = useState<string>(ALL);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    listStoriesService()
+    listCategoriesService()
+      .then(setCategories)
+      .catch(() => setCategories([]));
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    listStoriesService(selected === ALL ? undefined : selected)
       .then(setStories)
       .catch(() => setStories([]))
       .finally(() => setLoading(false));
-  }, []);
+  }, [selected]);
 
   return (
     <main className='min-h-dvh bg-[#FFF8ED] text-[#1B1300]'>
@@ -34,11 +50,32 @@ export default function StoriesBrowsePage() {
           Pick a story and start reading — no account needed.
         </p>
 
+        {/* Category filter */}
+        <div className='mt-6 flex flex-wrap gap-2'>
+          {[{ id: ALL, name: ALL }, ...categories].map((cat) => {
+            const active = selected === cat.id;
+            return (
+              <button
+                key={cat.id}
+                type='button'
+                onClick={() => setSelected(cat.id)}
+                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                  active
+                    ? 'bg-[#EC4007] text-white'
+                    : 'bg-white text-[#5B4B33] hover:bg-[#FCE9CE]'
+                }`}
+              >
+                {cat.name}
+              </button>
+            );
+          })}
+        </div>
+
         {loading ? (
           <p className='mt-10 text-[#5B4B33]'>Loading stories…</p>
         ) : stories.length === 0 ? (
           <p className='mt-10 text-[#5B4B33]'>
-            No stories available right now.
+            No stories in this category yet.
           </p>
         ) : (
           <div className='mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3'>

@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
-import { ageLabel, coverOf, getStory } from './get-story';
+import { ageLabel, coverOf, extractStoryId, getStory } from './get-story';
 import {
   APP_STORE_URL,
   PLAY_STORE_URL,
   SITE_URL,
   makeStoryDeepLink,
 } from './story-links';
+import StoryView from './story-view';
 
 const FALLBACK_DESCRIPTION =
   'Listen, read, and explore stories crafted just for kids on Storytime.';
@@ -133,12 +134,15 @@ export default async function StorySharePage({
           </p>
         </div>
 
-        {/* CTAs */}
+        {/* Read it here (guest) */}
+        {story && <StoryView storyId={extractStoryId(id)} />}
+
+        {/* Or get the app */}
         <div className='grid gap-3 sm:grid-cols-2'>
           {deepLink && (
             <a
               href={deepLink}
-              className='flex items-center justify-center rounded-2xl bg-[#EC4007] px-6 py-4 text-center text-base font-semibold text-white transition hover:opacity-90 sm:col-span-2'
+              className='flex items-center justify-center rounded-2xl border border-[#EC4007]/40 px-6 py-4 text-center text-base font-semibold text-[#EC4007] transition hover:bg-[#EC4007]/5 sm:col-span-2'
             >
               Open in the Storytime app
             </a>

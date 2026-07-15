@@ -542,6 +542,81 @@ export const getStoryThemesService = async () => {
   }
 };
 
+// ----- Guest reading (public, mirrors the mobile guest flow) -----
+
+export interface GuestSession {
+  sessionId: string;
+  expiresIn: number;
+}
+
+export interface GuestStory {
+  id: string;
+  title: string;
+  description?: string | null;
+  coverImageUrl?: string | null;
+  audioUrl?: string | null;
+  textContent?: string | null;
+  isInteractive?: boolean;
+  ageMin?: number | null;
+  ageMax?: number | null;
+}
+
+export interface StoryListItem {
+  id: string;
+  title: string;
+  description?: string | null;
+  coverImageUrl?: string | null;
+  ageMin?: number | null;
+  ageMax?: number | null;
+}
+
+// Thrown by the guest reader so callers can detect the quota wall (403).
+export interface ServiceError {
+  message: string;
+  status: number | null;
+}
+
+export const createGuestSessionService = async (): Promise<GuestSession> => {
+  const response = await api.post('guest/session');
+  return response.data;
+};
+
+// Reads a story as a guest. Consumes a quota slot for a new story, free for an
+// already-read one. Throws { message, status } — status 403 means quota reached.
+export const getGuestStoryService = async (
+  storyId: string
+): Promise<GuestStory> => {
+  try {
+    const response = await api.get(`guest/stories/${storyId}`);
+    return response.data;
+  } catch (error: unknown) {
+    if (error instanceof AxiosError) {
+      throw {
+        message: error.response?.data?.message || 'Failed to load story',
+        status: error.response?.status ?? null,
+      } satisfies ServiceError;
+    }
+    throw {
+      message: error instanceof Error ? error.message : 'Unexpected error',
+      status: null,
+    } satisfies ServiceError;
+  }
+};
+
+// Public list of stories for browsing (GET /stories is @OptionalAuth).
+export const listStoriesService = async (): Promise<StoryListItem[]> => {
+  try {
+    const response = await api.get('stories');
+    const data = response.data;
+    if (Array.isArray(data)) {
+      return data;
+    }
+    return data?.stories ?? data?.data ?? data?.items ?? [];
+  } catch {
+    return [];
+  }
+};
+
 export const getStoryByIdService = async (storyId: string) => {
   try {
     const response = await api.get(`stories/${storyId}`);

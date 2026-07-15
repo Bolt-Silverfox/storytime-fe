@@ -43,10 +43,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # NEXT_PUBLIC_API_URL is inlined at build time — the PROD_ENV_FILE secret
-      # must set NEXT_PUBLIC_API_URL=https://api.storytimeapp.me
+      # NEXT_PUBLIC_API_URL is inlined at build time — the production ENV_FILE
+      # secret must set NEXT_PUBLIC_API_URL=https://api.storytimeapp.me
       - name: Create .env file
-        run: echo "${{ secrets.PROD_ENV_FILE }}" > .env
+        run: echo "${{ secrets.ENV_FILE }}" > .env
 
       - name: Build application
         run: pnpm build
@@ -54,13 +54,13 @@ jobs:
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.PROD_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.PROD_SERVER_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
 
       - name: Ensure deploy path exists
         run: |
-          ssh ${{ secrets.PROD_SERVER_USER }}@${{ secrets.PROD_SERVER_HOST }} "mkdir -p ${{ secrets.PROD_DEPLOY_PATH }}"
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "mkdir -p ${{ secrets.DEPLOY_PATH }}"
 
       - name: Prepare deployment bundle
         run: |
@@ -74,12 +74,12 @@ jobs:
         run: |
           rsync -avz --delete \
             deploy_bundle/ \
-            ${{ secrets.PROD_SERVER_USER }}@${{ secrets.PROD_SERVER_HOST }}:${{ secrets.PROD_DEPLOY_PATH }}/
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.DEPLOY_PATH }}/
 
       - name: Restart application with PM2
         run: |
-          ssh ${{ secrets.PROD_SERVER_USER }}@${{ secrets.PROD_SERVER_HOST }} << 'EOF'
-            cd ${{ secrets.PROD_DEPLOY_PATH }}
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+            cd ${{ secrets.DEPLOY_PATH }}
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
             nvm use 20

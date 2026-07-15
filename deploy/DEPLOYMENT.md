@@ -27,24 +27,25 @@ Create these records at the DNS provider for `storytimeapp.me`:
 
 | Type | Name | Value |
 |---|---|---|
-| A | `dev.web` | `3.136.23.56` (shared dev/staging server) |
-| A | `staging.web` | `3.136.23.56` (shared dev/staging server) |
-| A | `web` | **<prod server IP>** |
+| A | `dev.web` | `52.18.195.224` (shared dev/staging server) |
+| A | `staging.web` | `52.18.195.224` (shared dev/staging server) |
+| A | `web` | `18.203.158.141` (ec2-18-203-158-141.eu-west-1) |
 
 (The backend CORS already allows `*.storytimeapp.me` at any depth, so no backend
 change is needed.)
 
 ## 2. GitHub Actions secrets
 
-**`production` environment** (for `deploy-prod.yml`):
+The `production` environment secrets are **already set** (via `gh secret set`),
+scoped to the environment with the same names the dev workflow uses:
 
-| Secret | Value |
+| Secret (production env) | Value |
 |---|---|
-| `PROD_SERVER_HOST` | prod server IP/host |
-| `PROD_SERVER_USER` | ssh user |
-| `PROD_DEPLOY_PATH` | e.g. `/var/www/storytime/prod/frontend` |
-| `PROD_SSH_PRIVATE_KEY` | private key with access to the prod box |
-| `PROD_ENV_FILE` | full `.env` contents, **must** include `NEXT_PUBLIC_API_URL=https://api.storytimeapp.me` |
+| `SERVER_HOST` | `ec2-18-203-158-141.eu-west-1.compute.amazonaws.com` |
+| `SERVER_USER` | `ubuntu` |
+| `DEPLOY_PATH` | `/var/www/storytime/prod/frontend` (⚠️ must be writable by `ubuntu` for rsync — `sudo chown -R ubuntu:ubuntu` it once) |
+| `SSH_PRIVATE_KEY` | `~/.ssh/storytime_rsa` (same key that reaches both boxes) |
+| `ENV_FILE` | `NEXT_PUBLIC_API_URL=https://api.storytimeapp.me` |
 
 **`development` environment** (existing `deploy-dev.yml`): confirm its
 `ENV_FILE` secret sets `NEXT_PUBLIC_API_URL=https://dev.api.storytimeapp.me`.

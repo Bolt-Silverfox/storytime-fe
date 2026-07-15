@@ -39,10 +39,11 @@ const buttonVariants = cva(
 );
 
 export type ButtonProps = (
-  | (React.ButtonHTMLAttributes<HTMLButtonElement> & { href?: undefined })
-  | (React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string })
+  | React.ButtonHTMLAttributes<HTMLButtonElement>
+  | React.AnchorHTMLAttributes<HTMLAnchorElement>
 ) &
   VariantProps<typeof buttonVariants> & {
+    href?: string;
     asChild?: boolean;
   };
 

@@ -11,10 +11,10 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
 
       - name: Install Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v6
         with:
           node-version: 18
 
@@ -51,8 +51,8 @@ jobs:
             echo '👉 Building project'
             sudo npm run build
 
-            echo '👉 Restarting PM2'
-            sudo pm2 restart storytime-frontend-staging || sudo pm2 start 'npm -- start' --name storytime-frontend-staging
+            echo '👉 Restarting PM2 (port 3675 -> staging.web.storytimeapp.me)'
+            sudo env PORT=3675 pm2 restart storytime-frontend-staging --update-env || sudo env PORT=3675 pm2 start 'npm -- start' --name storytime-frontend-staging
 
             echo '👉 Saving PM2 boot'
             sudo pm2 save

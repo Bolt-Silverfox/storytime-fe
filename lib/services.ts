@@ -603,15 +603,45 @@ export const getGuestStoryService = async (
   }
 };
 
-// Public list of stories for browsing (GET /stories is @OptionalAuth).
-export const listStoriesService = async (): Promise<StoryListItem[]> => {
+export interface StoryCategory {
+  id: string;
+  name: string;
+}
+
+// Public list of stories for browsing (GET /stories is @OptionalAuth),
+// optionally filtered by category name.
+export const listStoriesService = async (
+  category?: string
+): Promise<StoryListItem[]> => {
   try {
-    const response = await api.get('stories');
+    const url = category
+      ? `stories?category=${encodeURIComponent(category)}`
+      : 'stories';
+    const response = await api.get(url);
     const data = response.data;
     if (Array.isArray(data)) {
       return data;
     }
     return data?.stories ?? data?.data ?? data?.items ?? [];
+  } catch {
+    return [];
+  }
+};
+
+// Public list of story categories (GET /stories/categories is @Public).
+export const listCategoriesService = async (): Promise<StoryCategory[]> => {
+  try {
+    const response = await api.get('stories/categories');
+    const data = response.data;
+    const arr = Array.isArray(data)
+      ? data
+      : (data?.data ?? data?.categories ?? []);
+    return arr
+      .map((c: { id?: string; name?: string }) => ({
+        id: c.id ?? c.name ?? '',
+        name: c.name ?? '',
+      }))
+      .filter((c: StoryCategory) => c.name);
   } catch {
     return [];
   }

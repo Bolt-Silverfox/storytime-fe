@@ -13,7 +13,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { countries } from '@/data/countries';
-import { getKidsService, getUserFromStorage } from '@/lib/services';
+import {
+  deleteKidService,
+  getKidsService,
+  getUserFromStorage,
+  updateKidService,
+  updateParentProfileService,
+} from '@/lib/services';
 import { cn } from '@/lib/utils';
 import avatar from '@/public/avatar-big.png';
 import danny from '@/public/danny.png';
@@ -26,6 +32,7 @@ import oliva from '@/public/oliva.png';
 import stella from '@/public/stella.png';
 import Image from 'next/image';
 import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 interface MappedKid {
   id: string;
@@ -39,7 +46,7 @@ interface MappedKid {
 const defaultAvatars = [kidAvatar1, kidAvatar2, kidAvatar1, kidAvatar2];
 
 const PersonalSettingsPage = () => {
-  const user = getUserFromStorage();
+  const [user, setUser] = useState(() => getUserFromStorage());
   const [kids, setKids] = useState<MappedKid[]>([]);
   const [_loading, setLoading] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
@@ -85,36 +92,61 @@ const PersonalSettingsPage = () => {
     'Others',
   ];
 
-  useEffect(() => {
-    const fetchKids = async () => {
-      try {
-        const kidsData = await getKidsService();
-        const mappedKids = kidsData.map((kid: Kid, index: number) => ({
-          id: kid.id,
-          name: kid.name,
-          age: `${kid.ageRange} yrs`,
-          cstories: '0 Stories completed', // This could be fetched separately if needed
-          img: kid.avatarUrl || defaultAvatars[index % defaultAvatars.length],
-        }));
-        setKids(mappedKids);
-      } catch (error) {
-        console.error('Failed to fetch kids:', error);
-        setKids([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchKids();
+  const fetchKids = useCallback(async () => {
+    try {
+      const kidsData = await getKidsService();
+      const mappedKids = kidsData.map((kid: Kid, index: number) => ({
+        id: kid.id,
+        name: kid.name,
+        age: `${kid.ageRange}`,
+        cstories: '0 Stories completed', // This could be fetched separately if needed
+        img: kid.avatarUrl || defaultAvatars[index % defaultAvatars.length],
+      }));
+      setKids(mappedKids);
+    } catch (error) {
+      console.error('Failed to fetch kids:', error);
+      setKids([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchKids();
+  }, [fetchKids]);
 
   const handleFormChange = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSave = () => {
-    setEditOpen(false);
-    // Save logic here
+  const handleSave = async () => {
+    try {
+      await updateParentProfileService({
+        name: form.name,
+        language: form.language,
+        country: form.country,
+      });
+      const current = getUserFromStorage();
+      if (current) {
+        const updated = {
+          ...current,
+          name: form.name,
+          profile: {
+            ...current.profile,
+            language: form.language,
+            country: form.country,
+          },
+        };
+        localStorage.setItem('user', JSON.stringify(updated));
+        setUser(updated);
+      }
+      toast.success('Profile updated');
+      setEditOpen(false);
+    } catch (err) {
+      toast.error(
+        (err as { message?: string })?.message || 'Failed to update profile'
+      );
+    }
   };
 
   const handleEditKid = (kid: MappedKid) => {
@@ -127,9 +159,24 @@ const PersonalSettingsPage = () => {
     setKidForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSaveKid = () => {
-    setEditKidOpen(false);
-    // Save logic for kid here
+  const handleSaveKid = async () => {
+    if (!selectedKid) {
+      setEditKidOpen(false);
+      return;
+    }
+    try {
+      await updateKidService(selectedKid.id, {
+        name: kidForm.name,
+        ageRange: kidForm.age,
+      });
+      toast.success('Child updated');
+      setEditKidOpen(false);
+      await fetchKids();
+    } catch (err) {
+      toast.error(
+        (err as { message?: string })?.message || 'Failed to update child'
+      );
+    }
   };
 
   const handleRemoveKid = useCallback(() => {
@@ -137,10 +184,20 @@ const PersonalSettingsPage = () => {
     setEditKidOpen(false);
   }, []);
 
-  const confirmRemoveKid = () => {
+  const confirmRemoveKid = async () => {
+    if (selectedKid) {
+      try {
+        await deleteKidService(selectedKid.id);
+        toast.success('Child removed');
+        await fetchKids();
+      } catch (err) {
+        toast.error(
+          (err as { message?: string })?.message || 'Failed to remove child'
+        );
+      }
+    }
     setShowRemoveKidModal(false);
     setEditKidOpen(false);
-    // Remove logic for kid here
   };
 
   const cancelRemoveKid = () => {

@@ -368,6 +368,38 @@ export const addKidsService = async (kids: KidsPayload[]) => {
   }
 };
 
+// Update the parent's own profile (PATCH /user/me).
+export const updateParentProfileService = async (payload: {
+  name?: string;
+  language?: string;
+  country?: string;
+  biometricsEnabled?: boolean;
+  preferredCategoryIds?: string[];
+}) => {
+  const response = await api.patch('user/me', payload);
+  return response.data;
+};
+
+// Update a kid (PUT /auth/kids/:id).
+export const updateKidService = async (
+  kidId: string,
+  payload: {
+    name?: string;
+    ageRange?: string;
+    avatarId?: string;
+    preferredVoiceId?: string;
+  }
+) => {
+  const response = await api.put(`auth/kids/${kidId}`, payload);
+  return response.data;
+};
+
+// Delete a kid (DELETE /auth/kids/:id).
+export const deleteKidService = async (kidId: string) => {
+  const response = await api.delete(`auth/kids/${kidId}`);
+  return response.data;
+};
+
 export const getKidsService = async () => {
   try {
     const response = await api.get('auth/kids');
@@ -539,6 +571,111 @@ export const getStoryThemesService = async () => {
       message: error instanceof Error ? error.message : 'Unexpected error',
       status: null,
     };
+  }
+};
+
+// ----- Guest reading (public, mirrors the mobile guest flow) -----
+
+export interface GuestSession {
+  sessionId: string;
+  expiresIn: number;
+}
+
+export interface GuestStory {
+  id: string;
+  title: string;
+  description?: string | null;
+  coverImageUrl?: string | null;
+  audioUrl?: string | null;
+  textContent?: string | null;
+  isInteractive?: boolean;
+  ageMin?: number | null;
+  ageMax?: number | null;
+}
+
+export interface StoryListItem {
+  id: string;
+  title: string;
+  description?: string | null;
+  coverImageUrl?: string | null;
+  ageMin?: number | null;
+  ageMax?: number | null;
+}
+
+// Thrown by the guest reader so callers can detect the quota wall (403).
+export interface ServiceError {
+  message: string;
+  status: number | null;
+}
+
+export const createGuestSessionService = async (): Promise<GuestSession> => {
+  const response = await api.post('guest/session');
+  return response.data;
+};
+
+// Reads a story as a guest. Consumes a quota slot for a new story, free for an
+// already-read one. Throws { message, status } — status 403 means quota reached.
+export const getGuestStoryService = async (
+  storyId: string
+): Promise<GuestStory> => {
+  try {
+    const response = await api.get(`guest/stories/${storyId}`);
+    return response.data;
+  } catch (error: unknown) {
+    if (error instanceof AxiosError) {
+      throw {
+        message: error.response?.data?.message || 'Failed to load story',
+        status: error.response?.status ?? null,
+      } satisfies ServiceError;
+    }
+    throw {
+      message: error instanceof Error ? error.message : 'Unexpected error',
+      status: null,
+    } satisfies ServiceError;
+  }
+};
+
+export interface StoryCategory {
+  id: string;
+  name: string;
+}
+
+// Public list of stories for browsing (GET /stories is @OptionalAuth),
+// optionally filtered by category name.
+export const listStoriesService = async (
+  category?: string
+): Promise<StoryListItem[]> => {
+  try {
+    const url = category
+      ? `stories?category=${encodeURIComponent(category)}`
+      : 'stories';
+    const response = await api.get(url);
+    const data = response.data;
+    if (Array.isArray(data)) {
+      return data;
+    }
+    return data?.stories ?? data?.data ?? data?.items ?? [];
+  } catch {
+    return [];
+  }
+};
+
+// Public list of story categories (GET /stories/categories is @Public).
+export const listCategoriesService = async (): Promise<StoryCategory[]> => {
+  try {
+    const response = await api.get('stories/categories');
+    const data = response.data;
+    const arr = Array.isArray(data)
+      ? data
+      : (data?.data ?? data?.categories ?? []);
+    return arr
+      .map((c: { id?: string; name?: string }) => ({
+        id: c.id ?? c.name ?? '',
+        name: c.name ?? '',
+      }))
+      .filter((c: StoryCategory) => c.name);
+  } catch {
+    return [];
   }
 };
 

@@ -49,6 +49,10 @@ const VoiceSelector = ({
   // non-premium; free logged-in users can preview but not change (mirrors the
   // backend /voice/access gate and the mobile voice picker).
   const [isPremium, setIsPremium] = useState(false);
+  // The voice that currently reads this user's stories. For locked (guest/free)
+  // users this is the backend's lockedVoiceId/default so they can see which
+  // voice is active even though they can't switch.
+  const [currentVoiceId, setCurrentVoiceId] = useState<string | null>(null);
   const canSwitchVoice = isPremium;
   // A single shared preview player so tapping Listen on several voices doesn't
   // stack overlapping audio (mirrors the mobile single-player behaviour).
@@ -57,14 +61,12 @@ const VoiceSelector = ({
   useEffect(() => {
     const fetchVoices = async () => {
       try {
-        // /voice/available is public; /voice/preferred and /voice/access are
-        // auth-only, so guests only fetch the list (they're never premium).
+        // /voice/available and /voice/access are guest-accessible (OptionalAuth);
+        // /voice/preferred is auth-only, so guests skip only that one.
         const [voicesData, preferred, access] = await Promise.all([
           getAvailableVoicesService(),
           isGuest ? Promise.resolve(null) : getPreferredVoiceService(),
-          isGuest
-            ? Promise.resolve({ isPremium: false })
-            : getVoiceAccessService(),
+          getVoiceAccessService(),
         ]);
         const mappedVoices = voicesData.map((voice) => ({
           name: voice.displayName || voice.name,
@@ -75,6 +77,11 @@ const VoiceSelector = ({
         }));
         setVoices(mappedVoices);
         setIsPremium(access.isPremium);
+        // The voice that actually reads stories for a locked user — preferred
+        // if they have one, otherwise the backend's locked/default voice.
+        setCurrentVoiceId(
+          preferred?.id ?? access.lockedVoiceId ?? access.defaultVoice ?? null
+        );
         if (preferred?.id) {
           setSelectedVoiceId(preferred.id);
         }
@@ -158,6 +165,9 @@ const VoiceSelector = ({
     }
   };
 
+  const currentVoiceName =
+    voices.find((v) => v.id === currentVoiceId)?.name ?? null;
+
   if (loading) {
     return (
       <div className={`${expand ? 'h-[90%]' : ''}`}>
@@ -210,6 +220,7 @@ const VoiceSelector = ({
             avatar={voice.avatar}
             selectable={canSwitchVoice}
             active={selectedVoiceId === voice.id}
+            current={!canSwitchVoice && voice.id === currentVoiceId}
             onClick={() => setSelectedVoiceId(voice.id)}
             onListen={(e) => handleListen(voice, e)}
           />
@@ -217,7 +228,17 @@ const VoiceSelector = ({
       </div>
       {!canSwitchVoice && (
         <p className='mb-4 text-sm text-[#4A413F] font-abeezee'>
-          Preview any voice with <span className='font-semibold'>Listen</span>.{' '}
+          {currentVoiceName ? (
+            <>
+              <span className='font-semibold'>{currentVoiceName}</span> reads
+              your stories.{' '}
+            </>
+          ) : (
+            <>
+              Preview any voice with{' '}
+              <span className='font-semibold'>Listen</span>.{' '}
+            </>
+          )}
           {isGuest
             ? 'Sign up to change the reading voice.'
             : 'Upgrade to premium to change the reading voice.'}

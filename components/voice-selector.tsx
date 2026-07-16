@@ -3,6 +3,7 @@
 import {
   getAvailableVoicesService,
   getPreferredVoiceService,
+  getVoiceAccessService,
   setPreferredVoiceService,
 } from '@/lib/services';
 import { useEffect, useRef, useState } from 'react';
@@ -44,6 +45,11 @@ const VoiceSelector = ({
   const [settingVoice, setSettingVoice] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lockedMessage, setLockedMessage] = useState<string | null>(null);
+  // Only premium (paid) users may switch the reading voice. Guests are always
+  // non-premium; free logged-in users can preview but not change (mirrors the
+  // backend /voice/access gate and the mobile voice picker).
+  const [isPremium, setIsPremium] = useState(false);
+  const canSwitchVoice = isPremium;
   // A single shared preview player so tapping Listen on several voices doesn't
   // stack overlapping audio (mirrors the mobile single-player behaviour).
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -51,11 +57,14 @@ const VoiceSelector = ({
   useEffect(() => {
     const fetchVoices = async () => {
       try {
-        // /voice/available is public; /voice/preferred is auth-only, so guests
-        // only fetch the list (fetching preferred would 401).
-        const [voicesData, preferred] = await Promise.all([
+        // /voice/available is public; /voice/preferred and /voice/access are
+        // auth-only, so guests only fetch the list (they're never premium).
+        const [voicesData, preferred, access] = await Promise.all([
           getAvailableVoicesService(),
           isGuest ? Promise.resolve(null) : getPreferredVoiceService(),
+          isGuest
+            ? Promise.resolve({ isPremium: false })
+            : getVoiceAccessService(),
         ]);
         const mappedVoices = voicesData.map((voice) => ({
           name: voice.displayName || voice.name,
@@ -65,6 +74,7 @@ const VoiceSelector = ({
           avatar: voice.voiceAvatar ?? '',
         }));
         setVoices(mappedVoices);
+        setIsPremium(access.isPremium);
         if (preferred?.id) {
           setSelectedVoiceId(preferred.id);
         }
@@ -106,10 +116,11 @@ const VoiceSelector = ({
   };
 
   const handleSetVoice = async () => {
-    // Guests can't set a preferred voice — continue with the default voice
-    // (narration comes from the guest endpoint's pre-generated clip). They may
-    // continue without picking a card.
-    if (isGuest) {
+    // Guests and free (non-premium) users can't change the reading voice —
+    // continue with the default voice (guests read the endpoint's pre-generated
+    // clip; free users keep their locked/default voice). Never call
+    // setPreferredVoiceService in this case.
+    if (!canSwitchVoice) {
       onVoiceSelected?.(null);
       setStep(2);
       return;
@@ -197,16 +208,19 @@ const VoiceSelector = ({
             name={voice.name}
             description={voice.description}
             avatar={voice.avatar}
+            selectable={canSwitchVoice}
             active={selectedVoiceId === voice.id}
             onClick={() => setSelectedVoiceId(voice.id)}
             onListen={(e) => handleListen(voice, e)}
           />
         ))}
       </div>
-      {isGuest && (
+      {!canSwitchVoice && (
         <p className='mb-4 text-sm text-[#4A413F] font-abeezee'>
-          Preview any voice with <span className='font-semibold'>Listen</span>.
-          Sign up to change the reading voice.
+          Preview any voice with <span className='font-semibold'>Listen</span>.{' '}
+          {isGuest
+            ? 'Sign up to change the reading voice.'
+            : 'Upgrade to premium to change the reading voice.'}
         </p>
       )}
       {lockedMessage && (
@@ -220,16 +234,16 @@ const VoiceSelector = ({
       <button
         type='button'
         className={`w-full py-4 cursor-pointer hover:scale-105 transition-all duration-300 rounded-[3.125rem] font-semibold ${
-          isGuest || selectedVoiceId
+          !canSwitchVoice || selectedVoiceId
             ? 'bg-[#EC4007] text-white'
             : 'bg-[#FEEAE6] text-[#FB9583]'
         }`}
-        disabled={settingVoice || !(isGuest || selectedVoiceId)}
+        disabled={settingVoice || !(!canSwitchVoice || selectedVoiceId)}
         onClick={handleSetVoice}
       >
         {settingVoice
           ? 'Setting up...'
-          : isGuest
+          : !canSwitchVoice
             ? 'Continue'
             : 'Set-up AI voice'}
       </button>

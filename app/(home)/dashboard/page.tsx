@@ -1,36 +1,10 @@
 'use client';
 
 import Header from '@/components/header';
-import KidPicker from '@/components/kid-picker';
 import { cn } from '@/lib/utils';
-import { useEffect, useState } from 'react';
-import DailyChallenge from './_components/daily-challenge';
-import Recommended from './_components/recommended';
-import StoryCategory from './_components/story-category';
-import ThemeStory from './_components/theme-story';
+import StoryHome from './_components/story-home';
 
 const DashboardPage = () => {
-  const [selectedKidId, setSelectedKidId] = useState<string | null>(null);
-
-  useEffect(() => {
-    // Check for selectedKid in localStorage (the full kid object)
-    const selectedKidData = localStorage.getItem('selectedKid');
-    if (selectedKidData) {
-      try {
-        const selectedKid = JSON.parse(selectedKidData);
-        setSelectedKidId(selectedKid.id);
-      } catch (error) {
-        console.error('Error parsing selectedKid from localStorage:', error);
-        setSelectedKidId(null);
-      }
-    }
-  }, []);
-
-  // Handler to update selectedKidId from KidPicker
-  const handleKidSelected = (kidId: string) => {
-    setSelectedKidId(kidId);
-  };
-
   return (
     <div
       className={cn(
@@ -38,16 +12,7 @@ const DashboardPage = () => {
       )}
     >
       <Header white={false} />
-      {!selectedKidId ? (
-        <KidPicker onKidSelect={handleKidSelected} />
-      ) : (
-        <>
-          <DailyChallenge />
-          <Recommended />
-          <ThemeStory />
-          <StoryCategory />
-        </>
-      )}
+      <StoryHome />
     </div>
   );
 };

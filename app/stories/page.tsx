@@ -1,5 +1,7 @@
 'use client';
 
+import StoryHome from '@/app/(home)/dashboard/_components/story-home';
+import BackButton from '@/components/back-button';
 import {
   type StoryCategory,
   type StoryListItem,
@@ -7,14 +9,18 @@ import {
   listStoriesService,
 } from '@/lib/services';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
 
 const ALL = 'All';
 
-export default function StoriesBrowsePage() {
+function StoriesBrowse() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const category = searchParams.get('category');
+
   const [stories, setStories] = useState<StoryListItem[]>([]);
   const [categories, setCategories] = useState<StoryCategory[]>([]);
-  const [selected, setSelected] = useState<string>(ALL);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,27 +30,60 @@ export default function StoriesBrowsePage() {
   }, []);
 
   useEffect(() => {
+    if (!category) {
+      return;
+    }
     setLoading(true);
-    listStoriesService(selected === ALL ? undefined : selected)
+    listStoriesService(category)
       .then(setStories)
       .catch(() => setStories([]))
       .finally(() => setLoading(false));
-  }, [selected]);
+  }, [category]);
+
+  // No category filter -> the shared mobile-style home for guests.
+  if (!category) {
+    return (
+      <main className='min-h-dvh bg-[#FFF8ED] text-[#1B1300]'>
+        <header className='mx-auto flex max-w-6xl items-center justify-between px-6 py-5'>
+          <Link
+            href='/'
+            className='font-[family-name:var(--font-qilka)] text-2xl font-bold text-[#EC4007]'
+          >
+            Storytime
+          </Link>
+          <Link
+            href='/register'
+            className='rounded-full bg-[#EC4007] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90'
+          >
+            Sign up
+          </Link>
+        </header>
+        <section className='mx-auto max-w-6xl px-6 pb-16'>
+          <StoryHome />
+        </section>
+      </main>
+    );
+  }
+
+  const activeCategory = categories.find((c) => c.id === category);
 
   return (
     <main className='min-h-dvh bg-[#FFF8ED] text-[#1B1300]'>
       <header className='mx-auto flex max-w-5xl items-center justify-between px-6 py-5'>
-        <Link
-          href='/'
-          className='font-[family-name:var(--font-qilka)] text-2xl font-bold text-[#EC4007]'
-        >
-          Storytime
-        </Link>
+        <div className='flex items-center gap-3'>
+          <BackButton />
+          <Link
+            href='/'
+            className='font-[family-name:var(--font-qilka)] text-2xl font-bold text-[#EC4007]'
+          >
+            Storytime
+          </Link>
+        </div>
       </header>
 
       <section className='mx-auto max-w-5xl px-6 pb-16'>
         <h1 className='font-[family-name:var(--font-qilka)] text-3xl font-bold sm:text-4xl'>
-          Stories
+          {activeCategory?.name ?? 'Stories'}
         </h1>
         <p className='mt-2 text-[#5B4B33]'>
           Pick a story and start reading — no account needed.
@@ -53,12 +92,18 @@ export default function StoriesBrowsePage() {
         {/* Category filter */}
         <div className='mt-6 flex flex-wrap gap-2'>
           {[{ id: ALL, name: ALL }, ...categories].map((cat) => {
-            const active = selected === cat.id;
+            const active = cat.id === category;
             return (
               <button
                 key={cat.id}
                 type='button'
-                onClick={() => setSelected(cat.id)}
+                onClick={() => {
+                  if (cat.id === ALL) {
+                    router.push('/stories');
+                  } else {
+                    router.push(`/stories?category=${cat.id}`);
+                  }
+                }}
                 className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
                   active
                     ? 'bg-[#EC4007] text-white'
@@ -118,5 +163,13 @@ export default function StoriesBrowsePage() {
         )}
       </section>
     </main>
+  );
+}
+
+export default function StoriesBrowsePage() {
+  return (
+    <Suspense fallback={null}>
+      <StoriesBrowse />
+    </Suspense>
   );
 }

@@ -47,61 +47,18 @@ interface User {
   profile: UserProfile;
 }
 
-interface VoiceLabels {
-  accent: string;
-  description: string;
-  age: string;
-  gender: string;
-  use_case: string;
-}
-
-interface VoiceFineTuning {
-  is_allowed_to_fine_tune: boolean;
-  state: Record<string, unknown>;
-  verification_failures: unknown[];
-  verification_attempts_count: number;
-  manual_verification_requested: boolean;
-  language: string | null;
-  progress: Record<string, unknown>;
-  message: Record<string, unknown>;
-  dataset_duration_seconds: number | null;
-  verification_attempts: unknown;
-  slice_ids: unknown;
-  manual_verification: unknown;
-  max_verification_attempts: number | null;
-  next_max_verification_attempts_reset_unix_ms: number | null;
-}
-
-interface VoiceVerification {
-  requires_verification: boolean;
-  is_verified: boolean;
-  verification_failures: unknown[];
-  verification_attempts_count: number;
-  language: string | null;
-  verification_attempts: unknown;
-}
-
-interface Voice {
-  voice_id: string;
+// Shape returned by the backend voice endpoints (/voice/available,
+// /voice/preferred). `id` is the VoiceType key (e.g. "NIMBUS") and is also the
+// value accepted by set-preferred and batch TTS. When no voice is set,
+// /voice/preferred returns a placeholder with id === 'default'.
+export interface Voice {
+  id: string;
   name: string;
-  samples: unknown;
-  category: string;
-  fine_tuning: VoiceFineTuning;
-  labels: VoiceLabels;
-  description: string | null;
-  preview_url: string;
-  available_for_tiers: unknown[];
-  settings: unknown;
-  sharing: unknown;
-  high_quality_base_model_ids: string[];
-  verified_languages: unknown[];
-  safety_control: unknown;
-  voice_verification: VoiceVerification;
-  permission_on_resource: unknown;
-  is_owner: boolean;
-  is_legacy: boolean;
-  is_mixed: boolean;
-  created_at_unix: number | null;
+  displayName?: string;
+  type?: string;
+  previewUrl?: string | null;
+  voiceAvatar?: string | null;
+  elevenLabsVoiceId?: string | null;
 }
 
 const setTokens = (jwt: string, refreshToken: string, userData?: unknown) => {
@@ -449,6 +406,21 @@ export const getAvailableVoicesService = async (): Promise<Voice[]> => {
   }
 };
 
+// The user's globally-preferred narration voice (GET /voice/preferred).
+// Backend returns a "default" placeholder when none is set; normalize to null.
+export const getPreferredVoiceService = async (): Promise<Voice | null> => {
+  try {
+    const response = await api.get('voice/preferred');
+    const data = response.data;
+    if (!data || data.id === 'default') {
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+};
+
 export const setPreferredVoiceService = async (voiceId: string) => {
   try {
     const response = await api.patch('voice/preferred', {
@@ -461,6 +433,87 @@ export const setPreferredVoiceService = async (voiceId: string) => {
         throw {
           message:
             error.response.data?.message || 'Failed to set preferred voice',
+          status: error.response.status,
+          data: error.response.data,
+        };
+      }
+      if (error.request) {
+        throw { message: 'No response from server', status: null };
+      }
+    }
+    throw {
+      message: error instanceof Error ? error.message : 'Unexpected error',
+      status: null,
+    };
+  }
+};
+
+// Change the signed-in user's password (POST /auth/change-password).
+export const changePasswordService = async (
+  oldPassword: string,
+  newPassword: string
+) => {
+  try {
+    const response = await api.post('auth/change-password', {
+      oldPassword,
+      newPassword,
+    });
+    return response.data;
+  } catch (error: unknown) {
+    if (error instanceof AxiosError) {
+      if (error.response) {
+        throw {
+          message: error.response.data?.message || 'Failed to change password',
+          status: error.response.status,
+          data: error.response.data,
+        };
+      }
+      if (error.request) {
+        throw { message: 'No response from server', status: null };
+      }
+    }
+    throw {
+      message: error instanceof Error ? error.message : 'Unexpected error',
+      status: null,
+    };
+  }
+};
+
+export interface NotificationItem {
+  id?: string;
+  title?: string | null;
+  message?: string | null;
+  body?: string | null;
+  isRead?: boolean;
+  read?: boolean;
+  createdAt?: string | null;
+}
+
+// GET /notifications — the signed-in user's notifications. Returns [] on error.
+export const listNotificationsService = async (): Promise<
+  NotificationItem[]
+> => {
+  try {
+    const response = await api.get('notifications');
+    const data = response.data;
+    return Array.isArray(data) ? data : (data?.data ?? data?.items ?? []);
+  } catch {
+    return [];
+  }
+};
+
+// PATCH /notifications/mark-all-read — mark every notification as read.
+export const markAllNotificationsReadService = async () => {
+  try {
+    const response = await api.patch('notifications/mark-all-read');
+    return response.data;
+  } catch (error: unknown) {
+    if (error instanceof AxiosError) {
+      if (error.response) {
+        throw {
+          message:
+            error.response.data?.message ||
+            'Failed to mark notifications as read',
           status: error.response.status,
           data: error.response.data,
         };
@@ -638,23 +691,68 @@ export const getGuestStoryService = async (
 export interface StoryCategory {
   id: string;
   name: string;
+  image?: string | null;
+  description?: string | null;
+  storyCount?: number;
 }
 
-// Public list of stories for browsing (GET /stories is @OptionalAuth),
-// optionally filtered by category name.
+// Query flags accepted by GET /stories (mirrors the mobile home carousels).
+// `category` matches the category **id**, not its name.
+export interface StoryQuery {
+  category?: string;
+  minAge?: number;
+  maxAge?: number;
+  isSeasonal?: boolean;
+  isMostLiked?: boolean;
+  topPicksFromUs?: boolean;
+  shuffle?: boolean;
+  limit?: number;
+}
+
+const buildStoryQuery = (params: StoryQuery = {}): string => {
+  const search = new URLSearchParams();
+  if (params.category) {
+    search.set('category', params.category);
+  }
+  if (typeof params.minAge === 'number') {
+    search.set('minAge', String(params.minAge));
+  }
+  if (typeof params.maxAge === 'number') {
+    search.set('maxAge', String(params.maxAge));
+  }
+  if (params.isSeasonal) {
+    search.set('isSeasonal', 'true');
+  }
+  if (params.isMostLiked) {
+    search.set('isMostLiked', 'true');
+  }
+  if (params.topPicksFromUs) {
+    search.set('topPicksFromUs', 'true');
+  }
+  if (params.shuffle) {
+    search.set('shuffle', 'true');
+  }
+  if (typeof params.limit === 'number') {
+    search.set('limit', String(params.limit));
+  }
+  const qs = search.toString();
+  return qs ? `stories?${qs}` : 'stories';
+};
+
+// Public list of stories for browsing (GET /stories is @OptionalAuth).
+// Accepts either a bare category id (legacy) or a full query object.
 export const listStoriesService = async (
-  category?: string
+  params?: string | StoryQuery
 ): Promise<StoryListItem[]> => {
   try {
-    const url = category
-      ? `stories?category=${encodeURIComponent(category)}`
-      : 'stories';
-    const response = await api.get(url);
+    const query: StoryQuery =
+      typeof params === 'string' ? { category: params } : (params ?? {});
+    const response = await api.get(buildStoryQuery(query));
     const data = response.data;
     if (Array.isArray(data)) {
       return data;
     }
-    return data?.stories ?? data?.data ?? data?.items ?? [];
+    return data?.data ?? data?.stories ?? data?.items ?? [];
   } catch {
     return [];
   }
@@ -669,14 +767,119 @@ export const listCategoriesService = async (): Promise<StoryCategory[]> => {
       ? data
       : (data?.data ?? data?.categories ?? []);
     return arr
-      .map((c: { id?: string; name?: string }) => ({
-        id: c.id ?? c.name ?? '',
-        name: c.name ?? '',
-      }))
+      .map(
+        (c: {
+          id?: string;
+          name?: string;
+          image?: string | null;
+          imageUrl?: string | null;
+          description?: string | null;
+          storyCount?: number;
+        }) => ({
+          id: c.id ?? c.name ?? '',
+          name: c.name ?? '',
+          image: c.image ?? c.imageUrl ?? null,
+          description: c.description ?? null,
+          storyCount: c.storyCount,
+        })
+      )
       .filter((c: StoryCategory) => c.name);
   } catch {
     return [];
   }
+};
+
+// ----- Story progress / library (auth-only, user-level — no kid, mirrors the
+// mobile "ongoing" / "completed" library) -----
+
+// Record reading progress for the signed-in user. `progress` is 0-100;
+// `completed: true` marks the story done (adds it to the completed library).
+export const recordUserProgressService = async (
+  storyId: string,
+  progress: number,
+  completed?: boolean
+) => {
+  const response = await api.post('stories/user/progress', {
+    storyId,
+    progress,
+    ...(completed !== undefined ? { completed } : {}),
+  });
+  return response.data;
+};
+
+// GET /stories/user/library/in-progress — the user's ongoing stories.
+export const getInProgressStoriesService = async (): Promise<
+  StoryListItem[]
+> => {
+  try {
+    const response = await api.get('stories/user/library/in-progress');
+    const data = response.data;
+    return Array.isArray(data) ? data : (data?.data ?? data?.stories ?? []);
+  } catch {
+    return [];
+  }
+};
+
+// GET /stories/user/library/completed — the user's completed stories.
+export const getCompletedStoriesService = async (): Promise<
+  StoryListItem[]
+> => {
+  try {
+    const response = await api.get('stories/user/library/completed');
+    const data = response.data;
+    return Array.isArray(data) ? data : (data?.data ?? data?.stories ?? []);
+  } catch {
+    return [];
+  }
+};
+
+// Contact / feedback form (public — POST /help-support/feedback).
+export const submitFeedbackService = async (payload: {
+  fullname: string;
+  email: string;
+  category: string;
+  message: string;
+}) => {
+  const response = await api.post('help-support/feedback', payload);
+  return response.data;
+};
+
+// ----- Parent favorites (auth-only, flat/parent-level — mirrors mobile) -----
+
+export interface FavoriteStory {
+  id: string;
+  storyId: string;
+  title: string;
+  description?: string | null;
+  coverImageUrl?: string | null;
+  ageRange?: string | null;
+  durationSeconds?: number | null;
+}
+
+// GET /parent-favorites — the authenticated parent's favorited stories.
+export const listFavoritesService = async (): Promise<FavoriteStory[]> => {
+  try {
+    const response = await api.get('parent-favorites');
+    const data = response.data;
+    if (Array.isArray(data)) {
+      return data;
+    }
+    return data?.data ?? data?.items ?? [];
+  } catch {
+    return [];
+  }
+};
+
+// POST /parent-favorites { storyId }
+export const addFavoriteService = async (storyId: string) => {
+  const response = await api.post('parent-favorites', { storyId });
+  return response.data;
+};
+
+// DELETE /parent-favorites/:storyId
+export const removeFavoriteService = async (storyId: string) => {
+  const response = await api.delete(`parent-favorites/${storyId}`);
+  return response.data;
 };
 
 export const getStoryByIdService = async (storyId: string) => {
@@ -820,25 +1023,86 @@ export const clearSelectedModeFromStorage = () => {
 export interface StoryAudioParagraph {
   index: number;
   audioUrl: string;
+  // The paragraph text for this clip, used to render a read-along highlight
+  // that stays in sync with the audio.
+  text?: string;
 }
 
 export interface StoryAudioBatch {
   // e.g. 'queued' | 'processing' | 'completed' | 'partial' | 'failed'
   status: string;
   completedParagraphs: StoryAudioParagraph[];
+  // Every paragraph (with `text`), regardless of whether its audio is ready.
+  // Only the POST response carries text; the status endpoint drops it, so the
+  // reader captures this from the initial POST for the read-along highlight.
+  allParagraphs: StoryAudioParagraph[];
   totalQueued?: number;
   // Present when there is more audio still generating in the background.
   batchJobId?: string;
 }
 
+interface RawAudioParagraph {
+  index?: number;
+  audioUrl?: string | null;
+  text?: string;
+}
+
+interface RawAudioBatch {
+  status?: string;
+  // The POST /voice/story/audio/batch response uses `paragraphs`; the
+  // GET .../status/:jobId response uses `completedParagraphs`.
+  paragraphs?: RawAudioParagraph[];
+  completedParagraphs?: RawAudioParagraph[];
+  pendingParagraphs?: number;
+  totalParagraphs?: number;
+  totalQueued?: number;
+  batchJobId?: string;
+}
+
+// The two audio endpoints return different shapes; unify them here.
+// A paragraph counts as playable only once its `audioUrl` is populated.
 const normalizeAudioBatch = (raw: unknown): StoryAudioBatch => {
-  const data = (raw ?? {}) as Partial<StoryAudioBatch>;
-  return {
-    status: data.status ?? 'unknown',
-    completedParagraphs: Array.isArray(data.completedParagraphs)
+  const data = (raw ?? {}) as RawAudioBatch;
+  const source = Array.isArray(data.completedParagraphs)
+    ? data.completedParagraphs
+    : Array.isArray(data.paragraphs)
+      ? data.paragraphs
+      : [];
+  const completedParagraphs: StoryAudioParagraph[] = source
+    .filter(
+      (p): p is { index: number; audioUrl: string; text?: string } =>
+        typeof p?.index === 'number' && !!p?.audioUrl
+    )
+    .map((p) => ({ index: p.index, audioUrl: p.audioUrl, text: p.text }));
+
+  // Full paragraph list (with text) from the POST `paragraphs` field, even
+  // paragraphs whose audio isn't ready yet.
+  const allSource = Array.isArray(data.paragraphs)
+    ? data.paragraphs
+    : Array.isArray(data.completedParagraphs)
       ? data.completedParagraphs
-      : [],
-    totalQueued: data.totalQueued,
+      : [];
+  const allParagraphs: StoryAudioParagraph[] = allSource
+    .filter(
+      (p): p is RawAudioParagraph & { index: number } =>
+        typeof p?.index === 'number'
+    )
+    .map((p) => ({ index: p.index, audioUrl: p.audioUrl ?? '', text: p.text }));
+
+  // The POST response omits `status`; infer it from the pending count so the
+  // reader knows whether to keep polling the batch job.
+  let status = data.status;
+  if (!status) {
+    const pending =
+      typeof data.pendingParagraphs === 'number' ? data.pendingParagraphs : 0;
+    status = pending > 0 ? 'processing' : 'completed';
+  }
+
+  return {
+    status,
+    completedParagraphs,
+    allParagraphs,
+    totalQueued: data.totalQueued ?? data.totalParagraphs,
     batchJobId: data.batchJobId,
   };
 };

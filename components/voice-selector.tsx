@@ -2,52 +2,72 @@
 
 import {
   getAvailableVoicesService,
-  setKidPreferredVoiceService,
+  getPreferredVoiceService,
+  setPreferredVoiceService,
 } from '@/lib/services';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import VoiceCard from './voice-card';
+
+export interface SelectedVoice {
+  id: string;
+  name: string;
+}
 
 interface VoiceSelectorProps {
   setStep: (step: number) => void;
   expand: boolean;
+  // Reports the effective narration voice once chosen. `null` means the change
+  // was locked (free tier / guest) and the default voice should be used.
+  onVoiceSelected?: (voice: SelectedVoice | null) => void;
+  // Guests can browse + preview voices but can't set a preferred voice
+  // (/voice/preferred is auth-only). They continue with the default voice.
+  isGuest?: boolean;
 }
 
-const VoiceSelector = ({ setStep, expand }: VoiceSelectorProps) => {
-  const [selectedVoice, setSelectedVoice] = useState<string | null>(null);
-  const [voices, setVoices] = useState<
-    {
-      name: string;
-      description: string;
-      voice_id: string;
-      preview_url: string;
-      labels: {
-        accent: string;
-        description: string;
-        age: string;
-        gender: string;
-        use_case: string;
-      };
-    }[]
-  >([]);
+interface VoiceOption {
+  name: string;
+  description: string;
+  id: string;
+  previewUrl: string;
+}
+
+const VoiceSelector = ({
+  setStep,
+  expand,
+  onVoiceSelected,
+  isGuest = false,
+}: VoiceSelectorProps) => {
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string | null>(null);
+  const [voices, setVoices] = useState<VoiceOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [settingVoice, setSettingVoice] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [lockedMessage, setLockedMessage] = useState<string | null>(null);
+  // A single shared preview player so tapping Listen on several voices doesn't
+  // stack overlapping audio (mirrors the mobile single-player behaviour).
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     const fetchVoices = async () => {
       try {
-        const voicesData = await getAvailableVoicesService();
+        // /voice/available is public; /voice/preferred is auth-only, so guests
+        // only fetch the list (fetching preferred would 401).
+        const [voicesData, preferred] = await Promise.all([
+          getAvailableVoicesService(),
+          isGuest ? Promise.resolve(null) : getPreferredVoiceService(),
+        ]);
         const mappedVoices = voicesData.map((voice) => ({
-          name: voice.name,
-          description:
-            voice.labels.description ||
-            `${voice.labels.age} ${voice.labels.gender} voice`,
-          voice_id: voice.voice_id,
-          preview_url: voice.preview_url,
-          labels: voice.labels,
+          name: voice.displayName || voice.name,
+          description: voice.type ? `${voice.type} voice` : 'AI voice',
+          id: voice.id,
+          previewUrl: voice.previewUrl ?? '',
         }));
         setVoices(mappedVoices);
-      } catch (error) {
-        console.error('Failed to fetch voices:', error);
+        if (preferred?.id) {
+          setSelectedVoiceId(preferred.id);
+        }
+      } catch (err) {
+        console.error('Failed to fetch voices:', err);
         setVoices([]);
       } finally {
         setLoading(false);
@@ -55,55 +75,71 @@ const VoiceSelector = ({ setStep, expand }: VoiceSelectorProps) => {
     };
 
     fetchVoices();
+  }, [isGuest]);
+
+  // Stop any preview when the selector unmounts (e.g. modal closed).
+  useEffect(() => {
+    return () => {
+      previewAudioRef.current?.pause();
+    };
   }, []);
 
-  const handleListen = (
-    voice: { name: string; preview_url: string },
-    e?: React.MouseEvent
-  ) => {
-    // Stop propagation to prevent card selection when clicking listen
+  const handleListen = (voice: VoiceOption, e?: React.MouseEvent) => {
     if (e) {
       e.stopPropagation();
     }
-
-    if (voice.preview_url) {
-      const audio = new Audio(voice.preview_url);
-      audio.play().catch((error) => {
-        console.error('Error playing audio:', error);
-        alert(`Could not play sample for ${voice.name}`);
-      });
-    } else {
-      alert(`No preview available for ${voice.name}`);
+    if (!voice.previewUrl) {
+      return;
     }
-  };
-
-  const handleVoiceSelect = (voiceId: string) => {
-    setSelectedVoice(voiceId);
+    // Stop any preview already playing before starting the new one.
+    if (previewAudioRef.current) {
+      previewAudioRef.current.pause();
+      previewAudioRef.current.currentTime = 0;
+    }
+    const audio = new Audio(voice.previewUrl);
+    previewAudioRef.current = audio;
+    audio.play().catch((playError) => {
+      console.error('Error playing audio:', playError);
+    });
   };
 
   const handleSetVoice = async () => {
-    if (!selectedVoice) {
+    // Guests can't set a preferred voice — continue with the default voice
+    // (narration comes from the guest endpoint's pre-generated clip). They may
+    // continue without picking a card.
+    if (isGuest) {
+      onVoiceSelected?.(null);
+      setStep(2);
       return;
     }
 
-    // Get the selected kid from localStorage
-    const selectedKidData = localStorage.getItem('selectedKid');
-    if (!selectedKidData) {
-      alert('No kid selected. Please select a kid first.');
+    if (!selectedVoiceId) {
       return;
     }
-
-    const selectedKid = JSON.parse(selectedKidData);
-    const kidId = selectedKid.id;
+    const selected = voices.find((v) => v.id === selectedVoiceId);
+    if (!selected) {
+      return;
+    }
 
     setSettingVoice(true);
+    setError(null);
+    setLockedMessage(null);
     try {
-      await setKidPreferredVoiceService(kidId, selectedVoice);
-      // Voice set successfully, proceed to next step
+      await setPreferredVoiceService(selected.id);
+      onVoiceSelected?.({ id: selected.id, name: selected.name });
       setStep(2);
-    } catch (error) {
-      console.error('Failed to set kid preferred voice:', error);
-      alert('Failed to set preferred voice. Please try again.');
+    } catch (err) {
+      const status = (err as { status?: number | null })?.status;
+      if (status === 403) {
+        // Free tier can't change the voice — fall back to the default voice.
+        setLockedMessage(
+          'Changing voices is a premium feature. Using the default voice.'
+        );
+        onVoiceSelected?.(null);
+        setStep(2);
+      } else {
+        setError('Failed to set preferred voice. Please try again.');
+      }
     } finally {
       setSettingVoice(false);
     }
@@ -155,26 +191,44 @@ const VoiceSelector = ({ setStep, expand }: VoiceSelectorProps) => {
       >
         {voices.map((voice) => (
           <VoiceCard
-            key={voice.voice_id}
+            key={voice.id}
             name={voice.name}
             description={voice.description}
-            active={selectedVoice === voice.name}
-            onClick={() => handleVoiceSelect('Milo')}
+            active={selectedVoiceId === voice.id}
+            onClick={() => setSelectedVoiceId(voice.id)}
             onListen={(e) => handleListen(voice, e)}
           />
         ))}
       </div>
+      {isGuest && (
+        <p className='mb-4 text-sm text-[#4A413F] font-abeezee'>
+          Preview any voice with <span className='font-semibold'>Listen</span>.
+          Sign up to change the reading voice.
+        </p>
+      )}
+      {lockedMessage && (
+        <p className='mb-4 text-sm text-[#EC4007] font-abeezee'>
+          {lockedMessage}
+        </p>
+      )}
+      {error && (
+        <p className='mb-4 text-sm text-red-500 font-abeezee'>{error}</p>
+      )}
       <button
         type='button'
         className={`w-full py-4 cursor-pointer hover:scale-105 transition-all duration-300 rounded-[3.125rem] font-semibold ${
-          selectedVoice
+          isGuest || selectedVoiceId
             ? 'bg-[#EC4007] text-white'
             : 'bg-[#FEEAE6] text-[#FB9583]'
         }`}
-        disabled={!selectedVoice || settingVoice}
+        disabled={settingVoice || !(isGuest || selectedVoiceId)}
         onClick={handleSetVoice}
       >
-        {settingVoice ? 'Setting up...' : 'Set-up AI voice'}
+        {settingVoice
+          ? 'Setting up...'
+          : isGuest
+            ? 'Continue'
+            : 'Set-up AI voice'}
       </button>
     </div>
   );

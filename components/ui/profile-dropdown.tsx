@@ -66,7 +66,7 @@ export default function ProfileDropdown({
     localStorage.clear();
     sessionStorage.clear();
     // Full navigation so the middleware re-evaluates with cookies cleared.
-    window.location.href = '/login';
+    window.location.href = '/login?loggedOut=1';
   };
 
   return (

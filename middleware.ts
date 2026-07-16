@@ -29,7 +29,12 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (hasAuth) {
+  // A logout hands off to /login?loggedOut=1. Never bounce that back to the
+  // dashboard even if a stale token cookie lingers — the login page clears it.
+  // This is the escape hatch that stops a dead session from trapping the user.
+  const isLoggingOut = searchParams.has('loggedOut');
+
+  if (hasAuth && !isLoggingOut) {
     // The bare /stories page is the guest home; /stories with a category or
     // filter is a browse list both audiences use, so only redirect the former.
     const isGuestStoriesHome =

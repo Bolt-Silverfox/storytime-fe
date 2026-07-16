@@ -1,0 +1,50 @@
+name: Security
+
+on:
+  push:
+    branches: [main, staging, dev]
+  pull_request:
+  schedule:
+    # Weekly (Mondays 04:00 UTC).
+    - cron: '0 4 * * 1'
+
+jobs:
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # REPORT ONLY for now — the repo carries an existing vulnerability backlog
+      # (see Dependabot). Once high/critical alerts are cleared, make this a
+      # blocking gate by removing `|| true` and setting `--audit-level=high`.
+      - name: pnpm audit (report)
+        run: pnpm audit --audit-level=moderate || true
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Fails only on VERIFIED live secrets, so it won't false-positive on code.
+      - name: TruffleHog
+        uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --only-verified

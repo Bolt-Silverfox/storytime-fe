@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "net.emerj.storytime",
+      "sha256_cert_fingerprints": [
+        "5B:5C:4B:4A:E5:61:43:85:93:56:48:63:32:21:CA:23:1E:07:6D:44:BE:43:19:38:48:07:4D:D3:CE:A2:40:CA"
+      ]
+    }
+  }
+]

@@ -25,6 +25,9 @@ const AiVoicePage = () => {
   // Only premium (paid) users may change the reading voice. Free logged-in
   // users can preview but not save (mirrors the backend /voice/access gate).
   const [isPremium, setIsPremium] = useState(false);
+  // The voice that currently reads this user's stories — shown as "Current" so
+  // free users (who can't switch) still know which voice is active.
+  const [currentVoiceId, setCurrentVoiceId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const canSwitchVoice = isPremium;
 
@@ -49,6 +52,9 @@ const AiVoicePage = () => {
         }
         setVoices(Array.isArray(available) ? available : []);
         setIsPremium(access.isPremium);
+        setCurrentVoiceId(
+          preferred?.id ?? access.lockedVoiceId ?? access.defaultVoice ?? null
+        );
         if (preferred?.id) {
           setSelectedId(preferred.id);
         }
@@ -123,6 +129,11 @@ const AiVoicePage = () => {
     }
   };
 
+  const currentVoice = voices.find((v) => v.id === currentVoiceId);
+  const currentVoiceName = currentVoice
+    ? currentVoice.displayName || currentVoice.name
+    : null;
+
   return (
     <div className='bg-white rounded-[2.5625rem] border-[0.5px] border-solid border-[#FAF4F2] px-10 py-[2.125rem] max-w-[85vw] mx-auto my-12'>
       <Header white={false} />
@@ -177,6 +188,7 @@ const AiVoicePage = () => {
                   avatar={voice.voiceAvatar ?? ''}
                   selectable={canSwitchVoice}
                   active={selectedId === voice.id}
+                  current={!canSwitchVoice && voice.id === currentVoiceId}
                   onClick={() => setSelectedId(voice.id)}
                   onListen={() => handleListen(voice)}
                 />
@@ -197,9 +209,18 @@ const AiVoicePage = () => {
             ) : (
               <div className='mt-8 rounded-3xl border border-stone-100 bg-[#FFF8ED] px-6 py-6 text-center'>
                 <p className='text-[#4A413F] font-abeezee'>
-                  Preview any voice with{' '}
-                  <span className='font-semibold'>Listen</span>. Upgrade to
-                  premium to change the reading voice.
+                  {currentVoiceName ? (
+                    <>
+                      <span className='font-semibold'>{currentVoiceName}</span>{' '}
+                      reads your stories.{' '}
+                    </>
+                  ) : (
+                    <>
+                      Preview any voice with{' '}
+                      <span className='font-semibold'>Listen</span>.{' '}
+                    </>
+                  )}
+                  Upgrade to premium to change the reading voice.
                 </p>
               </div>
             )}

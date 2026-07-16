@@ -429,12 +429,20 @@ export const getPreferredVoiceService = async (): Promise<Voice | null> => {
 // explicitly grants it.
 export const getVoiceAccessService = async (): Promise<{
   isPremium: boolean;
+  // The voice a locked (guest/free) user is restricted to — i.e. the one that
+  // actually reads their stories. Null for premium users (who can switch).
+  lockedVoiceId: string | null;
+  defaultVoice: string | null;
 }> => {
   try {
     const response = await api.get('voice/access');
-    return { isPremium: !!response.data?.isPremium };
+    return {
+      isPremium: !!response.data?.isPremium,
+      lockedVoiceId: response.data?.lockedVoiceId ?? null,
+      defaultVoice: response.data?.defaultVoice ?? null,
+    };
   } catch {
-    return { isPremium: false };
+    return { isPremium: false, lockedVoiceId: null, defaultVoice: null };
   }
 };
 

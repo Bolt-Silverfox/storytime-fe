@@ -18,6 +18,11 @@ const menuItems = [
     link: '/dashboard/personal-settings',
   },
   {
+    label: 'Library',
+    icon: '/profile.svg',
+    link: '/library',
+  },
+  {
     label: 'Security settings',
     icon: '/safe.svg',
     link: '/dashboard/security-settings',

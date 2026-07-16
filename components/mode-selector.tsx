@@ -8,9 +8,15 @@ interface ModeSelectorProps {
   setStep: (step: number) => void;
   expand: boolean;
   onModeSelect?: (mode: string) => void;
+  // Interactive mode is only offered when the story has questions.
+  showInteractive?: boolean;
 }
 
-const ModeSelector = ({ setStep, onModeSelect }: ModeSelectorProps) => {
+const ModeSelector = ({
+  setStep,
+  onModeSelect,
+  showInteractive = true,
+}: ModeSelectorProps) => {
   const [selectedMode, setSelectedMode] = useState<string | null>(null);
 
   const handleModeSelect = (mode: string) => {
@@ -38,7 +44,11 @@ const ModeSelector = ({ setStep, onModeSelect }: ModeSelectorProps) => {
         <p className='text-[#4A413F] text-xs not-italic font-normal leading-4'>
           Select the type of story you want to read
         </p>
-        <div className={'grid grid-cols-2 gap-4 mb-8 mt-4'}>
+        <div
+          className={`grid gap-4 mb-8 mt-4 ${
+            showInteractive ? 'grid-cols-2' : 'grid-cols-1'
+          }`}
+        >
           <ModeCard
             title='Plain story mode'
             description='Just sit back and listen! The story is told from start to finish no interruptions, just imagination and fun.'
@@ -46,13 +56,15 @@ const ModeSelector = ({ setStep, onModeSelect }: ModeSelectorProps) => {
             onClick={() => handleModeSelect('plain')}
             img={plain}
           />
-          <ModeCard
-            title='Interactive story mode'
-            description={`Get ready to join the adventure! You'll be asked questions, make choices, and help shape how the story goes.`}
-            active={selectedMode === 'interactive'}
-            onClick={() => handleModeSelect('interactive')}
-            img={interactive}
-          />
+          {showInteractive && (
+            <ModeCard
+              title='Interactive story mode'
+              description={`Get ready to join the adventure! You'll be asked questions, make choices, and help shape how the story goes.`}
+              active={selectedMode === 'interactive'}
+              onClick={() => handleModeSelect('interactive')}
+              img={interactive}
+            />
+          )}
         </div>
       </div>
       <button

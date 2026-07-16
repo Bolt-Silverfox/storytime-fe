@@ -67,7 +67,16 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Guests have no refresh token; a 401 on an auth-only endpoint (e.g.
+    // /voice/preferred) must NOT trigger a refresh+redirect to /login. Just
+    // surface the error so the caller can handle it (guests browse freely).
+    const hasRefreshToken = !!Cookies.get('refreshToken');
+
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      hasRefreshToken
+    ) {
       originalRequest._retry = true;
 
       if (isRefreshing) {

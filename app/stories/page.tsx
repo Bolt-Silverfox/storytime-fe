@@ -2,6 +2,8 @@
 
 import StoryHome from '@/app/(home)/dashboard/_components/story-home';
 import BackButton from '@/components/back-button';
+import FavoriteHeart from '@/components/favorite-heart';
+import StoryStatusBadge from '@/components/story-status-badge';
 import {
   type StoryCategory,
   type StoryListItem,
@@ -18,10 +20,17 @@ function StoriesBrowse() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const category = searchParams.get('category');
+  // "View all" filters from the home sections.
+  const filter = searchParams.get('filter');
+  const minAge = searchParams.get('minAge');
+  const maxAge = searchParams.get('maxAge');
 
   const [stories, setStories] = useState<StoryListItem[]>([]);
   const [categories, setCategories] = useState<StoryCategory[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Browse mode when any category/filter is present; otherwise show the home.
+  const isBrowse = !!(category || filter);
 
   useEffect(() => {
     listCategoriesService()
@@ -30,18 +39,37 @@ function StoriesBrowse() {
   }, []);
 
   useEffect(() => {
-    if (!category) {
+    if (!isBrowse) {
       return;
     }
     setLoading(true);
-    listStoriesService(category)
+    let query: string | Record<string, unknown>;
+    if (category) {
+      query = category;
+    } else if (filter === 'recommendations') {
+      query = { isMostLiked: true, shuffle: true, limit: 40 };
+    } else if (filter === 'top-picks') {
+      query = { topPicksFromUs: true, shuffle: true, limit: 40 };
+    } else if (filter === 'seasonal') {
+      query = { isSeasonal: true, shuffle: true, limit: 40 };
+    } else if (filter === 'age') {
+      query = {
+        ...(minAge ? { minAge: Number(minAge) } : {}),
+        ...(maxAge ? { maxAge: Number(maxAge) } : {}),
+        shuffle: true,
+        limit: 40,
+      };
+    } else {
+      query = { shuffle: true, limit: 40 };
+    }
+    listStoriesService(query)
       .then(setStories)
       .catch(() => setStories([]))
       .finally(() => setLoading(false));
-  }, [category]);
+  }, [category, filter, minAge, maxAge, isBrowse]);
 
-  // No category filter -> the shared mobile-style home for guests.
-  if (!category) {
+  // Nothing selected -> the shared mobile-style home for guests.
+  if (!isBrowse) {
     return (
       <main className='min-h-dvh bg-[#FFF8ED] text-[#1B1300]'>
         <header className='mx-auto flex max-w-6xl items-center justify-between px-6 py-5'>
@@ -66,6 +94,17 @@ function StoriesBrowse() {
   }
 
   const activeCategory = categories.find((c) => c.id === category);
+  const browseTitle = category
+    ? (activeCategory?.name ?? 'Stories')
+    : filter === 'recommendations'
+      ? 'Top recommendations'
+      : filter === 'top-picks'
+        ? "Today's top picks"
+        : filter === 'seasonal'
+          ? 'Seasonal stories'
+          : filter === 'age' && minAge && maxAge
+            ? `Stories for ages ${minAge}–${maxAge}`
+            : 'All stories';
 
   return (
     <main className='min-h-dvh bg-[#FFF8ED] text-[#1B1300]'>
@@ -83,7 +122,7 @@ function StoriesBrowse() {
 
       <section className='mx-auto max-w-5xl px-6 pb-16'>
         <h1 className='font-[family-name:var(--font-qilka)] text-3xl font-bold sm:text-4xl'>
-          {activeCategory?.name ?? 'Stories'}
+          {browseTitle}
         </h1>
         <p className='mt-2 text-[#5B4B33]'>
           Pick a story and start reading — no account needed.
@@ -125,39 +164,48 @@ function StoriesBrowse() {
         ) : (
           <div className='mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3'>
             {stories.map((story) => (
-              <Link
-                key={story.id}
-                href={`/story/${story.id}`}
-                className='group overflow-hidden rounded-3xl bg-white shadow-sm transition hover:shadow-md'
-              >
-                <div className='aspect-[4/3] w-full overflow-hidden bg-[#FCE9CE]'>
-                  {story.coverImageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- remote Cloudinary host
-                    <img
-                      src={story.coverImageUrl}
-                      alt={story.title}
-                      className='h-full w-full object-cover transition group-hover:scale-[1.03]'
-                    />
-                  ) : (
-                    <div className='flex h-full w-full items-center justify-center text-5xl'>
-                      📖
-                    </div>
-                  )}
-                </div>
-                <div className='p-4'>
-                  <h2 className='font-[family-name:var(--font-qilka)] text-lg font-bold leading-snug'>
-                    {story.title}
-                  </h2>
-                  {typeof story.ageMin === 'number' && (
-                    <span className='mt-1 inline-block text-sm font-semibold text-[#4807EC]'>
-                      Ages {story.ageMin}
-                      {typeof story.ageMax === 'number'
-                        ? `–${story.ageMax}`
-                        : '+'}
-                    </span>
-                  )}
-                </div>
-              </Link>
+              <div key={story.id} className='relative'>
+                <StoryStatusBadge
+                  storyId={story.id}
+                  className='absolute left-3 top-3 z-10'
+                />
+                <FavoriteHeart
+                  storyId={story.id}
+                  className='absolute right-3 top-3 z-10'
+                />
+                <Link
+                  href={`/story/${story.id}`}
+                  className='group block overflow-hidden rounded-3xl bg-white shadow-sm transition hover:shadow-md'
+                >
+                  <div className='aspect-[4/3] w-full overflow-hidden bg-[#FCE9CE]'>
+                    {story.coverImageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- remote Cloudinary host
+                      <img
+                        src={story.coverImageUrl}
+                        alt={story.title}
+                        className='h-full w-full object-cover transition group-hover:scale-[1.03]'
+                      />
+                    ) : (
+                      <div className='flex h-full w-full items-center justify-center text-5xl'>
+                        📖
+                      </div>
+                    )}
+                  </div>
+                  <div className='p-4'>
+                    <h2 className='font-[family-name:var(--font-qilka)] text-lg font-bold leading-snug'>
+                      {story.title}
+                    </h2>
+                    {typeof story.ageMin === 'number' && (
+                      <span className='mt-1 inline-block text-sm font-semibold text-[#4807EC]'>
+                        Ages {story.ageMin}
+                        {typeof story.ageMax === 'number'
+                          ? `–${story.ageMax}`
+                          : '+'}
+                      </span>
+                    )}
+                  </div>
+                </Link>
+              </div>
             ))}
           </div>
         )}

@@ -1,5 +1,7 @@
 'use client';
 
+import FavoriteHeart from '@/components/favorite-heart';
+import StoryStatusBadge from '@/components/story-status-badge';
 import {
   type StoryCategory,
   type StoryListItem,
@@ -113,7 +115,11 @@ const StoryHome = () => {
             Stories by age
           </h2>
           <Link
-            href='/stories'
+            href={
+              ageGroup === 'All'
+                ? '/stories?filter=all'
+                : `/stories?filter=age&minAge=${AGE_GROUPS.find((g) => g.label === ageGroup)?.minAge}&maxAge=${AGE_GROUPS.find((g) => g.label === ageGroup)?.maxAge}`
+            }
             className='text-sm font-semibold text-[#EC4007] font-abeezee hover:underline'
           >
             View all
@@ -164,7 +170,7 @@ const StoryHome = () => {
       <StorySection
         title='Top recommendations'
         stories={topRecommendations}
-        viewAllHref='/stories'
+        viewAllHref='/stories?filter=recommendations'
         loading={loading}
       />
 
@@ -172,7 +178,7 @@ const StoryHome = () => {
       <StorySection
         title="Today's top picks"
         stories={topPicks}
-        viewAllHref='/stories'
+        viewAllHref='/stories?filter=top-picks'
         loading={loading}
       />
 
@@ -180,7 +186,7 @@ const StoryHome = () => {
       <StorySection
         title='Seasonal stories'
         stories={seasonal}
-        viewAllHref='/stories'
+        viewAllHref='/stories?filter=seasonal'
         loading={loading}
       />
 
@@ -251,35 +257,45 @@ const StorySectionCardLink = ({ story }: { story: StoryListItem }) => {
         ? `Ages ${story.ageMin}+`
         : null;
   return (
-    <Link
-      href={`/story/${story.id}`}
-      className='group block w-[15rem] shrink-0 overflow-hidden rounded-3xl border border-stone-100 bg-white shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] transition-all duration-300 hover:scale-[1.03]'
-    >
-      <div className='aspect-[4/3] w-full overflow-hidden bg-[#FCE9CE]'>
-        {story.coverImageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- remote Cloudinary host, avoids next.config image allowlist
-          <img
-            src={story.coverImageUrl}
-            alt={story.title}
-            className='h-full w-full object-cover transition group-hover:scale-105'
-          />
-        ) : (
-          <div className='flex h-full w-full items-center justify-center text-5xl'>
-            📖
-          </div>
-        )}
-      </div>
-      <div className='p-4'>
-        <h3 className='truncate text-[#221D1D] text-lg not-italic font-bold leading-6 font-qilka'>
-          {story.title}
-        </h3>
-        {age && (
-          <span className='mt-1 inline-block text-sm font-semibold text-[#4807EC] font-abeezee'>
-            {age}
-          </span>
-        )}
-      </div>
-    </Link>
+    <div className='relative w-[15rem] shrink-0'>
+      <StoryStatusBadge
+        storyId={story.id}
+        className='absolute left-3 top-3 z-10'
+      />
+      <FavoriteHeart
+        storyId={story.id}
+        className='absolute right-3 top-3 z-10'
+      />
+      <Link
+        href={`/story/${story.id}`}
+        className='group block overflow-hidden rounded-3xl border border-stone-100 bg-white shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] transition-all duration-300 hover:scale-[1.03]'
+      >
+        <div className='aspect-[4/3] w-full overflow-hidden bg-[#FCE9CE]'>
+          {story.coverImageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- remote Cloudinary host, avoids next.config image allowlist
+            <img
+              src={story.coverImageUrl}
+              alt={story.title}
+              className='h-full w-full object-cover transition group-hover:scale-105'
+            />
+          ) : (
+            <div className='flex h-full w-full items-center justify-center text-5xl'>
+              📖
+            </div>
+          )}
+        </div>
+        <div className='p-4'>
+          <h3 className='truncate text-[#221D1D] text-lg not-italic font-bold leading-6 font-qilka'>
+            {story.title}
+          </h3>
+          {age && (
+            <span className='mt-1 inline-block text-sm font-semibold text-[#4807EC] font-abeezee'>
+              {age}
+            </span>
+          )}
+        </div>
+      </Link>
+    </div>
   );
 };
 

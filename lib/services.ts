@@ -549,8 +549,14 @@ export const clearUserFromStorage = () => {
 
 export const isUserLoggedIn = () => {
   const user = getUserFromStorage();
+  // The access token cookie expires after ~1h, but the refresh token lasts 7
+  // days and the axios interceptor transparently refreshes on the next API
+  // call. Treat either token as "still signed in" so the UI (favorites heart,
+  // save-to-favorites, etc.) doesn't disappear the moment the access token
+  // lapses.
   const accessToken = Cookies.get('accessToken');
-  return !!(user && accessToken);
+  const refreshToken = Cookies.get('refreshToken');
+  return !!(user && (accessToken || refreshToken));
 };
 
 export const getStoriesByKidIdService = async (kidId: string) => {

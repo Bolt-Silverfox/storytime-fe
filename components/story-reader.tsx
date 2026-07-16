@@ -1,4 +1,5 @@
 import { ensureGuestSession } from '@/lib/guest';
+import { markDone, markReading } from '@/lib/progress-store';
 import {
   type StoryAudioParagraph,
   getGuestStoryService,
@@ -144,6 +145,8 @@ const StoryReader = ({
           const storyData = await getStoryByIdService(storyId);
           setStory(storyData);
         }
+        // Story loaded successfully — mark it as being read.
+        markReading(storyId);
       } catch (err) {
         const status = (err as { status?: number | null })?.status;
         if (status === 403) {
@@ -323,7 +326,12 @@ const StoryReader = ({
   // When the story is read through (or the reader taps Finish), record it as
   // completed in the user's library. Auth-only; guests can't track progress.
   useEffect(() => {
-    if (!storyFinished || isGuest || !storyId) {
+    if (!storyFinished || !storyId) {
+      return;
+    }
+    // Reflect completion on story cards immediately (works for guests too).
+    markDone(storyId);
+    if (isGuest) {
       return;
     }
     let active = true;

@@ -54,14 +54,25 @@ export default function Home() {
               </p>
             </div>
 
-            <Button
-              variant='primary'
-              className='md:w-[237px] w-full text-white rounded-[50px] px-[50px] py-2.5 gap-2.5'
-              href='/register'
-            >
-              <Volume2Icon className='w-6 h-6' />
-              <span className='font-regular-body'>Start listening</span>
-            </Button>
+            <div className='flex flex-col items-center gap-3 sm:flex-row'>
+              <Button
+                variant='primary'
+                className='md:w-[237px] w-full text-white rounded-[50px] px-[50px] py-2.5 gap-2.5'
+                href='/register'
+              >
+                <Volume2Icon className='w-6 h-6' />
+                <span className='font-regular-body'>Start listening</span>
+              </Button>
+              <Button
+                variant='outline'
+                className='md:w-[237px] w-full rounded-[50px] px-[50px] py-2.5 gap-2.5'
+                href='/stories'
+              >
+                <span className='font-regular-body'>
+                  Read stories free — no account
+                </span>
+              </Button>
+            </div>
           </div>
 
           <div className='flex items-center gap-4'>
@@ -184,7 +195,7 @@ export default function Home() {
         </div>
 
         <Link
-          href='/dashboard'
+          href='/stories'
           className={cn(
             buttonVariants({ variant: 'outline' }),
             'rounded-full bg-transparent border-[#EC4007] text-[#EC4007] px-[54px] border h-auto py-2.5'
@@ -212,6 +223,7 @@ export default function Home() {
 
                 <Button
                   variant='outline'
+                  href='/stories'
                   className='rounded-full bg-transparent text-white px-[54px] border h-auto py-2.5'
                 >
                   Browse all stories

@@ -42,9 +42,13 @@ const Recommended = () => {
         setKidName(selectedKid.name);
 
         const storiesData = await getStoriesByKidIdService(selectedKid.id);
+        // The list endpoint returns { data: [...], pagination }, not a bare array.
+        const arr = Array.isArray(storiesData)
+          ? storiesData
+          : (storiesData?.data ?? storiesData?.stories ?? []);
 
         // Select 2 random stories
-        const shuffled = storiesData.sort(() => 0.5 - Math.random());
+        const shuffled = [...arr].sort(() => 0.5 - Math.random());
         const selectedStories = shuffled.slice(0, 2);
 
         setStories(selectedStories);

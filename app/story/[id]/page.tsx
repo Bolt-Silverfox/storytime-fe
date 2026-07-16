@@ -1,12 +1,8 @@
 import BackButton from '@/components/back-button';
 import type { Metadata } from 'next';
 import { ageLabel, coverOf, extractStoryId, getStory } from './get-story';
-import {
-  APP_STORE_URL,
-  PLAY_STORE_URL,
-  SITE_URL,
-  makeStoryDeepLink,
-} from './story-links';
+import OpenInAppButton from './open-in-app-button';
+import { APP_STORE_URL, PLAY_STORE_URL, SITE_URL } from './story-links';
 import StoryView from './story-view';
 
 const FALLBACK_DESCRIPTION =
@@ -83,7 +79,6 @@ export default async function StorySharePage({
       : "This story couldn't be found, but there's a whole library waiting in the Storytime app.");
   const cover = story ? coverOf(story) : null;
   const age = story ? ageLabel(story) : null;
-  const deepLink = story ? makeStoryDeepLink(story.id) : null;
 
   return (
     <main className='min-h-dvh bg-[#FFF8ED] text-[#1B1300]'>
@@ -143,14 +138,7 @@ export default async function StorySharePage({
 
         {/* Or get the app */}
         <div className='grid gap-3 sm:grid-cols-2'>
-          {deepLink && (
-            <a
-              href={deepLink}
-              className='flex items-center justify-center rounded-2xl border border-[#EC4007]/40 px-6 py-4 text-center text-base font-semibold text-[#EC4007] transition hover:bg-[#EC4007]/5 sm:col-span-2'
-            >
-              Open in the Storytime app
-            </a>
-          )}
+          {story && <OpenInAppButton storyId={story.id} />}
           <a
             href={APP_STORE_URL}
             className='flex items-center justify-center rounded-2xl border border-[#1B1300]/15 bg-white px-6 py-4 text-center text-base font-semibold transition hover:border-[#1B1300]/30'

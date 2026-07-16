@@ -1,0 +1,18 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "36CFL54G89.net.emerj.storytime",
+        "appIDs": ["36CFL54G89.net.emerj.storytime"],
+        "paths": ["/story/*"],
+        "components": [
+          {
+            "/": "/story/*",
+            "comment": "Story deep links open the Storytime app"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -41,7 +41,7 @@ const VoiceCard = ({
 
   return (
     <div
-      className={` p-6 rounded-[1.5625rem] border-[0.5px] border-solid text-center flex flex-col items-center transition-all duration-300 ${
+      className={` p-4 sm:p-6 min-w-0 rounded-[1.5625rem] border-[0.5px] border-solid text-center flex flex-col items-center transition-all duration-300 ${
         selectable ? 'cursor-pointer hover:scale-105' : 'cursor-default'
       } ${
         highlight
@@ -70,11 +70,11 @@ const VoiceCard = ({
         <img
           src={avatar}
           alt={name}
-          className='mb-3 h-16 w-16 rounded-full object-cover'
+          className='mb-3 h-14 w-14 sm:h-16 sm:w-16 shrink-0 rounded-full object-cover'
         />
       ) : (
         <div
-          className={`mb-3 flex h-16 w-16 items-center justify-center rounded-full text-2xl ${
+          className={`mb-3 flex h-14 w-14 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-full text-2xl ${
             highlight ? 'bg-white/20' : 'bg-[#FCE9CE]'
           }`}
         >
@@ -96,7 +96,7 @@ const VoiceCard = ({
         {description}
       </p>
       <div
-        className={` mt-6 shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] px-6 py-2.5 rounded-[3.125rem] border-[0.5px] border-solid border-[#FAF4F2] hover:scale-105 transition-all duration-300 flex items-center gap-3 w-fit text-center cursor-pointer ${
+        className={` mt-6 shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] px-4 sm:px-6 py-2.5 rounded-[3.125rem] border-[0.5px] border-solid border-[#FAF4F2] hover:scale-105 transition-all duration-300 flex items-center justify-center gap-3 w-fit max-w-full text-center cursor-pointer ${
           highlight
             ? 'bg-[#F84020] text-white border-[#F84020]'
             : 'bg-white text-[#4A413F]'
@@ -113,9 +113,13 @@ const VoiceCard = ({
           }
         }}
       >
-        <Image src={highlight ? volumeActive : volume} alt='volume' />
+        <Image
+          src={highlight ? volumeActive : volume}
+          alt='volume'
+          className='shrink-0'
+        />
         <p
-          className={`text-xs not-italic font-normal leading-4 font-abeezee ${
+          className={`text-xs not-italic font-normal leading-4 font-abeezee whitespace-nowrap ${
             highlight ? 'text-white' : 'text-[#4A413F]'
           }`}
         >

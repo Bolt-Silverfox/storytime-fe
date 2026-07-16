@@ -53,8 +53,10 @@ const Modal: React.FC<ModalProps> = ({
         >
           <motion.div
             className={`relative border-stone-100 bg-white ${
-              expand ? 'w-[70vw] ' : 'w-[32vw]'
-            } p-8 rounded-[1.8125rem] border-[0.5px] border-solid mr-3 h-[95vh] font-abeezee overflow-y-auto scrollbar transition-all duration-100 ease-in-out`}
+              expand
+                ? 'w-[95vw] max-w-[56rem] sm:w-[70vw]'
+                : 'w-[95vw] max-w-[32rem] sm:w-[32vw]'
+            } p-5 sm:p-8 rounded-[1.8125rem] border-[0.5px] border-solid mr-0 sm:mr-3 max-h-[95vh] h-[95vh] font-abeezee overflow-y-auto scrollbar transition-all duration-100 ease-in-out`}
             initial={{ x: '100%', opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: '100%', opacity: 0 }}
@@ -66,13 +68,13 @@ const Modal: React.FC<ModalProps> = ({
             // }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className='flex justify-between items-center mb-10'>
+            <div className='flex flex-wrap justify-between items-center gap-3 mb-6 sm:mb-10'>
               {title && (
-                <h2 className='text-[#221D1D] text-base not-italic font-normal leading-5'>
+                <h2 className='text-[#221D1D] text-base not-italic font-normal leading-5 min-w-0'>
                   {title}
                 </h2>
               )}
-              <div className='flex justify-between items-center gap-8'>
+              <div className='flex justify-between items-center gap-3 sm:gap-8 shrink-0'>
                 {expandable && (
                   <button
                     type='button'

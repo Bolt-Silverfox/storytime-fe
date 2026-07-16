@@ -89,7 +89,7 @@ function StoriesBrowse() {
   if (!isBrowse) {
     return (
       <main className='min-h-dvh bg-[#FFF8ED] text-[#1B1300]'>
-        <header className='mx-auto flex max-w-6xl items-center justify-between px-6 py-5'>
+        <header className='mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 sm:px-6 pt-8 pb-5'>
           <Link
             href='/'
             className='font-[family-name:var(--font-qilka)] text-2xl font-bold text-[#EC4007]'
@@ -103,7 +103,7 @@ function StoriesBrowse() {
             Sign up
           </Link>
         </header>
-        <section className='mx-auto max-w-6xl px-6 pb-16'>
+        <section className='mx-auto max-w-6xl px-4 sm:px-6 pb-16'>
           <StoryHome />
         </section>
       </main>
@@ -125,9 +125,9 @@ function StoriesBrowse() {
 
   return (
     <main className='min-h-dvh bg-[#FFF8ED] text-[#1B1300]'>
-      <header className='mx-auto flex max-w-5xl items-center justify-between px-6 py-5'>
+      <header className='mx-auto flex max-w-5xl items-center justify-between px-4 sm:px-6 pt-8 pb-5'>
         <div className='flex items-center gap-3'>
-          <BackButton />
+          <BackButton className='shrink-0' />
           <Link
             href='/'
             className='font-[family-name:var(--font-qilka)] text-2xl font-bold text-[#EC4007]'
@@ -137,7 +137,7 @@ function StoriesBrowse() {
         </div>
       </header>
 
-      <section className='mx-auto max-w-5xl px-6 pb-16'>
+      <section className='mx-auto max-w-5xl px-4 sm:px-6 pb-16'>
         <h1 className='font-[family-name:var(--font-qilka)] text-3xl font-bold sm:text-4xl'>
           {browseTitle}
         </h1>
@@ -146,7 +146,7 @@ function StoriesBrowse() {
         </p>
 
         {/* Category filter */}
-        <div className='mt-6 flex flex-wrap gap-2'>
+        <div className='mt-6 flex flex-wrap gap-2 sm:gap-3'>
           {[{ id: ALL, name: ALL }, ...categories].map((cat) => {
             const active = cat.id === category;
             return (
@@ -160,7 +160,7 @@ function StoriesBrowse() {
                     router.push(`/stories?category=${cat.id}`);
                   }
                 }}
-                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition ${
                   active
                     ? 'bg-[#EC4007] text-white'
                     : 'bg-white text-[#5B4B33] hover:bg-[#FCE9CE]'

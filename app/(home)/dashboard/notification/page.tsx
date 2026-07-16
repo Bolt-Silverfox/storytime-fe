@@ -3,6 +3,7 @@
 import BackButton from '@/components/back-button';
 import Header from '@/components/header';
 import { Switch } from '@/components/ui/switch';
+import { useWebPush } from '@/lib/hooks/use-web-push';
 import {
   type NotificationItem,
   type NotificationPreference,
@@ -200,6 +201,50 @@ const InboxTab = () => {
   );
 };
 
+const BrowserNotificationsRow = () => {
+  const { supported, permission, enabled, enabling, enable, disable } =
+    useWebPush();
+  const blocked = permission === 'denied';
+
+  const description = !supported
+    ? 'Not available in this browser'
+    : blocked
+      ? 'Blocked — allow notifications in your browser settings'
+      : 'Get alerts on this device even when Storytime is closed';
+
+  return (
+    <div className='flex flex-col gap-3'>
+      <h3 className='text-[#221D1D] text-lg not-italic font-bold leading-6 font-qilka'>
+        Browser notifications
+      </h3>
+      <div className='rounded-3xl border border-stone-100 bg-white px-6 py-2 shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)]'>
+        <div className='flex items-center justify-between gap-4 py-4'>
+          <div>
+            <p className='text-[#221D1D] text-base not-italic font-normal leading-5 font-abeezee'>
+              Enable browser notifications
+            </p>
+            <p className='mt-0.5 text-[#4A413F] text-xs not-italic font-normal leading-4 font-abeezee'>
+              {description}
+            </p>
+          </div>
+          <Switch
+            checked={enabled}
+            disabled={!supported || blocked || enabling}
+            onCheckedChange={(next) => {
+              if (next) {
+                enable();
+              } else {
+                disable();
+              }
+            }}
+            className='data-[state=checked]:bg-[#EC4007]'
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const SettingsTab = () => {
   const [preferences, setPreferences] = useState<NotificationPreference[]>([]);
   const [loading, setLoading] = useState(true);
@@ -244,81 +289,77 @@ const SettingsTab = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className='flex flex-col gap-4'>
-        {[1, 2, 3].map((i) => (
-          <div
-            key={i}
-            className='h-[4rem] animate-pulse rounded-3xl bg-stone-100'
-          />
-        ))}
-      </div>
-    );
-  }
-
   const visibleCount = preferences.filter(
     (p) => CATEGORY_LABELS[p.category]
   ).length;
 
-  if (visibleCount === 0) {
-    return (
-      <div className='rounded-3xl border border-stone-100 bg-[#FFF8ED] px-6 py-12 text-center'>
-        <p className='text-[#4A413F] font-abeezee'>
-          No notification preferences yet.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div className='flex flex-col gap-8'>
-      {SECTIONS.map((section) => {
-        const rows = preferences.filter(
-          (p) =>
-            section.categories.includes(p.category) &&
-            CATEGORY_LABELS[p.category]
-        );
-        if (rows.length === 0) {
-          return null;
-        }
-        return (
-          <div key={section.title} className='flex flex-col gap-3'>
-            <h3 className='text-[#221D1D] text-lg not-italic font-bold leading-6 font-qilka'>
-              {section.title}
-            </h3>
-            <div className='rounded-3xl border border-stone-100 bg-white px-6 py-2 shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)]'>
-              {rows.map((pref, index) => {
-                const isLast = index === rows.length - 1;
-                const channel = CHANNEL_LABELS[pref.type] ?? pref.type;
-                return (
-                  <div
-                    key={pref.id}
-                    className={`flex items-center justify-between gap-4 py-4 ${
-                      isLast ? '' : 'border-b border-stone-100'
-                    }`}
-                  >
-                    <div>
-                      <p className='text-[#221D1D] text-base not-italic font-normal leading-5 font-abeezee'>
-                        {CATEGORY_LABELS[pref.category]}
-                      </p>
-                      <p className='mt-0.5 text-[#4A413F] text-xs not-italic font-normal leading-4 font-abeezee'>
-                        {channel}
-                      </p>
+      <BrowserNotificationsRow />
+
+      {loading ? (
+        <div className='flex flex-col gap-4'>
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className='h-[4rem] animate-pulse rounded-3xl bg-stone-100'
+            />
+          ))}
+        </div>
+      ) : visibleCount === 0 ? (
+        <div className='rounded-3xl border border-stone-100 bg-[#FFF8ED] px-6 py-12 text-center'>
+          <p className='text-[#4A413F] font-abeezee'>
+            No notification preferences yet.
+          </p>
+        </div>
+      ) : (
+        SECTIONS.map((section) => {
+          const rows = preferences.filter(
+            (p) =>
+              section.categories.includes(p.category) &&
+              CATEGORY_LABELS[p.category]
+          );
+          if (rows.length === 0) {
+            return null;
+          }
+          return (
+            <div key={section.title} className='flex flex-col gap-3'>
+              <h3 className='text-[#221D1D] text-lg not-italic font-bold leading-6 font-qilka'>
+                {section.title}
+              </h3>
+              <div className='rounded-3xl border border-stone-100 bg-white px-6 py-2 shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)]'>
+                {rows.map((pref, index) => {
+                  const isLast = index === rows.length - 1;
+                  const channel = CHANNEL_LABELS[pref.type] ?? pref.type;
+                  return (
+                    <div
+                      key={pref.id}
+                      className={`flex items-center justify-between gap-4 py-4 ${
+                        isLast ? '' : 'border-b border-stone-100'
+                      }`}
+                    >
+                      <div>
+                        <p className='text-[#221D1D] text-base not-italic font-normal leading-5 font-abeezee'>
+                          {CATEGORY_LABELS[pref.category]}
+                        </p>
+                        <p className='mt-0.5 text-[#4A413F] text-xs not-italic font-normal leading-4 font-abeezee'>
+                          {channel}
+                        </p>
+                      </div>
+                      <Switch
+                        checked={pref.enabled}
+                        disabled={pendingIds.includes(pref.id)}
+                        onCheckedChange={() => handleToggle(pref)}
+                        className='data-[state=checked]:bg-[#EC4007]'
+                      />
                     </div>
-                    <Switch
-                      checked={pref.enabled}
-                      disabled={pendingIds.includes(pref.id)}
-                      onCheckedChange={() => handleToggle(pref)}
-                      className='data-[state=checked]:bg-[#EC4007]'
-                    />
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })
+      )}
     </div>
   );
 };

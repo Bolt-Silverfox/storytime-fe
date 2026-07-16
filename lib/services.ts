@@ -546,6 +546,59 @@ export const markAllNotificationsReadService = async () => {
   }
 };
 
+export interface NotificationPreference {
+  id: string;
+  type: string;
+  category: string;
+  enabled: boolean;
+}
+
+// GET /notification-preferences/users/:userId — the user's raw preference
+// records. Returns [] on error.
+export const getNotificationPreferencesService = async (
+  userId: string
+): Promise<NotificationPreference[]> => {
+  try {
+    const response = await api.get(`notification-preferences/users/${userId}`);
+    const data = response.data;
+    return Array.isArray(data) ? data : (data?.data ?? []);
+  } catch {
+    return [];
+  }
+};
+
+// PATCH /notification-preferences/:id — toggle a single preference on/off.
+export const updateNotificationPreferenceService = async (
+  id: string,
+  enabled: boolean
+) => {
+  try {
+    const response = await api.patch(`notification-preferences/${id}`, {
+      enabled,
+    });
+    return response.data;
+  } catch (error: unknown) {
+    if (error instanceof AxiosError) {
+      if (error.response) {
+        throw {
+          message:
+            error.response.data?.message ||
+            'Failed to update notification preference',
+          status: error.response.status,
+          data: error.response.data,
+        };
+      }
+      if (error.request) {
+        throw { message: 'No response from server', status: null };
+      }
+    }
+    throw {
+      message: error instanceof Error ? error.message : 'Unexpected error',
+      status: null,
+    };
+  }
+};
+
 // Utility functions for managing user data in local storage
 export const getUserFromStorage = (): User | null => {
   try {

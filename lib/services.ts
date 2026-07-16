@@ -607,6 +607,67 @@ export const updateNotificationPreferenceService = async (
   }
 };
 
+// ----- Web push device registration (FCM tokens) -----
+
+// POST /devices/register — register the browser's FCM token so the backend can
+// deliver web push notifications. Auth + X-API-Key are added by the axios
+// interceptor.
+export const registerWebPushTokenService = async (token: string) => {
+  try {
+    const deviceInfo =
+      typeof navigator !== 'undefined' ? navigator.userAgent : undefined;
+    const response = await api.post('devices/register', {
+      token,
+      platform: 'web',
+      ...(deviceInfo ? { deviceInfo } : {}),
+    });
+    return response.data;
+  } catch (error: unknown) {
+    if (error instanceof AxiosError) {
+      if (error.response) {
+        throw {
+          message: error.response.data?.message || 'Failed to register device',
+          status: error.response.status,
+          data: error.response.data,
+        };
+      }
+      if (error.request) {
+        throw { message: 'No response from server', status: null };
+      }
+    }
+    throw {
+      message: error instanceof Error ? error.message : 'Unexpected error',
+      status: null,
+    };
+  }
+};
+
+// DELETE /devices — unregister the browser's FCM token.
+export const unregisterWebPushTokenService = async (token: string) => {
+  try {
+    const response = await api.delete('devices', { data: { token } });
+    return response.data;
+  } catch (error: unknown) {
+    if (error instanceof AxiosError) {
+      if (error.response) {
+        throw {
+          message:
+            error.response.data?.message || 'Failed to unregister device',
+          status: error.response.status,
+          data: error.response.data,
+        };
+      }
+      if (error.request) {
+        throw { message: 'No response from server', status: null };
+      }
+    }
+    throw {
+      message: error instanceof Error ? error.message : 'Unexpected error',
+      status: null,
+    };
+  }
+};
+
 // Utility functions for managing user data in local storage
 export const getUserFromStorage = (): User | null => {
   try {

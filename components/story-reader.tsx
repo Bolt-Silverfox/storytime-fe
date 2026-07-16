@@ -110,6 +110,8 @@ const StoryReader = ({
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioLoading, setAudioLoading] = useState(false);
   const [audioError, setAudioError] = useState<string | null>(null);
+  // Bumped by the "Try again" button to re-run audio generation on failure.
+  const [audioRetry, setAudioRetry] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -163,6 +165,7 @@ const StoryReader = ({
     fetchStory();
   }, [storyId, isGuest]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: audioRetry is a deliberate trigger so the "Try again" button re-runs audio generation; it isn't read in the body.
   useEffect(() => {
     let cancelled = false;
 
@@ -259,7 +262,7 @@ const StoryReader = ({
     return () => {
       cancelled = true;
     };
-  }, [storyId, isGuest, voiceId, guestAudioUrl]);
+  }, [storyId, isGuest, voiceId, guestAudioUrl, audioRetry]);
 
   // Keep a ref of isPlaying so the audio-element listeners (mounted once) can
   // read the latest value without stale closures.
@@ -711,7 +714,19 @@ const StoryReader = ({
           />
         </button>
         {audioError && (
-          <p className='text-red-500 text-sm mt-2 text-center'>{audioError}</p>
+          <div className='mt-2 flex flex-col items-center gap-2'>
+            <p className='text-red-500 text-sm text-center'>{audioError}</p>
+            <button
+              type='button'
+              onClick={() => {
+                setAudioError(null);
+                setAudioRetry((n) => n + 1);
+              }}
+              className='rounded-full border border-[#EC4007] px-5 py-2 font-abeezee text-sm font-semibold text-[#EC4007] transition hover:bg-[#EC4007]/5'
+            >
+              Try again
+            </button>
+          </div>
         )}
         {!isGuest && isChecked && (
           <div className='mt-8 text-center'>

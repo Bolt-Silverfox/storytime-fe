@@ -29,6 +29,7 @@ interface VoiceOption {
   description: string;
   id: string;
   previewUrl: string;
+  avatar: string;
 }
 
 const VoiceSelector = ({
@@ -61,6 +62,7 @@ const VoiceSelector = ({
           description: voice.type ? `${voice.type} voice` : 'AI voice',
           id: voice.id,
           previewUrl: voice.previewUrl ?? '',
+          avatar: voice.voiceAvatar ?? '',
         }));
         setVoices(mappedVoices);
         if (preferred?.id) {
@@ -194,6 +196,7 @@ const VoiceSelector = ({
             key={voice.id}
             name={voice.name}
             description={voice.description}
+            avatar={voice.avatar}
             active={selectedVoiceId === voice.id}
             onClick={() => setSelectedVoiceId(voice.id)}
             onListen={(e) => handleListen(voice, e)}

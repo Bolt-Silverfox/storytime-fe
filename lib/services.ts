@@ -549,8 +549,14 @@ export const clearUserFromStorage = () => {
 
 export const isUserLoggedIn = () => {
   const user = getUserFromStorage();
+  // The access token cookie expires after ~1h, but the refresh token lasts 7
+  // days and the axios interceptor transparently refreshes on the next API
+  // call. Treat either token as "still signed in" so the UI (favorites heart,
+  // save-to-favorites, etc.) doesn't disappear the moment the access token
+  // lapses.
   const accessToken = Cookies.get('accessToken');
-  return !!(user && accessToken);
+  const refreshToken = Cookies.get('refreshToken');
+  return !!(user && (accessToken || refreshToken));
 };
 
 export const getStoriesByKidIdService = async (kidId: string) => {
@@ -758,6 +764,56 @@ export const listStoriesService = async (
   }
 };
 
+export interface StoriesPage {
+  items: StoryListItem[];
+  currentPage: number;
+  totalPages: number;
+  totalCount: number;
+}
+
+// Paginated list of stories for the browse / "View all" infinite scroll.
+// Unlike listStoriesService (bare array, used by the home carousels), this
+// returns page metadata so useInfiniteQuery can advance the cursor. Do NOT
+// pass shuffle here — reordering between pages would duplicate items.
+export const listStoriesPageService = async (
+  params: StoryQuery & { page?: number } = {}
+): Promise<StoriesPage> => {
+  try {
+    const search = new URLSearchParams();
+    if (params.category) {
+      search.set('category', params.category);
+    }
+    if (typeof params.minAge === 'number') {
+      search.set('minAge', String(params.minAge));
+    }
+    if (typeof params.maxAge === 'number') {
+      search.set('maxAge', String(params.maxAge));
+    }
+    if (params.isSeasonal) {
+      search.set('isSeasonal', 'true');
+    }
+    if (params.isMostLiked) {
+      search.set('isMostLiked', 'true');
+    }
+    if (params.topPicksFromUs) {
+      search.set('topPicksFromUs', 'true');
+    }
+    search.set('page', String(params.page ?? 1));
+    search.set('limit', String(params.limit ?? 24));
+    const response = await api.get(`stories?${search.toString()}`);
+    const data = response.data;
+    const pagination = data?.pagination;
+    return {
+      items: data?.data ?? [],
+      currentPage: pagination?.currentPage ?? 1,
+      totalPages: pagination?.totalPages ?? 1,
+      totalCount: pagination?.totalCount ?? 0,
+    };
+  } catch {
+    return { items: [], currentPage: 1, totalPages: 1, totalCount: 0 };
+  }
+};
+
 // Public list of story categories (GET /stories/categories is @Public).
 export const listCategoriesService = async (): Promise<StoryCategory[]> => {
   try {
@@ -807,12 +863,13 @@ export const recordUserProgressService = async (
   return response.data;
 };
 
-// GET /stories/user/library/in-progress — the user's ongoing stories.
+// GET /stories/user/library/continue-reading — the user's ongoing stories.
+// (The backend route is `continue-reading`, not `in-progress`.)
 export const getInProgressStoriesService = async (): Promise<
   StoryListItem[]
 > => {
   try {
-    const response = await api.get('stories/user/library/in-progress');
+    const response = await api.get('stories/user/library/continue-reading');
     const data = response.data;
     return Array.isArray(data) ? data : (data?.data ?? data?.stories ?? []);
   } catch {

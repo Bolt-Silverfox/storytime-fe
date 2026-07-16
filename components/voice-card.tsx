@@ -5,12 +5,14 @@ import Image from 'next/image';
 const VoiceCard = ({
   name,
   description,
+  avatar,
   onListen,
   active = false,
   onClick,
 }: {
   name: string;
   description: string;
+  avatar?: string;
   onListen: (e: React.MouseEvent) => void;
   active?: boolean;
   onClick?: () => void;
@@ -29,6 +31,22 @@ const VoiceCard = ({
       }
     }}
   >
+    {avatar ? (
+      // eslint-disable-next-line @next/next/no-img-element -- remote Cloudinary host
+      <img
+        src={avatar}
+        alt={name}
+        className='mb-3 h-16 w-16 rounded-full object-cover'
+      />
+    ) : (
+      <div
+        className={`mb-3 flex h-16 w-16 items-center justify-center rounded-full text-2xl ${
+          active ? 'bg-white/20' : 'bg-[#FCE9CE]'
+        }`}
+      >
+        🎙️
+      </div>
+    )}
     <h2
       className={`text-center text-xl not-italic font-bold leading-6 font-qilka ${
         active ? 'text-white' : 'text-[#221D1D]'

@@ -2,11 +2,13 @@
 
 import { EmptyStates } from '@/components/ui/empty-states';
 import { useAuth } from '@/context/auth-context';
+import { isUserLoggedIn } from '@/lib/services';
 import { getFirstName } from '@/lib/utils';
 import { IconMoodSad } from '@tabler/icons-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { StepBack } from 'lucide-react';
-import React from 'react';
+import { useRouter } from 'next/navigation';
+import React, { useEffect } from 'react';
 import { AuthFooter } from './components/auth-footer';
 import { CredentialsStep } from './components/registration-steps/credentials-step';
 import { DetailsStep } from './components/registration-steps/details-step';
@@ -21,12 +23,23 @@ const stepComponents = {
 } as const;
 
 const RegisterPage = () => {
+  const router = useRouter();
   const {
     registrationStep,
     handleRegistrationStepForward,
     handleRegistrationStepBackward,
     registrationData,
   } = useAuth();
+
+  // Redirect already-authenticated users away from the register page. A dead
+  // session has its cookies cleared by the axios refresh interceptor, so
+  // isUserLoggedIn() is false and the form renders normally.
+  useEffect(() => {
+    if (isUserLoggedIn()) {
+      router.replace('/dashboard');
+    }
+  }, [router]);
+
   const StepComponent =
     stepComponents[registrationStep as keyof typeof stepComponents];
   return (

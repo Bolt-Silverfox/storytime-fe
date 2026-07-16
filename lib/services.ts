@@ -421,6 +421,31 @@ export const getPreferredVoiceService = async (): Promise<Voice | null> => {
   }
 };
 
+// GET /voice/access — the backend's voice entitlement for the current user.
+// `isPremium` mirrors SubscriptionService.isPremiumUser() (active subscription,
+// coupon access, or admin) and is the exact rule used to gate voice switching.
+// The route is @OptionalAuth, so guests receive `isPremium: false`. Defaults to
+// non-premium on any error so voice switching stays locked unless the server
+// explicitly grants it.
+export const getVoiceAccessService = async (): Promise<{
+  isPremium: boolean;
+  // The voice a locked (guest/free) user is restricted to — i.e. the one that
+  // actually reads their stories. Null for premium users (who can switch).
+  lockedVoiceId: string | null;
+  defaultVoice: string | null;
+}> => {
+  try {
+    const response = await api.get('voice/access');
+    return {
+      isPremium: !!response.data?.isPremium,
+      lockedVoiceId: response.data?.lockedVoiceId ?? null,
+      defaultVoice: response.data?.defaultVoice ?? null,
+    };
+  } catch {
+    return { isPremium: false, lockedVoiceId: null, defaultVoice: null };
+  }
+};
+
 export const setPreferredVoiceService = async (voiceId: string) => {
   try {
     const response = await api.patch('voice/preferred', {
@@ -514,6 +539,59 @@ export const markAllNotificationsReadService = async () => {
           message:
             error.response.data?.message ||
             'Failed to mark notifications as read',
+          status: error.response.status,
+          data: error.response.data,
+        };
+      }
+      if (error.request) {
+        throw { message: 'No response from server', status: null };
+      }
+    }
+    throw {
+      message: error instanceof Error ? error.message : 'Unexpected error',
+      status: null,
+    };
+  }
+};
+
+export interface NotificationPreference {
+  id: string;
+  type: string;
+  category: string;
+  enabled: boolean;
+}
+
+// GET /notification-preferences/users/:userId — the user's raw preference
+// records. Returns [] on error.
+export const getNotificationPreferencesService = async (
+  userId: string
+): Promise<NotificationPreference[]> => {
+  try {
+    const response = await api.get(`notification-preferences/users/${userId}`);
+    const data = response.data;
+    return Array.isArray(data) ? data : (data?.data ?? []);
+  } catch {
+    return [];
+  }
+};
+
+// PATCH /notification-preferences/:id — toggle a single preference on/off.
+export const updateNotificationPreferenceService = async (
+  id: string,
+  enabled: boolean
+) => {
+  try {
+    const response = await api.patch(`notification-preferences/${id}`, {
+      enabled,
+    });
+    return response.data;
+  } catch (error: unknown) {
+    if (error instanceof AxiosError) {
+      if (error.response) {
+        throw {
+          message:
+            error.response.data?.message ||
+            'Failed to update notification preference',
           status: error.response.status,
           data: error.response.data,
         };

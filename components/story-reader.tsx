@@ -326,7 +326,7 @@ const StoryReader = ({
   // When the story is read through (or the reader taps Finish), record it as
   // completed in the user's library. Auth-only; guests can't track progress.
   useEffect(() => {
-    if (!storyFinished || !storyId) {
+    if (!(storyFinished && storyId)) {
       return;
     }
     // Reflect completion on story cards immediately (works for guests too).

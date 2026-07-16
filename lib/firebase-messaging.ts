@@ -15,20 +15,33 @@ import {
   onMessage,
 } from 'firebase/messaging';
 
+// The Firebase web config is public by design (it ships in the client bundle
+// and identifies the project; access is gated by Firebase rules + authorized
+// domains, not by hiding these values). Likewise the VAPID key below is the
+// PUBLIC web-push key. They're kept as defaults so web push works in every
+// environment without ENV_FILE changes; NEXT_PUBLIC_FIREBASE_* still override.
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  apiKey:
+    process.env.NEXT_PUBLIC_FIREBASE_API_KEY ||
+    'AIzaSyD0palNuJyJX1xIMnYCL_vWMP5NS1CgDRE',
   authDomain:
     process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ||
     'storytimeapp-29aea.firebaseapp.com',
   projectId:
     process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'storytimeapp-29aea',
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  storageBucket:
+    process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
+    'storytimeapp-29aea.firebasestorage.app',
   messagingSenderId:
     process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '601078972007',
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  appId:
+    process.env.NEXT_PUBLIC_FIREBASE_APP_ID ||
+    '1:601078972007:web:ad94daca6d2d1cc4061ec2',
 };
 
-const VAPID_KEY = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+const VAPID_KEY =
+  process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY ||
+  'BNezYbRjNXIdWs6HAebYqepnOmJVj85JF0xxfrtD27OvUghzjpME6c3qku_7WFzbZckfC52AVC-J2aM5JRSerrM';
 
 // True only when the values FCM cannot work without are all present. The web
 // appId and VAPID key are the two that must come from the Firebase Console.

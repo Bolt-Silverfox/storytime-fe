@@ -12,7 +12,8 @@
       "bun.lock",
       ".next",
       "output",
-      "next-env.d.ts"
+      "next-env.d.ts",
+      "public/firebase-messaging-sw.js"
     ]
   },
   "formatter": {

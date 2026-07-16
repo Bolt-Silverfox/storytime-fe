@@ -178,8 +178,8 @@ const VoiceSelector = ({
           Customize how you want this AI voice to sound
         </p>
         <div
-          className={`grid gap-4 mb-8 mt-4 ${
-            expand ? 'grid-cols-3' : 'grid-cols-2'
+          className={`grid gap-3 sm:gap-4 mb-8 mt-4 ${
+            expand ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2'
           }`}
         >
           {[1, 2, 3, 4, 5, 6].map((i) => (

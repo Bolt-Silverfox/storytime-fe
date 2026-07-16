@@ -498,7 +498,7 @@ const StoryReader = ({
           <img
             src={displayImage}
             alt={displayTitle}
-            className='w-full rounded-2xl object-cover'
+            className='w-full max-w-full rounded-2xl object-cover'
           />
         ) : null}
         <h3 className='text-[#221D1D] text-[1.625rem] not-italic font-bold leading-[1.875rem] font-qilka mt-4 mb-0.5'>
@@ -521,7 +521,7 @@ const StoryReader = ({
             <Image
               src={movement}
               alt='movement'
-              className='h-[9rem] rounded-[3xl] mb-4 object-cover'
+              className='h-[9rem] max-w-full rounded-[3xl] mb-4 object-cover'
             />
             <div className='bg-white flex justify-center items-center gap-3 shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] px-6 py-2.5 rounded-[3.125rem] border-[0.5px] border-solid border-[#FAF4F2]'>
               <h5 className='text-[#221D1D] text-right text-xl not-italic font-bold leading-6'>
@@ -543,7 +543,7 @@ const StoryReader = ({
             </small>
           </div>
         ) : (
-          <div className='flex items-center gap-4 justify-between w-full'>
+          <div className='flex flex-wrap items-center gap-4 justify-between w-full'>
             <div className='flex items-center gap-4'>
               <Image src={movementSmall} alt='movement' className='' />
               <small className='text-[#4A413F] text-base not-italic font-normal leading-5 font-abeezee mt-2'>
@@ -578,7 +578,7 @@ const StoryReader = ({
           />
         </div>
         {isChecked && (
-          <div className='w-[75%] mx-auto'>
+          <div className='w-full sm:w-[75%] mx-auto'>
             {mode === 'interactive' &&
             story?.questions &&
             story.questions.length > 0 &&

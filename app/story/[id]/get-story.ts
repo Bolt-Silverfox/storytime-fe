@@ -42,9 +42,13 @@ export async function getStory(param: string): Promise<SharedStory | null> {
     return null;
   }
   const id = extractStoryId(param);
+  const apiKey = process.env.NEXT_PUBLIC_API_KEY;
   try {
     const res = await fetch(`${base}/api/v1/stories/${id}`, {
-      headers: { Accept: 'application/json' },
+      headers: {
+        Accept: 'application/json',
+        ...(apiKey ? { 'X-API-Key': apiKey } : {}),
+      },
       next: { revalidate: 3600 },
     });
     if (!res.ok) {

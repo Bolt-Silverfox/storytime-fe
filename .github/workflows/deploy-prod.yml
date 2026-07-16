@@ -1,0 +1,92 @@
+name: CI/CD - Production
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  NODE_VERSION: '24'
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 9
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+
+  deploy:
+    name: Deploy to Production Server
+    runs-on: ubuntu-latest
+    needs: [lint]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 9
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # NEXT_PUBLIC_API_URL is inlined at build time — the production ENV_FILE
+      # secret must set NEXT_PUBLIC_API_URL=https://api.storytimeapp.me
+      - name: Create .env file
+        run: echo "${{ secrets.ENV_FILE }}" > .env
+
+      - name: Build application
+        run: pnpm build
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Ensure deploy path exists
+        run: |
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "mkdir -p ${{ secrets.DEPLOY_PATH }}"
+
+      - name: Prepare deployment bundle
+        run: |
+          mkdir -p deploy_bundle/.next
+          cp -r .next/standalone/. deploy_bundle/
+          cp -r .next/static deploy_bundle/.next/
+          cp -r public deploy_bundle/
+          cp ecosystem.config.js .env deploy_bundle/
+
+      - name: Deploy with rsync
+        run: |
+          rsync -avz --delete-after \
+            deploy_bundle/ \
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.DEPLOY_PATH }}/
+
+      - name: Restart application with PM2
+        run: |
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+            cd ${{ secrets.DEPLOY_PATH }}
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+            nvm use 24
+            npx pm2 startOrReload ecosystem.config.js --only storytime-fe-prod --update-env
+            npx pm2 save
+          EOF
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_rsa

@@ -1,9 +1,9 @@
 'use client';
 
+import { clearUserFromStorage } from '@/lib/services';
 import { AnimatePresence, motion } from 'framer-motion';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 
 interface ProfileDropdownProps {
@@ -45,7 +45,6 @@ export default function ProfileDropdown({
   onClose,
 }: ProfileDropdownProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const router = useRouter();
 
   // Close on click outside
   useEffect(() => {
@@ -61,9 +60,13 @@ export default function ProfileDropdown({
   }, [open, onClose]);
 
   const handleLogout = () => {
+    // Clear the auth cookies too (accessToken/refreshToken) — otherwise the
+    // route middleware still sees them and bounces /login back to /dashboard.
+    clearUserFromStorage();
     localStorage.clear();
     sessionStorage.clear();
-    router.push('/login');
+    // Full navigation so the middleware re-evaluates with cookies cleared.
+    window.location.href = '/login?loggedOut=1';
   };
 
   return (

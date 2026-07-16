@@ -11,7 +11,11 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/auth-context';
-import { isUserLoggedIn, loginService } from '@/lib/services';
+import {
+  clearUserFromStorage,
+  isUserLoggedIn,
+  loginService,
+} from '@/lib/services';
 import { cn } from '@/lib/utils';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { EyeIcon, EyeOff } from 'lucide-react';
@@ -45,11 +49,19 @@ const Page = () => {
     },
   });
 
-  // Redirect already-authenticated users away from the login page.
-  // A dead/expired session lands here with its cookies already cleared by the
-  // axios refresh interceptor, so isUserLoggedIn() is false and the form renders
-  // normally — there is no risk of trapping a user in a redirect loop.
+  // Redirect already-authenticated users away from the login page — unless we
+  // arrived here from a logout (?loggedOut=1). In that case clear any residual
+  // session first so a stale/lingering token cookie can't bounce the user back
+  // to the dashboard, then render the form normally. Guarantees logout always
+  // reaches a usable login page.
   useEffect(() => {
+    const loggedOut = new URLSearchParams(window.location.search).has(
+      'loggedOut'
+    );
+    if (loggedOut) {
+      clearUserFromStorage();
+      return;
+    }
     if (isUserLoggedIn()) {
       router.replace('/dashboard');
     }

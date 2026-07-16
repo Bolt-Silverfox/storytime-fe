@@ -8,6 +8,7 @@ import {
   type Voice,
   getAvailableVoicesService,
   getPreferredVoiceService,
+  getVoiceAccessService,
   isUserLoggedIn,
   setPreferredVoiceService,
 } from '@/lib/services';
@@ -21,7 +22,11 @@ const AiVoicePage = () => {
   const [loading, setLoading] = useState(true);
   const [loggedIn, setLoggedIn] = useState(true);
   const [saving, setSaving] = useState(false);
+  // Only premium (paid) users may change the reading voice. Free logged-in
+  // users can preview but not save (mirrors the backend /voice/access gate).
+  const [isPremium, setIsPremium] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const canSwitchVoice = isPremium;
 
   useEffect(() => {
     if (!isUserLoggedIn()) {
@@ -34,14 +39,16 @@ const AiVoicePage = () => {
     const load = async () => {
       setLoading(true);
       try {
-        const [available, preferred] = await Promise.all([
+        const [available, preferred, access] = await Promise.all([
           getAvailableVoicesService(),
           getPreferredVoiceService(),
+          getVoiceAccessService(),
         ]);
         if (!active) {
           return;
         }
         setVoices(Array.isArray(available) ? available : []);
+        setIsPremium(access.isPremium);
         if (preferred?.id) {
           setSelectedId(preferred.id);
         }
@@ -89,6 +96,11 @@ const AiVoicePage = () => {
   };
 
   const handleSave = async () => {
+    // Free users can't change the reading voice — the Save action is hidden for
+    // them, but guard here too so we never call setPreferredVoiceService.
+    if (!canSwitchVoice) {
+      return;
+    }
     if (!selectedId) {
       toast('Select a voice first');
       return;
@@ -163,23 +175,34 @@ const AiVoicePage = () => {
                   name={voice.displayName || voice.name}
                   description={voice.type ? `${voice.type} voice` : 'AI voice'}
                   avatar={voice.voiceAvatar ?? ''}
+                  selectable={canSwitchVoice}
                   active={selectedId === voice.id}
                   onClick={() => setSelectedId(voice.id)}
                   onListen={() => handleListen(voice)}
                 />
               ))}
             </div>
-            <div className='mt-8 flex justify-end'>
-              <Button
-                type='button'
-                variant='primary'
-                className='px-12'
-                disabled={saving || !selectedId}
-                onClick={handleSave}
-              >
-                {saving ? 'Saving…' : 'Save voice'}
-              </Button>
-            </div>
+            {canSwitchVoice ? (
+              <div className='mt-8 flex justify-end'>
+                <Button
+                  type='button'
+                  variant='primary'
+                  className='px-12'
+                  disabled={saving || !selectedId}
+                  onClick={handleSave}
+                >
+                  {saving ? 'Saving…' : 'Save voice'}
+                </Button>
+              </div>
+            ) : (
+              <div className='mt-8 rounded-3xl border border-stone-100 bg-[#FFF8ED] px-6 py-6 text-center'>
+                <p className='text-[#4A413F] font-abeezee'>
+                  Preview any voice with{' '}
+                  <span className='font-semibold'>Listen</span>. Upgrade to
+                  premium to change the reading voice.
+                </p>
+              </div>
+            )}
           </>
         )}
       </section>

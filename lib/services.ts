@@ -421,6 +421,23 @@ export const getPreferredVoiceService = async (): Promise<Voice | null> => {
   }
 };
 
+// GET /voice/access — the backend's voice entitlement for the current user.
+// `isPremium` mirrors SubscriptionService.isPremiumUser() (active subscription,
+// coupon access, or admin) and is the exact rule used to gate voice switching.
+// The route is @OptionalAuth, so guests receive `isPremium: false`. Defaults to
+// non-premium on any error so voice switching stays locked unless the server
+// explicitly grants it.
+export const getVoiceAccessService = async (): Promise<{
+  isPremium: boolean;
+}> => {
+  try {
+    const response = await api.get('voice/access');
+    return { isPremium: !!response.data?.isPremium };
+  } catch {
+    return { isPremium: false };
+  }
+};
+
 export const setPreferredVoiceService = async (voiceId: string) => {
   try {
     const response = await api.patch('voice/preferred', {

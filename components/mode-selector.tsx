@@ -45,8 +45,8 @@ const ModeSelector = ({
           Select the type of story you want to read
         </p>
         <div
-          className={`grid gap-4 mb-8 mt-4 ${
-            showInteractive ? 'grid-cols-2' : 'grid-cols-1'
+          className={`grid gap-3 sm:gap-4 mb-8 mt-4 ${
+            showInteractive ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'
           }`}
         >
           <ModeCard

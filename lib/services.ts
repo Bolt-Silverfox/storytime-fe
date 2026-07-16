@@ -863,12 +863,13 @@ export const recordUserProgressService = async (
   return response.data;
 };
 
-// GET /stories/user/library/in-progress — the user's ongoing stories.
+// GET /stories/user/library/continue-reading — the user's ongoing stories.
+// (The backend route is `continue-reading`, not `in-progress`.)
 export const getInProgressStoriesService = async (): Promise<
   StoryListItem[]
 > => {
   try {
-    const response = await api.get('stories/user/library/in-progress');
+    const response = await api.get('stories/user/library/continue-reading');
     const data = response.data;
     return Array.isArray(data) ? data : (data?.data ?? data?.stories ?? []);
   } catch {

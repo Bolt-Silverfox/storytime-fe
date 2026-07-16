@@ -162,6 +162,7 @@ const AiVoicePage = () => {
                   key={voice.id}
                   name={voice.displayName || voice.name}
                   description={voice.type ? `${voice.type} voice` : 'AI voice'}
+                  avatar={voice.voiceAvatar ?? ''}
                   active={selectedId === voice.id}
                   onClick={() => setSelectedId(voice.id)}
                   onListen={() => handleListen(voice)}

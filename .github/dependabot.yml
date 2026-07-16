@@ -1,0 +1,24 @@
+version: 2
+updates:
+  # Application dependencies (npm/pnpm).
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+    open-pull-requests-limit: 10
+    labels:
+      - 'dependencies'
+    groups:
+      # Batch low-risk updates into a single PR to cut noise.
+      minor-and-patch:
+        update-types:
+          - 'minor'
+          - 'patch'
+
+  # Keep GitHub Actions pinned versions current.
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+    labels:
+      - 'ci'

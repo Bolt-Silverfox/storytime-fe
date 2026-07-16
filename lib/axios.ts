@@ -26,6 +26,10 @@ const processQueue = (error: any, token: string | null = null) => {
 const API_ORIGIN =
   process.env.NEXT_PUBLIC_API_URL || 'https://dev.api.storytimeapp.me';
 
+// The API gateway (nginx on prod/staging) requires an API key, mirroring the
+// mobile app's X-API-Key header (EXPO_PUBLIC_API_KEY). Inlined at build time.
+const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
+
 const api = axios.create({
   baseURL: `${API_ORIGIN}/api/v1/`,
   headers: {
@@ -35,6 +39,9 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
+  if (API_KEY && config.headers) {
+    config.headers['X-API-Key'] = API_KEY;
+  }
   const token = Cookies.get('accessToken');
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -99,9 +106,11 @@ api.interceptors.response.use(
         // Backend route is POST /auth/refresh with body { token }, and the
         // response is enveloped. It returns a new jwt only (no rotated refresh
         // token), so we keep the existing refreshToken cookie.
-        const { data } = await axios.post(`${API_ORIGIN}/api/v1/auth/refresh`, {
-          token: refreshToken,
-        });
+        const { data } = await axios.post(
+          `${API_ORIGIN}/api/v1/auth/refresh`,
+          { token: refreshToken },
+          API_KEY ? { headers: { 'X-API-Key': API_KEY } } : undefined
+        );
 
         const newAccessToken = data?.data?.jwt;
         if (!newAccessToken) {

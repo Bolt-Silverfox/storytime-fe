@@ -2,6 +2,7 @@
 
 import BackButton from '@/components/back-button';
 import Header from '@/components/header';
+import StoryStatusBadge from '@/components/story-status-badge';
 import {
   type FavoriteStory,
   isUserLoggedIn,
@@ -101,6 +102,10 @@ const FavoritesPage = () => {
                 key={story.id}
                 className='group relative overflow-hidden rounded-3xl border border-stone-100 bg-white shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] transition-all duration-300 hover:scale-[1.02]'
               >
+                <StoryStatusBadge
+                  storyId={story.storyId}
+                  className='absolute left-3 top-3 z-10'
+                />
                 <Link href={`/story/${story.storyId}`}>
                   <div className='aspect-[4/3] w-full overflow-hidden bg-[#FCE9CE]'>
                     {story.coverImageUrl ? (

@@ -11,13 +11,13 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/auth-context';
-import { loginService } from '@/lib/services';
+import { isUserLoggedIn, loginService } from '@/lib/services';
 import { cn } from '@/lib/utils';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { EyeIcon, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -44,6 +44,16 @@ const Page = () => {
       password: '',
     },
   });
+
+  // Redirect already-authenticated users away from the login page.
+  // A dead/expired session lands here with its cookies already cleared by the
+  // axios refresh interceptor, so isUserLoggedIn() is false and the form renders
+  // normally — there is no risk of trapping a user in a redirect loop.
+  useEffect(() => {
+    if (isUserLoggedIn()) {
+      router.replace('/dashboard');
+    }
+  }, [router]);
 
   async function onSubmit(data: z.infer<typeof FormSchema>) {
     setIsLoading(true);

@@ -4,15 +4,15 @@ import StoryHome from '@/app/(home)/dashboard/_components/story-home';
 import BackButton from '@/components/back-button';
 import FavoriteHeart from '@/components/favorite-heart';
 import StoryStatusBadge from '@/components/story-status-badge';
+import { useInfiniteStories } from '@/lib/hooks/use-infinite-stories';
 import {
   type StoryCategory,
-  type StoryListItem,
+  type StoryQuery,
   listCategoriesService,
-  listStoriesService,
 } from '@/lib/services';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 
 const ALL = 'All';
 
@@ -25,9 +25,8 @@ function StoriesBrowse() {
   const minAge = searchParams.get('minAge');
   const maxAge = searchParams.get('maxAge');
 
-  const [stories, setStories] = useState<StoryListItem[]>([]);
   const [categories, setCategories] = useState<StoryCategory[]>([]);
-  const [loading, setLoading] = useState(true);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   // Browse mode when any category/filter is present; otherwise show the home.
   const isBrowse = !!(category || filter);
@@ -38,35 +37,53 @@ function StoriesBrowse() {
       .catch(() => setCategories([]));
   }, []);
 
+  // Params driving the paginated infinite-scroll query (no shuffle — paging).
+  let storyParams: StoryQuery;
+  if (category) {
+    storyParams = { category };
+  } else if (filter === 'recommendations') {
+    storyParams = { isMostLiked: true };
+  } else if (filter === 'top-picks') {
+    storyParams = { topPicksFromUs: true };
+  } else if (filter === 'seasonal') {
+    storyParams = { isSeasonal: true };
+  } else if (filter === 'age') {
+    storyParams = {
+      minAge: Number(minAge) || undefined,
+      maxAge: Number(maxAge) || undefined,
+    };
+  } else {
+    storyParams = {};
+  }
+
+  const { stories, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
+    useInfiniteStories(storyParams);
+
   useEffect(() => {
-    if (!isBrowse) {
-      return;
-    }
-    setLoading(true);
-    let query: string | Record<string, unknown>;
-    if (category) {
-      query = category;
-    } else if (filter === 'recommendations') {
-      query = { isMostLiked: true, shuffle: true, limit: 40 };
-    } else if (filter === 'top-picks') {
-      query = { topPicksFromUs: true, shuffle: true, limit: 40 };
-    } else if (filter === 'seasonal') {
-      query = { isSeasonal: true, shuffle: true, limit: 40 };
-    } else if (filter === 'age') {
-      query = {
-        ...(minAge ? { minAge: Number(minAge) } : {}),
-        ...(maxAge ? { maxAge: Number(maxAge) } : {}),
-        shuffle: true,
-        limit: 40,
-      };
-    } else {
-      query = { shuffle: true, limit: 40 };
-    }
-    listStoriesService(query)
-      .then(setStories)
-      .catch(() => setStories([]))
-      .finally(() => setLoading(false));
-  }, [category, filter, minAge, maxAge, isBrowse]);
+    // Load the next page when the sentinel nears the viewport bottom. A scroll
+    // check is used (rather than IntersectionObserver) because it's reliable
+    // across environments and fires even before the sentinel is fully visible.
+    const check = () => {
+      if (!hasNextPage || isFetchingNextPage) {
+        return;
+      }
+      const node = sentinelRef.current;
+      if (!node) {
+        return;
+      }
+      if (node.getBoundingClientRect().top <= window.innerHeight + 800) {
+        fetchNextPage();
+      }
+    };
+    window.addEventListener('scroll', check, { passive: true });
+    window.addEventListener('resize', check);
+    // Run once in case the first page doesn't fill the screen.
+    check();
+    return () => {
+      window.removeEventListener('scroll', check);
+      window.removeEventListener('resize', check);
+    };
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   // Nothing selected -> the shared mobile-style home for guests.
   if (!isBrowse) {
@@ -155,7 +172,7 @@ function StoriesBrowse() {
           })}
         </div>
 
-        {loading ? (
+        {isLoading ? (
           <p className='mt-10 text-[#5B4B33]'>Loading stories…</p>
         ) : stories.length === 0 ? (
           <p className='mt-10 text-[#5B4B33]'>
@@ -208,6 +225,12 @@ function StoriesBrowse() {
               </div>
             ))}
           </div>
+        )}
+
+        {/* Infinite-scroll sentinel + loading indicator */}
+        <div ref={sentinelRef} className='h-px w-full' />
+        {isFetchingNextPage && (
+          <p className='mt-6 text-center text-[#5B4B33]'>Loading more…</p>
         )}
       </section>
     </main>

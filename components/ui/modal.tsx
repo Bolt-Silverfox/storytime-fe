@@ -81,7 +81,7 @@ const Modal: React.FC<ModalProps> = ({
                   >
                     <Image src={expandIcon} alt='expand' />
                     <p className='text-[#221D1D] text-base not-italic font-normal leading-5'>
-                      Expand
+                      {expand ? 'Collapse' : 'Expand'}
                     </p>
                   </button>
                 )}

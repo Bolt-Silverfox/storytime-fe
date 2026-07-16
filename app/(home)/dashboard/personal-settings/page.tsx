@@ -1,5 +1,6 @@
 'use client';
 
+import BackButton from '@/components/back-button';
 import Header from '@/components/header';
 import KidsCard from '@/components/kids-card';
 import { Button } from '@/components/ui/button';
@@ -233,6 +234,10 @@ const PersonalSettingsPage = () => {
       )}
     >
       <Header white={false} />
+      <div className='mt-12 mb-4 flex items-center gap-3'>
+        <BackButton />
+        <span className='font-abeezee text-sm text-[#4A413F]'>Back</span>
+      </div>
       <div className='flex items-center justify-between'>
         <div className='flex items-center gap-8'>
           <Image

@@ -13,6 +13,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern';
 import { Textarea } from '@/components/ui/textarea';
+import { submitFeedbackService } from '@/lib/services';
 import { cn } from '@/lib/utils';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Mail, Users } from 'lucide-react';
@@ -35,10 +36,6 @@ const contactSchema = z.object({
 
 type ContactFormType = z.infer<typeof contactSchema>;
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 const Page = () => {
   const form = useForm<ContactFormType>({
     resolver: zodResolver(contactSchema),
@@ -50,10 +47,22 @@ const Page = () => {
     },
   });
 
-  async function onSubmit() {
-    await sleep(2000);
-
-    toast.success('Form submitted successfully!');
+  async function onSubmit(values: ContactFormType) {
+    try {
+      // Backend feedback DTO uses `category`; map the form's subject onto it.
+      await submitFeedbackService({
+        fullname: values.fullname,
+        email: values.email,
+        category: values.subject,
+        message: values.message,
+      });
+      toast.success('Message sent! We’ll get back to you within 24-48 hours.');
+      form.reset();
+    } catch (_error) {
+      toast.error(
+        'Something went wrong. Please try again or email us directly.'
+      );
+    }
   }
   return (
     <main className='space-y-16 '>

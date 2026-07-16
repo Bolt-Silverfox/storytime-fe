@@ -1,3 +1,4 @@
+import BackButton from '@/components/back-button';
 import type { Metadata } from 'next';
 import { ageLabel, coverOf, extractStoryId, getStory } from './get-story';
 import {
@@ -88,12 +89,15 @@ export default async function StorySharePage({
     <main className='min-h-dvh bg-[#FFF8ED] text-[#1B1300]'>
       {/* Header */}
       <header className='mx-auto flex max-w-3xl items-center justify-between px-6 py-5'>
-        <a
-          href={SITE_URL}
-          className='font-[family-name:var(--font-qilka)] text-2xl font-bold text-[#EC4007]'
-        >
-          Storytime
-        </a>
+        <div className='flex items-center gap-3'>
+          <BackButton />
+          <a
+            href='/'
+            className='font-[family-name:var(--font-qilka)] text-2xl font-bold text-[#EC4007]'
+          >
+            Storytime
+          </a>
+        </div>
         <a
           href={APP_STORE_URL}
           className='rounded-full bg-[#EC4007] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90'

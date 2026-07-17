@@ -1,5 +1,6 @@
 'use client';
 
+import CategoryImage from '@/components/category-image';
 import FavoriteHeart from '@/components/favorite-heart';
 import StoryStatusBadge from '@/components/story-status-badge';
 import {
@@ -226,14 +227,11 @@ const StoryHome = () => {
                 href={`/stories?category=${category.id}`}
                 className='group relative flex h-[9rem] items-end overflow-hidden rounded-3xl border border-stone-100 bg-[#FCE9CE] shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] transition-all duration-300 hover:scale-[1.03]'
               >
-                {category.image && (
-                  // eslint-disable-next-line @next/next/no-img-element -- remote Cloudinary host, avoids next.config image allowlist
-                  <img
-                    src={category.image}
-                    alt={category.name}
-                    className='absolute inset-0 h-full w-full object-cover transition group-hover:scale-105'
-                  />
-                )}
+                <CategoryImage
+                  src={category.image}
+                  alt={category.name}
+                  className='absolute inset-0 h-full w-full object-cover transition group-hover:scale-105'
+                />
                 <div className='absolute inset-0 bg-gradient-to-t from-black/60 to-transparent' />
                 <h3 className='relative z-10 p-4 text-white text-lg not-italic font-bold leading-6 font-qilka'>
                   {category.name}

@@ -55,32 +55,28 @@ const StoryCard = ({ story }: { story: StoryListItem }) => {
   );
 };
 
-const LibrarySection = ({
-  title,
+type TabKey = 'in-progress' | 'completed';
+
+const StoryGrid = ({
   stories,
   emptyMessage,
 }: {
-  title: string;
   stories: StoryListItem[];
   emptyMessage: string;
 }) => {
+  if (stories.length === 0) {
+    return (
+      <p className='text-[#4A413F] text-sm not-italic font-normal leading-5 font-abeezee'>
+        {emptyMessage}
+      </p>
+    );
+  }
   return (
-    <section className='mb-10'>
-      <h3 className='mb-4 text-[#221D1D] text-xl not-italic font-bold leading-6 font-qilka'>
-        {title}
-      </h3>
-      {stories.length === 0 ? (
-        <p className='text-[#4A413F] text-sm not-italic font-normal leading-5 font-abeezee'>
-          {emptyMessage}
-        </p>
-      ) : (
-        <div className='grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-4'>
-          {stories.map((story) => (
-            <StoryCard key={story.id} story={story} />
-          ))}
-        </div>
-      )}
-    </section>
+    <div className='grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-4'>
+      {stories.map((story) => (
+        <StoryCard key={story.id} story={story} />
+      ))}
+    </div>
   );
 };
 
@@ -89,6 +85,7 @@ const LibraryPage = () => {
   const [completed, setCompleted] = useState<StoryListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loggedIn, setLoggedIn] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabKey>('in-progress');
 
   useEffect(() => {
     if (!isUserLoggedIn()) {
@@ -110,6 +107,15 @@ const LibraryPage = () => {
 
     fetchLibrary();
   }, []);
+
+  const tabButtonClass = (tab: TabKey) => {
+    const base =
+      'rounded-full px-5 py-2.5 text-sm font-semibold font-abeezee transition';
+    if (activeTab === tab) {
+      return `${base} bg-[#EC4007] text-white`;
+    }
+    return `${base} text-[#4A413F] hover:bg-[#FEEAE6]`;
+  };
 
   return (
     <div className='bg-white rounded-[2.5625rem] border-[0.5px] border-solid border-[#FAF4F2] px-10 py-[2.125rem] max-w-[85vw] mx-auto my-12'>
@@ -149,18 +155,38 @@ const LibraryPage = () => {
             ))}
           </div>
         ) : (
-          <>
-            <LibrarySection
-              title='Continue reading'
-              stories={inProgress}
-              emptyMessage='Nothing here yet — start reading to fill your library.'
-            />
-            <LibrarySection
-              title='Completed'
-              stories={completed}
-              emptyMessage='Nothing here yet — finish a story to see it here.'
-            />
-          </>
+          <div>
+            <div className='mb-6 inline-flex gap-2 rounded-full bg-[#FAF4F2] p-1'>
+              <button
+                type='button'
+                onClick={() => setActiveTab('in-progress')}
+                className={tabButtonClass('in-progress')}
+              >
+                In progress
+                {inProgress.length > 0 ? ` (${inProgress.length})` : ''}
+              </button>
+              <button
+                type='button'
+                onClick={() => setActiveTab('completed')}
+                className={tabButtonClass('completed')}
+              >
+                Completed
+                {completed.length > 0 ? ` (${completed.length})` : ''}
+              </button>
+            </div>
+
+            {activeTab === 'in-progress' ? (
+              <StoryGrid
+                stories={inProgress}
+                emptyMessage='Nothing here yet — start reading to fill your library.'
+              />
+            ) : (
+              <StoryGrid
+                stories={completed}
+                emptyMessage='Nothing here yet — finish a story to see it here.'
+              />
+            )}
+          </div>
         )}
       </section>
     </div>

@@ -1,3 +1,4 @@
+import CategoryImage from '@/components/category-image';
 import {
   Accordion,
   AccordionContent,
@@ -173,11 +174,12 @@ export default function Home() {
                 className='md:[&:nth-child(1)]:border-t-0 md:[&:nth-child(1)]:border-l-0 md:[&:nth-child(2)]:border-t-0 md:[&:nth-child(3)]:border-t-0 md:[&:nth-child(3)]:border-r-0 !border-b-0 md:[&:nth-child(4)]:border-l-0 md:last:border-r-0 md:border-4 border-l-0 p-8 border-[#F8EEEB] rounded-none shadow-none bg-transparent'
               >
                 <CardContent className='flex flex-col items-start gap-6 p-0'>
-                  <Image
+                  <CategoryImage
                     src={category.image}
                     height={194}
                     width={301}
-                    alt='Category Image'
+                    alt={category.title}
+                    label={category.title}
                     className='rounded-[23px] w-full md:aspect-square'
                   />
                   <div className='flex flex-col items-start gap-3 w-full'>

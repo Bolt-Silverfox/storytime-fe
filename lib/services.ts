@@ -1234,6 +1234,11 @@ export interface StoryAudioBatch {
   // Only the POST response carries text; the status endpoint drops it, so the
   // reader captures this from the initial POST for the read-along highlight.
   allParagraphs: StoryAudioParagraph[];
+  // Indices of paragraphs whose TTS generation failed (from the status
+  // endpoint's `failedParagraphs`). These need a retry, not a loading spinner.
+  failedParagraphs: number[];
+  // How many paragraphs are still generating in the background (0 when done).
+  pendingParagraphs: number;
   totalQueued?: number;
   // Present when there is more audio still generating in the background.
   batchJobId?: string;
@@ -1251,6 +1256,7 @@ interface RawAudioBatch {
   // GET .../status/:jobId response uses `completedParagraphs`.
   paragraphs?: RawAudioParagraph[];
   completedParagraphs?: RawAudioParagraph[];
+  failedParagraphs?: number[];
   pendingParagraphs?: number;
   totalParagraphs?: number;
   totalQueued?: number;
@@ -1287,19 +1293,26 @@ const normalizeAudioBatch = (raw: unknown): StoryAudioBatch => {
     )
     .map((p) => ({ index: p.index, audioUrl: p.audioUrl ?? '', text: p.text }));
 
+  const pendingParagraphs =
+    typeof data.pendingParagraphs === 'number' ? data.pendingParagraphs : 0;
+
   // The POST response omits `status`; infer it from the pending count so the
   // reader knows whether to keep polling the batch job.
   let status = data.status;
   if (!status) {
-    const pending =
-      typeof data.pendingParagraphs === 'number' ? data.pendingParagraphs : 0;
-    status = pending > 0 ? 'processing' : 'completed';
+    status = pendingParagraphs > 0 ? 'processing' : 'completed';
   }
+
+  const failedParagraphs = Array.isArray(data.failedParagraphs)
+    ? data.failedParagraphs.filter((n): n is number => typeof n === 'number')
+    : [];
 
   return {
     status,
     completedParagraphs,
     allParagraphs,
+    failedParagraphs,
+    pendingParagraphs,
     totalQueued: data.totalQueued ?? data.totalParagraphs,
     batchJobId: data.batchJobId,
   };

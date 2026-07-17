@@ -614,12 +614,14 @@ export const updateNotificationPreferenceService = async (
 // interceptor.
 export const registerWebPushTokenService = async (token: string) => {
   try {
-    const deviceInfo =
+    // Backend DTO field is `deviceName` (and it rejects unknown props), so send
+    // the user agent under that key.
+    const deviceName =
       typeof navigator !== 'undefined' ? navigator.userAgent : undefined;
     const response = await api.post('devices/register', {
       token,
       platform: 'web',
-      ...(deviceInfo ? { deviceInfo } : {}),
+      ...(deviceName ? { deviceName } : {}),
     });
     return response.data;
   } catch (error: unknown) {

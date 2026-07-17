@@ -700,30 +700,6 @@ export const isUserLoggedIn = () => {
   return !!(user && (accessToken || refreshToken));
 };
 
-export const getStoriesByKidIdService = async (kidId: string) => {
-  try {
-    const response = await api.get(`stories?kidId=${kidId}`);
-    return response.data;
-  } catch (error: unknown) {
-    if (error instanceof AxiosError) {
-      if (error.response) {
-        throw {
-          message: error.response.data?.message || 'Failed to fetch stories',
-          status: error.response.status,
-          data: error.response.data,
-        };
-      }
-      if (error.request) {
-        throw { message: 'No response from server', status: null };
-      }
-    }
-    throw {
-      message: error instanceof Error ? error.message : 'Unexpected error',
-      status: null,
-    };
-  }
-};
-
 export const getStoryCategoriesService = async () => {
   try {
     const response = await api.get('stories/categories');
@@ -734,31 +710,6 @@ export const getStoryCategoriesService = async () => {
         throw {
           message:
             error.response.data?.message || 'Failed to fetch story categories',
-          status: error.response.status,
-          data: error.response.data,
-        };
-      }
-      if (error.request) {
-        throw { message: 'No response from server', status: null };
-      }
-    }
-    throw {
-      message: error instanceof Error ? error.message : 'Unexpected error',
-      status: null,
-    };
-  }
-};
-
-export const getStoryThemesService = async () => {
-  try {
-    const response = await api.get('stories/themes');
-    return response.data;
-  } catch (error: unknown) {
-    if (error instanceof AxiosError) {
-      if (error.response) {
-        throw {
-          message:
-            error.response.data?.message || 'Failed to fetch story themes',
           status: error.response.status,
           data: error.response.data,
         };
@@ -1175,36 +1126,6 @@ export const getDailyChallengesService = async (kidId: string) => {
         throw {
           message:
             error.response.data?.message || 'Failed to fetch daily challenges',
-          status: error.response.status,
-          data: error.response.data,
-        };
-      }
-      if (error.request) {
-        throw { message: 'No response from server', status: null };
-      }
-    }
-    throw {
-      message: error instanceof Error ? error.message : 'Unexpected error',
-      status: null,
-    };
-  }
-};
-
-export const getStoriesByThemeAndKidService = async (
-  theme: string,
-  kidId: string
-) => {
-  try {
-    const response = await api.get(
-      `stories?theme=${encodeURIComponent(theme)}&kidId=${kidId}`
-    );
-    return response.data;
-  } catch (error: unknown) {
-    if (error instanceof AxiosError) {
-      if (error.response) {
-        throw {
-          message:
-            error.response.data?.message || 'Failed to fetch stories by theme',
           status: error.response.status,
           data: error.response.data,
         };

@@ -1,6 +1,7 @@
 'use client';
 
 import Header from '@/components/header';
+import QuotaIndicator from '@/components/quota-indicator';
 import { cn } from '@/lib/utils';
 import StoryHome from './_components/story-home';
 
@@ -12,6 +13,7 @@ const DashboardPage = () => {
       )}
     >
       <Header white={false} />
+      <QuotaIndicator className='my-6' />
       <StoryHome />
     </div>
   );

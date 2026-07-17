@@ -6,12 +6,11 @@ import RecommendedCard from '@/components/recommended-card';
 import StoryCard from '@/components/story-card';
 import StoryReader from '@/components/story-reader';
 import Modal from '@/components/ui/modal';
-import VoiceSelector from '@/components/voice-selector';
+import VoiceSelector, { type SelectedVoice } from '@/components/voice-selector';
 import { getStoriesByThemeAndKidService } from '@/lib/services';
 import arrow from '@/public/arrow-left.svg';
 import kid from '@/public/kid-1.png';
 import search from '@/public/search.svg';
-import story2 from '@/public/story-2.png';
 // Import theme images
 import adventure from '@/public/theme/Adventure.jpg';
 import betrayalAndRedemption from '@/public/theme/Betrayal-and-redemption.jpg';
@@ -55,6 +54,9 @@ const ThemePageClient = ({ theme }: ThemePageClientProps) => {
   const [expand, setExpand] = useState(false);
   const [selectedMode, setSelectedMode] = useState<string | null>(null);
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
+  const [selectedVoice, setSelectedVoice] = useState<SelectedVoice | null>(
+    null
+  );
   const [themeStories, setThemeStories] = useState<Story[]>([]);
   const [_story, _setStory] = useState<Story | null>(null);
   const [loading, setLoading] = useState(true);
@@ -133,6 +135,11 @@ const ThemePageClient = ({ theme }: ThemePageClientProps) => {
     setSelectedStoryId(storyId);
     setModal(true);
   };
+
+  // The reader shows the real cover/title/description of the chosen story
+  // (already loaded into state) rather than a placeholder.
+  const selectedStory =
+    themeStories.find((s) => s.id === selectedStoryId) ?? null;
 
   if (loading) {
     return (
@@ -247,7 +254,13 @@ const ThemePageClient = ({ theme }: ThemePageClientProps) => {
         setExpand={setExpand}
         expand={expand}
       >
-        {step === 1 && <VoiceSelector setStep={setStep} expand={expand} />}
+        {step === 1 && (
+          <VoiceSelector
+            setStep={setStep}
+            expand={expand}
+            onVoiceSelected={(voice) => setSelectedVoice(voice)}
+          />
+        )}
         {step === 2 && (
           <ModeSelector
             setStep={setStep}
@@ -257,10 +270,11 @@ const ThemePageClient = ({ theme }: ThemePageClientProps) => {
         )}
         {step === 3 && (
           <StoryReader
-            description='A boy and a dog are best friends. They go on an adventure together and have a lot of fun. The boy is a superhero and the dog is a superhero too.'
-            title='A boy and a dog'
-            voice='Nimbus'
-            img={story2.src}
+            description={selectedStory?.description ?? ''}
+            title={selectedStory?.title ?? ''}
+            voice={selectedVoice?.name ?? 'Storyteller'}
+            voiceId={selectedVoice?.id ?? null}
+            img={selectedStory?.coverImageUrl ?? ''}
             setStep={setStep}
             mode={selectedMode}
             storyId={selectedStoryId}

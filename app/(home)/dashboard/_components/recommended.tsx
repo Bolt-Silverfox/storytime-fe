@@ -4,9 +4,8 @@ import ModeSelector from '@/components/mode-selector';
 import RecommendedCard from '@/components/recommended-card';
 import StoryReader from '@/components/story-reader';
 import Modal from '@/components/ui/modal';
-import VoiceSelector from '@/components/voice-selector';
+import VoiceSelector, { type SelectedVoice } from '@/components/voice-selector';
 import { getStoriesByKidIdService } from '@/lib/services';
-import story2 from '@/public/story-2.png';
 import { useEffect, useState } from 'react';
 
 interface Story {
@@ -27,6 +26,9 @@ const Recommended = () => {
   const [kidName, setKidName] = useState<string | null>(null);
   const [selectedMode, setSelectedMode] = useState<string | null>(null);
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
+  const [selectedVoice, setSelectedVoice] = useState<SelectedVoice | null>(
+    null
+  );
 
   useEffect(() => {
     const fetchStories = async () => {
@@ -72,6 +74,10 @@ const Recommended = () => {
     setModal(true);
   };
 
+  // The reader shows the real cover/title/description of the chosen story
+  // (already loaded into state) rather than a placeholder.
+  const selectedStory = stories.find((s) => s.id === selectedStoryId) ?? null;
+
   return (
     <div className='mt-[5.25rem]'>
       <h2 className='text-[#4A413F] text-base not-italic font-normal leading-5 font-abeezee mb-4'>
@@ -104,7 +110,13 @@ const Recommended = () => {
         setExpand={setExpand}
         expand={expand}
       >
-        {step === 1 && <VoiceSelector setStep={setStep} expand={expand} />}
+        {step === 1 && (
+          <VoiceSelector
+            setStep={setStep}
+            expand={expand}
+            onVoiceSelected={(voice) => setSelectedVoice(voice)}
+          />
+        )}
         {step === 2 && (
           <ModeSelector
             setStep={setStep}
@@ -114,10 +126,11 @@ const Recommended = () => {
         )}
         {step === 3 && (
           <StoryReader
-            description='A boy and a dog are best friends. They go on an adventure together and have a lot of fun. The boy is a superhero and the dog is a superhero too.'
-            title='A boy and a dog'
-            voice='Nimbus'
-            img={story2.src}
+            description={selectedStory?.description ?? ''}
+            title={selectedStory?.title ?? ''}
+            voice={selectedVoice?.name ?? 'Storyteller'}
+            voiceId={selectedVoice?.id ?? null}
+            img={selectedStory?.coverImageUrl ?? ''}
             setStep={setStep}
             mode={selectedMode}
             storyId={selectedStoryId}

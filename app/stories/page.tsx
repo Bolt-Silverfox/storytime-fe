@@ -145,8 +145,9 @@ function StoriesBrowse() {
           Pick a story and start reading — no account needed.
         </p>
 
-        {/* Category filter */}
-        <div className='mt-6 flex flex-wrap gap-2 sm:gap-3'>
+        {/* Category filter — horizontal scroll on mobile (avoids long labels
+            stacking one-per-row), wraps normally from sm up. */}
+        <div className='mt-6 -mx-1 flex gap-2 overflow-x-auto px-1 pb-2 sm:mx-0 sm:flex-wrap sm:gap-3 sm:overflow-visible sm:px-0 sm:pb-0'>
           {[{ id: ALL, name: ALL }, ...categories].map((cat) => {
             const active = cat.id === category;
             return (
@@ -160,7 +161,7 @@ function StoriesBrowse() {
                     router.push(`/stories?category=${cat.id}`);
                   }
                 }}
-                className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition ${
+                className={`shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition ${
                   active
                     ? 'bg-[#EC4007] text-white'
                     : 'bg-white text-[#5B4B33] hover:bg-[#FCE9CE]'

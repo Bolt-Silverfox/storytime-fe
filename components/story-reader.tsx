@@ -1,6 +1,7 @@
 import { ensureGuestSession } from '@/lib/guest';
 import { markDone, markReading } from '@/lib/progress-store';
 import {
+  type StoryAudioBatch,
   type StoryAudioParagraph,
   getGuestStoryService,
   getStoryAudioBatchStatusService,
@@ -108,8 +109,18 @@ const StoryReader = ({
 
   // Audio states
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  // True only while the initial batch request is in flight (before any clip is
+  // playable). Once the first paragraph has audio, playback is enabled.
   const [audioLoading, setAudioLoading] = useState(false);
+  // True while more paragraphs are still generating in the background (pending,
+  // none failed). Drives a calm "Preparing audio…" indicator, never an error.
+  const [audioGenerating, setAudioGenerating] = useState(false);
+  // Set only on a real failure (batch FAILED with nothing playable, the initial
+  // request threw, a needed paragraph failed, or playback itself failed) — this
+  // is what gates the "Try again" retry affordance.
   const [audioError, setAudioError] = useState<string | null>(null);
+  // Indices of paragraphs whose audio generation failed (per-paragraph retry).
+  const [failedIndices, setFailedIndices] = useState<Set<number>>(new Set());
   // Bumped by the "Try again" button to re-run audio generation on failure.
   const [audioRetry, setAudioRetry] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
@@ -119,6 +130,16 @@ const StoryReader = ({
   const playlistRef = useRef<string[]>([]);
   const clipIndexRef = useRef(0);
   const isPlayingRef = useRef(false);
+  // Total paragraphs expected + which failed, read inside the (once-mounted)
+  // audio listeners to decide whether to wait for more audio or finish.
+  const totalCountRef = useRef(0);
+  const failedIndicesRef = useRef<Set<number>>(new Set());
+  // True when auto-advance reached the end of the ready clips but more are still
+  // generating — we hold here and resume once the next clip arrives.
+  const waitingForNextRef = useRef(false);
+  // Guards the one-time "enable playback off the first eager clip" assignment so
+  // background polls don't reset the current playhead.
+  const hasSetInitialAudioRef = useRef(false);
   // Per-paragraph text (aligned with the audio clips) + which one is playing,
   // to render a read-along highlight that tracks the narration.
   const [audioParagraphs, setAudioParagraphs] = useState<StoryAudioParagraph[]>(
@@ -190,61 +211,150 @@ const StoryReader = ({
         return;
       }
 
+      // Fresh start for this story / voice / retry.
       setAudioLoading(true);
       setAudioError(null);
-      try {
-        let batch = await startStoryAudioBatchService(
-          storyId,
-          voiceId ?? undefined
-        );
-        // Only the POST response carries paragraph `text` (the status endpoint
-        // drops it). Capture it now so the read-along highlight has text even
-        // when the audio is generated asynchronously.
-        const textByIndex = new Map<number, string>();
+      setAudioGenerating(false);
+      setFailedIndices(new Set());
+      setAudioParagraphs([]);
+      setAudioUrl(null);
+      setCurrentClip(0);
+      setIsPlaying(false);
+      playlistRef.current = [];
+      clipIndexRef.current = 0;
+      totalCountRef.current = 0;
+      failedIndicesRef.current = new Set();
+      waitingForNextRef.current = false;
+      hasSetInitialAudioRef.current = false;
+
+      // Accumulated across polls: paragraph text (only the POST carries it) and
+      // ready audio URLs (the status endpoint reports these cumulatively).
+      const textByIndex = new Map<number, string>();
+      const readyByIndex = new Map<number, string>();
+
+      // Fold a batch snapshot into playable state. Enables playback as soon as
+      // the first paragraph is ready and, if auto-advance is waiting, resumes.
+      const applyBatch = (batch: StoryAudioBatch) => {
         for (const p of batch.allParagraphs) {
           if (p.text) {
             textByIndex.set(p.index, p.text);
           }
         }
-        // Poll until background generation finishes (or we hit the cap).
+        for (const p of batch.completedParagraphs) {
+          if (p.audioUrl) {
+            readyByIndex.set(p.index, p.audioUrl);
+          }
+        }
+        const failed = new Set<number>(batch.failedParagraphs);
+        failedIndicesRef.current = failed;
+
+        const accounted = readyByIndex.size + failed.size;
+        const total = Math.max(
+          totalCountRef.current,
+          batch.completedParagraphs.length +
+            batch.pendingParagraphs +
+            failed.size,
+          batch.totalQueued ?? 0,
+          batch.allParagraphs.length,
+          accounted
+        );
+        totalCountRef.current = total;
+
+        // Only the contiguous run of ready clips from index 0 is playable in
+        // order; a gap means we wait for that paragraph before playing past it.
+        const playlist: string[] = [];
+        for (let i = 0; readyByIndex.has(i); i += 1) {
+          playlist.push(readyByIndex.get(i) as string);
+        }
+        playlistRef.current = playlist;
+
+        // Full ordered paragraph list (text + audio state) for the read-along.
+        const known = [
+          ...Array.from(readyByIndex.keys()),
+          ...Array.from(textByIndex.keys()),
+        ];
+        const maxIndex = Math.max(total - 1, ...known);
+        const paras: StoryAudioParagraph[] = [];
+        for (let i = 0; i <= maxIndex; i += 1) {
+          paras.push({
+            index: i,
+            audioUrl: readyByIndex.get(i) ?? '',
+            text: textByIndex.get(i),
+          });
+        }
+        setAudioParagraphs(paras);
+        setFailedIndices(failed);
+
+        // Enable playback the moment the first clip is ready (bug 1).
+        if (playlist.length > 0 && !hasSetInitialAudioRef.current) {
+          hasSetInitialAudioRef.current = true;
+          setAudioLoading(false);
+          clipIndexRef.current = 0;
+          setCurrentClip(0);
+          setAudioUrl(playlist[0]);
+        }
+
+        // Auto-advance was waiting for the next clip and it just arrived.
+        if (
+          waitingForNextRef.current &&
+          playlist.length > clipIndexRef.current + 1
+        ) {
+          waitingForNextRef.current = false;
+          const next = clipIndexRef.current + 1;
+          clipIndexRef.current = next;
+          setCurrentClip(next);
+          setAudioUrl(playlist[next]);
+        }
+
+        const stillGenerating = accounted < total;
+        setAudioGenerating(stillGenerating);
+        return { playlist, accounted, total, failedSize: failed.size };
+      };
+
+      try {
+        const initial = await startStoryAudioBatchService(
+          storyId,
+          voiceId ?? undefined
+        );
+        if (cancelled) {
+          return;
+        }
+        let snap = applyBatch(initial);
+
+        // Keep polling in the background for the remaining paragraphs. Playback
+        // is already possible off the eager clips while this runs.
         let attempts = 0;
         while (
           !cancelled &&
-          batch.batchJobId &&
-          batch.status !== 'completed' &&
-          batch.status !== 'failed' &&
-          attempts < 30
+          initial.batchJobId &&
+          snap.accounted < snap.total &&
+          attempts < 60
         ) {
           await new Promise((resolve) => setTimeout(resolve, 2000));
           attempts += 1;
-          batch = await getStoryAudioBatchStatusService(batch.batchJobId);
+          const batch = await getStoryAudioBatchStatusService(
+            initial.batchJobId
+          );
+          if (cancelled) {
+            return;
+          }
+          snap = applyBatch(batch);
+          if (batch.status === 'failed' || batch.status === 'completed') {
+            break;
+          }
         }
         if (cancelled) {
           return;
         }
 
-        const sortedParas = [...batch.completedParagraphs].sort(
-          (a, b) => a.index - b.index
-        );
-        const playlist = sortedParas.map((p) => p.audioUrl);
-        if (playlist.length === 0) {
-          setAudioError(
-            'Audio is still being prepared. Please try again shortly.'
-          );
-          return;
+        // Real failure ONLY when nothing at all is playable AND something failed.
+        if (snap.playlist.length === 0 && snap.failedSize > 0) {
+          setAudioError('We couldn’t prepare the audio for this story.');
+          setAudioGenerating(false);
+        } else if (snap.accounted >= snap.total) {
+          // Everything accounted for (ready and/or failed) — stop the spinner.
+          setAudioGenerating(false);
         }
-        // Merge the captured text onto the audio-ready paragraphs so each clip
-        // has its text for the highlight.
-        const merged = sortedParas.map((p) => ({
-          index: p.index,
-          audioUrl: p.audioUrl,
-          text: p.text ?? textByIndex.get(p.index),
-        }));
-        playlistRef.current = playlist;
-        clipIndexRef.current = 0;
-        setCurrentClip(0);
-        setAudioParagraphs(merged);
-        setAudioUrl(playlist[0]);
       } catch (error) {
         if (cancelled) {
           return;
@@ -279,21 +389,37 @@ const StoryReader = ({
 
     const updateTime = () => setCurrentTime(audio.currentTime);
     const updateDuration = () => setDuration(audio.duration);
-    // At clip end, advance to the next paragraph; stop (and reset) at the end.
+    // At clip end, advance to the next paragraph; wait if it isn't ready yet;
+    // stop (and reset) once the whole story has been read through.
     const handleEnded = () => {
       const next = clipIndexRef.current + 1;
       if (next < playlistRef.current.length) {
         clipIndexRef.current = next;
         setCurrentClip(next);
         setAudioUrl(playlistRef.current[next]);
-      } else {
-        // Reached the end of the narration — the story has been read through.
-        setIsPlaying(false);
-        setStoryFinished(true);
-        clipIndexRef.current = 0;
-        setCurrentClip(0);
-        setAudioUrl(playlistRef.current[0] ?? null);
+        return;
       }
+      // The next clip isn't in the playlist yet. If that paragraph is still
+      // generating (not failed), hold and resume when polling delivers it —
+      // don't error and don't mark the story finished (bug 3).
+      if (next < totalCountRef.current && !failedIndicesRef.current.has(next)) {
+        waitingForNextRef.current = true;
+        setAudioGenerating(true);
+        return;
+      }
+      // The next paragraph failed — surface a retry rather than a silent finish.
+      if (failedIndicesRef.current.has(next)) {
+        setIsPlaying(false);
+        waitingForNextRef.current = false;
+        setAudioError('Some of the audio couldn’t be prepared.');
+        return;
+      }
+      // Reached the end of the narration — the story has been read through.
+      setIsPlaying(false);
+      setStoryFinished(true);
+      clipIndexRef.current = 0;
+      setCurrentClip(0);
+      setAudioUrl(playlistRef.current[0] ?? null);
     };
 
     audio.addEventListener('timeupdate', updateTime);
@@ -535,11 +661,9 @@ const StoryReader = ({
               />
             </div>
             <small className='text-[#4A413F] text-base not-italic font-normal leading-5 font-abeezee mt-2'>
-              {audioLoading
-                ? 'Preparing narration…'
-                : audioError
-                  ? audioError
-                  : `${formatTime(currentTime)} / ${formatTime(duration)}`}
+              {audioLoading || audioGenerating
+                ? 'Preparing audio…'
+                : `${formatTime(currentTime)} / ${formatTime(duration)}`}
             </small>
           </div>
         ) : (
@@ -547,11 +671,9 @@ const StoryReader = ({
             <div className='flex items-center gap-4'>
               <Image src={movementSmall} alt='movement' className='' />
               <small className='text-[#4A413F] text-base not-italic font-normal leading-5 font-abeezee mt-2'>
-                {audioLoading
-                  ? 'Preparing narration…'
-                  : audioError
-                    ? audioError
-                    : `${formatTime(currentTime)} / ${formatTime(duration)}`}
+                {audioLoading || audioGenerating
+                  ? 'Preparing audio…'
+                  : `${formatTime(currentTime)} / ${formatTime(duration)}`}
               </small>
             </div>
             <div className='bg-white flex justify-center items-center gap-3 shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] px-6 py-2.5 rounded-[3.125rem] border-[0.5px] border-solid border-[#FAF4F2] font-qilka'>
@@ -666,18 +788,45 @@ const StoryReader = ({
               <div className='space-y-4 text-left'>
                 {readingParagraphs.map((para, i) => {
                   const active = useAudioParagraphs && i === currentClip;
+                  // Per-paragraph audio state (only meaningful when the clips are
+                  // text-aligned): ready → playable, failed → retry, else loading.
+                  const paraFailed = useAudioParagraphs && failedIndices.has(i);
+                  const paraReady =
+                    !useAudioParagraphs || !!audioParagraphs[i]?.audioUrl;
                   return (
-                    <p
-                      key={`para-${i}-${para.slice(0, 12)}`}
-                      id={`reading-para-${i}`}
-                      className={`text-lg not-italic font-normal leading-8 font-abeezee -mx-2 rounded-md px-2 transition-colors duration-300 ${
-                        active
-                          ? 'bg-[#FFEFB8] font-medium text-[#221D1D]'
-                          : 'text-[#221D1D]'
-                      }`}
-                    >
-                      {para}
-                    </p>
+                    <div key={`para-${i}-${para.slice(0, 12)}`}>
+                      <p
+                        id={`reading-para-${i}`}
+                        className={`text-lg not-italic font-normal leading-8 font-abeezee -mx-2 rounded-md px-2 transition-colors duration-300 ${
+                          active
+                            ? 'bg-[#FFEFB8] font-medium text-[#221D1D]'
+                            : 'text-[#221D1D]'
+                        }`}
+                      >
+                        {para}
+                      </p>
+                      {paraFailed ? (
+                        <span className='mt-1 flex items-center gap-2 px-2 text-sm text-red-500 font-abeezee'>
+                          Audio unavailable
+                          <button
+                            type='button'
+                            onClick={() => {
+                              setAudioError(null);
+                              setAudioRetry((n) => n + 1);
+                            }}
+                            className='rounded-full border border-[#EC4007] px-3 py-1 text-xs font-semibold text-[#EC4007] transition hover:bg-[#EC4007]/5'
+                          >
+                            Retry
+                          </button>
+                        </span>
+                      ) : null}
+                      {!(paraReady || paraFailed) ? (
+                        <span className='mt-1 flex items-center gap-2 px-2 text-sm text-[#4A413F] font-abeezee'>
+                          <span className='inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#83E9FB] border-t-transparent' />
+                          Preparing audio…
+                        </span>
+                      ) : null}
+                    </div>
                   );
                 })}
                 {mode === 'interactive' &&
@@ -700,9 +849,9 @@ const StoryReader = ({
         <button
           type='button'
           onClick={handlePlayPause}
-          disabled={!audioUrl || audioLoading || !!audioError}
+          disabled={!audioUrl || audioLoading}
           className={`mt-12 ${
-            !audioUrl || audioLoading || !!audioError
+            !audioUrl || audioLoading
               ? 'opacity-50 cursor-not-allowed'
               : 'cursor-pointer'
           }`}

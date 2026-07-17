@@ -835,6 +835,67 @@ export const getGuestStoryService = async (
   }
 };
 
+// Unified story-read quota for the active audience. Premium/unlimited users
+// report `unlimited: true`; free users and guests report how many unique new
+// stories they can still read.
+export interface StoryQuota {
+  isPremium: boolean;
+  unlimited: boolean;
+  used: number;
+  totalAllowed: number;
+  remaining: number;
+}
+
+interface RawQuota {
+  isPremium?: boolean;
+  unlimited?: boolean;
+  used?: number;
+  totalAllowed?: number;
+  remaining?: number;
+}
+
+const normalizeQuota = (d: RawQuota): StoryQuota => {
+  const unlimited = !!(d?.unlimited || d?.isPremium);
+  const totalAllowed = Number(d?.totalAllowed ?? 0);
+  const used = Number(d?.used ?? 0);
+  const remaining = Number(d?.remaining ?? Math.max(0, totalAllowed - used));
+  return {
+    isPremium: !!d?.isPremium,
+    unlimited,
+    used,
+    totalAllowed,
+    remaining,
+  };
+};
+
+// Fetches the current story-read quota for the active user type:
+//  - logged-in: GET stories/user/quota (free-tier lifetime limit + weekly bonus)
+//  - guest: GET guest/quota (unique stories per session; needs a guest session)
+// Returns null on any error so callers hide the indicator rather than show a
+// wrong number (the backend 403 wall remains the hard backstop).
+export const getStoryQuotaService = async (): Promise<StoryQuota | null> => {
+  try {
+    if (isUserLoggedIn()) {
+      const { data } = await api.get('stories/user/quota');
+      return normalizeQuota(data);
+    }
+    // Guest: ensure a session exists so the backend can track/read the quota.
+    let sessionId = Cookies.get('guestSessionId');
+    if (!sessionId) {
+      const session = await createGuestSessionService();
+      const expiresDays = session.expiresIn ? session.expiresIn / 86400 : 7;
+      Cookies.set('guestSessionId', session.sessionId, {
+        expires: expiresDays,
+      });
+      sessionId = session.sessionId;
+    }
+    const { data } = await api.get('guest/quota');
+    return normalizeQuota(data);
+  } catch {
+    return null;
+  }
+};
+
 export interface StoryCategory {
   id: string;
   name: string;

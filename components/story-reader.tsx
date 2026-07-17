@@ -1,4 +1,5 @@
 import { ensureGuestSession } from '@/lib/guest';
+import { STORY_QUOTA_QUERY_KEY } from '@/lib/hooks/use-story-quota';
 import { markDone, markReading } from '@/lib/progress-store';
 import {
   type StoryAudioBatch,
@@ -13,6 +14,7 @@ import edit from '@/public/edit.svg';
 import movementSmall from '@/public/movement-small.png';
 import movement from '@/public/movement.png';
 import play from '@/public/play.svg';
+import { useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
@@ -146,6 +148,7 @@ const StoryReader = ({
     []
   );
   const [currentClip, setCurrentClip] = useState(0);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const fetchStory = async () => {
@@ -168,8 +171,10 @@ const StoryReader = ({
           const storyData = await getStoryByIdService(storyId);
           setStory(storyData);
         }
-        // Story loaded successfully — mark it as being read.
+        // Story loaded successfully — mark it as being read. Opening a new
+        // story may have consumed a quota slot, so refresh the quota indicator.
         markReading(storyId);
+        queryClient.invalidateQueries({ queryKey: STORY_QUOTA_QUERY_KEY });
       } catch (err) {
         const status = (err as { status?: number | null })?.status;
         if (status === 403) {
@@ -184,7 +189,7 @@ const StoryReader = ({
     };
 
     fetchStory();
-  }, [storyId, isGuest]);
+  }, [storyId, isGuest, queryClient]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: audioRetry is a deliberate trigger so the "Try again" button re-runs audio generation; it isn't read in the body.
   useEffect(() => {

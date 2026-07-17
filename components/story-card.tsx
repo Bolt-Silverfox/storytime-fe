@@ -1,5 +1,6 @@
 'use client';
 
+import CategoryImage from '@/components/category-image';
 import { cn } from '@/lib/utils';
 import heartFilled from '@/public/hearted.svg';
 import heart from '@/public/not-hearted.svg';
@@ -50,7 +51,7 @@ const StoryCard = ({
       }}
       className='border border-stone-100 shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] rounded-3xl border-solid hover:scale-105 transition-all duration-300 cursor-pointer relative'
     >
-      <Image
+      <CategoryImage
         src={img}
         alt={title}
         width={224}

@@ -2,15 +2,20 @@ import BackButton from '@/components/back-button';
 import type { Metadata } from 'next';
 import { ageLabel, coverOf, extractStoryId, getStory } from './get-story';
 import OpenInAppButton from './open-in-app-button';
-import { APP_STORE_URL, PLAY_STORE_URL, SITE_URL } from './story-links';
+import {
+  APP_STORE_URL,
+  PLAY_STORE_URL,
+  SITE_URL,
+  ogImageUrl,
+} from './story-links';
 import StoryView from './story-view';
 
 const FALLBACK_DESCRIPTION =
   'Listen, read, and explore stories crafted just for kids on Storytime.';
 
-// og:image / twitter:image are supplied automatically by the sibling
-// opengraph-image.tsx (a dynamically generated 1200×630 card with the story
-// title), so metadata below only sets text fields.
+// og:image / twitter:image use the story's Cloudinary cover (transformed to a
+// 1200×630 JPEG). The dynamic opengraph-image route was removed because it
+// crashed (502) in the self-hosted standalone build, breaking WhatsApp previews.
 export async function generateMetadata({
   params,
 }: {
@@ -42,6 +47,7 @@ export async function generateMetadata({
 
   const description = story.description?.trim() || FALLBACK_DESCRIPTION;
   const title = `${story.title} · Storytime`;
+  const ogImage = ogImageUrl(coverOf(story));
 
   return {
     metadataBase: new URL(SITE_URL),
@@ -54,11 +60,15 @@ export async function generateMetadata({
       url,
       siteName: 'Storytime',
       type: 'article',
+      ...(ogImage
+        ? { images: [{ url: ogImage, width: 1200, height: 630, alt: title }] }
+        : {}),
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
+      ...(ogImage ? { images: [ogImage] } : {}),
     },
   };
 }

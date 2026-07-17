@@ -18,21 +18,29 @@ const qilka = localFont({
   variable: '--font-qilka',
 });
 
+const SITE_TITLE = 'Storytime — Audio stories crafted just for kids';
+const SITE_DESCRIPTION =
+  'Listen, read, and explore hundreds of interactive, screen-free stories made just for kids — perfect for bedtime and beyond.';
+
 export const metadata: Metadata = {
-  metadataBase: new URL('https://www.storytimeapp.me'),
-  title: 'Storytime',
-  description: 'Storytime is a platform for children to read stories.',
+  // web.storytimeapp.me is the live host (www is not served), so canonical URLs,
+  // OG, and the OG image must all resolve here or social previews break.
+  metadataBase: new URL('https://web.storytimeapp.me'),
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
+  applicationName: 'Storytime',
+  alternates: { canonical: 'https://web.storytimeapp.me' },
   openGraph: {
-    title: 'Storytime',
-    description: 'Listen, read, and explore stories crafted just for kids.',
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
     siteName: 'Storytime',
-    url: 'https://www.storytimeapp.me',
+    url: 'https://web.storytimeapp.me',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Storytime',
-    description: 'Listen, read, and explore stories crafted just for kids.',
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
   },
 };
 

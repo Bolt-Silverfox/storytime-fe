@@ -483,8 +483,7 @@ const StoryReader = ({
 
   // Keep the highlighted paragraph in view as the narration advances.
   useEffect(() => {
-    const hasAudioParas =
-      audioParagraphs.length > 0 && audioParagraphs.every((p) => !!p.text);
+    const hasAudioParas = audioParagraphs.length > 0;
     if (!(hasAudioParas && isChecked) || typeof document === 'undefined') {
       return;
     }
@@ -556,16 +555,21 @@ const StoryReader = ({
   const displayContent = story?.textContent || 'Story content not available';
   // Break the story into readable paragraphs for read-along.
   const paragraphs = splitIntoParagraphs(displayContent);
-  // Prefer the audio-aligned paragraphs (each carries its own text) so the
-  // read-along highlight tracks the narration exactly; fall back to sentence
-  // grouping when per-paragraph text isn't available (e.g. the guest clip).
-  const audioParaTexts = audioParagraphs
-    .map((p) => p.text)
-    .filter((t): t is string => !!t);
-  const useAudioParagraphs =
-    audioParaTexts.length > 0 &&
-    audioParaTexts.length === audioParagraphs.length;
-  const readingParagraphs = useAudioParagraphs ? audioParaTexts : paragraphs;
+  // The read-along highlight follows the audio clips. The batch endpoint only
+  // returns paragraph text for the eager (first-generated) clips; later clips
+  // arrive from the status poll with an audioUrl but no text, so requiring every
+  // clip to carry text would keep the highlight off for the whole story while
+  // paragraphs are still generating. The backend also splits paragraphs by a
+  // different algorithm than splitIntoParagraphs, so per-index text can't be
+  // guaranteed to match; drive the highlight off the audio-aligned list whenever
+  // there's a playlist (i === currentClip), and fill any missing display text
+  // from the story's own paragraph split by index so nothing renders blank.
+  // Guests (no batch, single clip) leave audioParagraphs empty → plain fallback,
+  // no highlight.
+  const useAudioParagraphs = audioParagraphs.length > 0;
+  const readingParagraphs = useAudioParagraphs
+    ? audioParagraphs.map((p, i) => p.text || paragraphs[i] || '')
+    : paragraphs;
 
   if (loading) {
     return (

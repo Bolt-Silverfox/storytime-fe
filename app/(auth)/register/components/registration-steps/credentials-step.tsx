@@ -87,11 +87,14 @@ export const CredentialsStep = () => {
     setIsLoading(true);
     try {
       // todo: set user to global context
+      // NOTE: `title` is collected in the details step for UI purposes only.
+      // The backend RegisterDto does not whitelist it and the API gateway runs
+      // ValidationPipe with forbidNonWhitelisted, so sending `title` returns
+      // 400 "property title should not exist". Only send fields the DTO accepts.
       const _response = await registerService({
         email: data.email,
         password: data.password,
         fullName: registrationData?.name ?? '',
-        title: registrationData?.title ?? '',
       });
 
       setRegistrationData({

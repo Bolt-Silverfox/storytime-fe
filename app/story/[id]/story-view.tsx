@@ -1,9 +1,11 @@
 'use client';
 
 import ModeSelector from '@/components/mode-selector';
+import QuotaIndicator from '@/components/quota-indicator';
 import StoryReader from '@/components/story-reader';
 import Modal from '@/components/ui/modal';
 import VoiceSelector, { type SelectedVoice } from '@/components/voice-selector';
+import { useStoryQuota } from '@/lib/hooks/use-story-quota';
 import {
   addFavoriteService,
   getPreferredVoiceService,
@@ -38,6 +40,12 @@ export default function StoryView({ storyId }: { storyId: string }) {
     null
   );
   const [storyDetail, setStoryDetail] = useState<StoryDetail | null>(null);
+
+  // Guests / free users: surface remaining quota and block opening a new story
+  // once it's exhausted (the backend 403s anyway, but gating here means they
+  // aren't sent into a reader that immediately walls them).
+  const { quota } = useStoryQuota();
+  const outOfQuota = !!quota && !quota.unlimited && quota.remaining <= 0;
 
   // Favorites (auth-only). Reflect current saved state and allow toggling.
   const [canFavorite, setCanFavorite] = useState(false);
@@ -139,14 +147,21 @@ export default function StoryView({ storyId }: { storyId: string }) {
 
   return (
     <div className='flex flex-col items-center gap-3'>
-      <button
-        type='button'
-        onClick={handleStart}
-        disabled={preparing}
-        className='rounded-2xl bg-[#EC4007] px-8 py-4 text-base font-semibold text-white transition hover:opacity-90 disabled:opacity-60'
-      >
-        {preparing ? 'Opening…' : 'Read this story'}
-      </button>
+      {outOfQuota ? (
+        <QuotaIndicator variant='banner' className='w-full max-w-md' />
+      ) : (
+        <>
+          <button
+            type='button'
+            onClick={handleStart}
+            disabled={preparing}
+            className='rounded-2xl bg-[#EC4007] px-8 py-4 text-base font-semibold text-white transition hover:opacity-90 disabled:opacity-60'
+          >
+            {preparing ? 'Opening…' : 'Read this story'}
+          </button>
+          <QuotaIndicator variant='compact' />
+        </>
+      )}
       {canFavorite && (
         <button
           type='button'

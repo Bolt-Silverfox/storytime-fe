@@ -700,30 +700,6 @@ export const isUserLoggedIn = () => {
   return !!(user && (accessToken || refreshToken));
 };
 
-export const getStoriesByKidIdService = async (kidId: string) => {
-  try {
-    const response = await api.get(`stories?kidId=${kidId}`);
-    return response.data;
-  } catch (error: unknown) {
-    if (error instanceof AxiosError) {
-      if (error.response) {
-        throw {
-          message: error.response.data?.message || 'Failed to fetch stories',
-          status: error.response.status,
-          data: error.response.data,
-        };
-      }
-      if (error.request) {
-        throw { message: 'No response from server', status: null };
-      }
-    }
-    throw {
-      message: error instanceof Error ? error.message : 'Unexpected error',
-      status: null,
-    };
-  }
-};
-
 export const getStoryCategoriesService = async () => {
   try {
     const response = await api.get('stories/categories');
@@ -734,31 +710,6 @@ export const getStoryCategoriesService = async () => {
         throw {
           message:
             error.response.data?.message || 'Failed to fetch story categories',
-          status: error.response.status,
-          data: error.response.data,
-        };
-      }
-      if (error.request) {
-        throw { message: 'No response from server', status: null };
-      }
-    }
-    throw {
-      message: error instanceof Error ? error.message : 'Unexpected error',
-      status: null,
-    };
-  }
-};
-
-export const getStoryThemesService = async () => {
-  try {
-    const response = await api.get('stories/themes');
-    return response.data;
-  } catch (error: unknown) {
-    if (error instanceof AxiosError) {
-      if (error.response) {
-        throw {
-          message:
-            error.response.data?.message || 'Failed to fetch story themes',
           status: error.response.status,
           data: error.response.data,
         };
@@ -832,6 +783,67 @@ export const getGuestStoryService = async (
       message: error instanceof Error ? error.message : 'Unexpected error',
       status: null,
     } satisfies ServiceError;
+  }
+};
+
+// Unified story-read quota for the active audience. Premium/unlimited users
+// report `unlimited: true`; free users and guests report how many unique new
+// stories they can still read.
+export interface StoryQuota {
+  isPremium: boolean;
+  unlimited: boolean;
+  used: number;
+  totalAllowed: number;
+  remaining: number;
+}
+
+interface RawQuota {
+  isPremium?: boolean;
+  unlimited?: boolean;
+  used?: number;
+  totalAllowed?: number;
+  remaining?: number;
+}
+
+const normalizeQuota = (d: RawQuota): StoryQuota => {
+  const unlimited = !!(d?.unlimited || d?.isPremium);
+  const totalAllowed = Number(d?.totalAllowed ?? 0);
+  const used = Number(d?.used ?? 0);
+  const remaining = Number(d?.remaining ?? Math.max(0, totalAllowed - used));
+  return {
+    isPremium: !!d?.isPremium,
+    unlimited,
+    used,
+    totalAllowed,
+    remaining,
+  };
+};
+
+// Fetches the current story-read quota for the active user type:
+//  - logged-in: GET stories/user/quota (free-tier lifetime limit + weekly bonus)
+//  - guest: GET guest/quota (unique stories per session; needs a guest session)
+// Returns null on any error so callers hide the indicator rather than show a
+// wrong number (the backend 403 wall remains the hard backstop).
+export const getStoryQuotaService = async (): Promise<StoryQuota | null> => {
+  try {
+    if (isUserLoggedIn()) {
+      const { data } = await api.get('stories/user/quota');
+      return normalizeQuota(data);
+    }
+    // Guest: ensure a session exists so the backend can track/read the quota.
+    let sessionId = Cookies.get('guestSessionId');
+    if (!sessionId) {
+      const session = await createGuestSessionService();
+      const expiresDays = session.expiresIn ? session.expiresIn / 86400 : 7;
+      Cookies.set('guestSessionId', session.sessionId, {
+        expires: expiresDays,
+      });
+      sessionId = session.sessionId;
+    }
+    const { data } = await api.get('guest/quota');
+    return normalizeQuota(data);
+  } catch {
+    return null;
   }
 };
 
@@ -1114,36 +1126,6 @@ export const getDailyChallengesService = async (kidId: string) => {
         throw {
           message:
             error.response.data?.message || 'Failed to fetch daily challenges',
-          status: error.response.status,
-          data: error.response.data,
-        };
-      }
-      if (error.request) {
-        throw { message: 'No response from server', status: null };
-      }
-    }
-    throw {
-      message: error instanceof Error ? error.message : 'Unexpected error',
-      status: null,
-    };
-  }
-};
-
-export const getStoriesByThemeAndKidService = async (
-  theme: string,
-  kidId: string
-) => {
-  try {
-    const response = await api.get(
-      `stories?theme=${encodeURIComponent(theme)}&kidId=${kidId}`
-    );
-    return response.data;
-  } catch (error: unknown) {
-    if (error instanceof AxiosError) {
-      if (error.response) {
-        throw {
-          message:
-            error.response.data?.message || 'Failed to fetch stories by theme',
           status: error.response.status,
           data: error.response.data,
         };

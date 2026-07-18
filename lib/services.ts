@@ -5,7 +5,6 @@ import Cookies from 'js-cookie';
 interface RegisterPayload {
   email: string;
   password: string;
-  title: string;
   fullName: string;
 }
 

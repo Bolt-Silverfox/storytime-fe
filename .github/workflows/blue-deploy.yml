@@ -1,0 +1,109 @@
+name: Blue Deploy (develop-v1.3.0)
+
+# Deploys the v1.3.0 "blue" frontend to blue.dev.storytimeapp.me, on the SAME
+# host as green (dev.storytimeapp.me) but a separate port (:3010), directory,
+# and PM2 app. Green is never touched.
+#
+# NEXT_PUBLIC_API_URL is baked at BUILD time, so blue is built against the BLUE
+# backend (blue.dev.api). Uses the repo's EC2_HOST / EC2_USERNAME / EC2_SSH_KEY
+# secrets.
+#
+# Manual-only until you're ready; uncomment `push` to auto-deploy on push.
+on:
+  workflow_dispatch:
+  # push:
+  #   branches: ['develop-v1.3.0']
+
+concurrency:
+  group: fe-blue-deploy
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+  BLUE_API_URL: 'https://blue.dev.api.storytimeapp.me'
+
+jobs:
+  deploy-blue:
+    name: Deploy Blue FE
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build blue (bakes blue API URL)
+        env:
+          NEXT_PUBLIC_API_URL: ${{ env.BLUE_API_URL }}
+          NEXT_PUBLIC_GIT_SHA: ${{ github.sha }}
+        run: pnpm build
+
+      - name: Assemble standalone bundle
+        run: |
+          cp -r public .next/standalone/ 2>/dev/null || true
+          mkdir -p .next/standalone/.next
+          cp -r .next/static .next/standalone/.next/static
+
+      - name: Setup SSH key
+        run: |
+          echo "${{ secrets.EC2_SSH_KEY }}" > /tmp/ssh_key
+          chmod 600 /tmp/ssh_key
+
+      - name: Add server host key
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          ssh-keyscan -H "$EC2_HOST" > /tmp/known_hosts
+          chmod 600 /tmp/known_hosts
+
+      - name: Prepare blue directory
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: mkdir -p /home/ubuntu/storytime/blue/storytime-fe/.next
+
+      - name: Sync standalone build + ecosystem
+        run: |
+          rsync -avz --delete \
+            -e "ssh -i /tmp/ssh_key -o UserKnownHostsFile=/tmp/known_hosts -o StrictHostKeyChecking=yes" \
+            ./.next/standalone/ ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}:/home/ubuntu/storytime/blue/storytime-fe/
+          rsync -avz \
+            -e "ssh -i /tmp/ssh_key -o UserKnownHostsFile=/tmp/known_hosts -o StrictHostKeyChecking=yes" \
+            ./ecosystem.config.js ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}:/home/ubuntu/storytime/blue/storytime-fe/
+
+      - name: (Re)start blue FE
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            source ~/.nvm/nvm.sh
+            cd /home/ubuntu/storytime/blue/storytime-fe
+            BLUE_PORT=3010 npx pm2 startOrReload ecosystem.config.js --only storytime-fe-blue --update-env
+
+      - name: Verify blue FE
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            sleep 8
+            curl -sf http://localhost:3010/api/health || exit 1
+            echo "Blue FE verified on :3010"

@@ -43,12 +43,16 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        # --no-frozen-lockfile: package.json carries a pnpm.onlyBuiltDependencies
+        # allowlist (sharp/oxide/biome) that isn't reflected in an older lockfile.
+        run: pnpm install --no-frozen-lockfile
 
       - name: Build blue (bakes blue API URL)
         env:
           NEXT_PUBLIC_API_URL: ${{ env.BLUE_API_URL }}
           NEXT_PUBLIC_GIT_SHA: ${{ github.sha }}
+          # pnpm 11's pre-run deps check otherwise aborts on the build-script gate.
+          PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN: 'false'
         run: pnpm build
 
       - name: Assemble standalone bundle

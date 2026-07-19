@@ -91,7 +91,6 @@ export const CredentialsStep = () => {
         email: data.email,
         password: data.password,
         fullName: registrationData?.name ?? '',
-        title: registrationData?.title ?? '',
       });
 
       setRegistrationData({

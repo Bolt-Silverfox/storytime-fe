@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "prepare": "git config core.hooksPath .githooks || true",
+    "prepare": "command -v git >/dev/null 2>&1 && { cur=$(git config --local core.hooksPath 2>/dev/null || true); if [ -z \"$cur\" ] || [ \"$cur\" = .githooks ]; then git config core.hooksPath .githooks || echo '[prepare] warning: failed to set core.hooksPath for git hooks' >&2; else echo \"[prepare] warning: core.hooksPath already set to '$cur'; not overwriting (run: git config core.hooksPath .githooks to enable the CodeRabbit pre-push hook)\" >&2; fi; }; true",
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",

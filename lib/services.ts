@@ -156,7 +156,7 @@ export const loginService = async (payload: LoginPayload) => {
 
 export const verifyEmailService = async (token: string) => {
   try {
-    const response = await api.post(`/auth/verify-email?token=${token}`);
+    const response = await api.post('/auth/verify-email', { token });
     return response.data;
     // biome-ignore lint/suspicious/noExplicitAny: external error shape
   } catch (error: any) {
@@ -176,7 +176,7 @@ export const verifyEmailService = async (token: string) => {
 
 export const sendVerificationEmailService = async (email: string) => {
   try {
-    const response = await api.post(`/auth/send-verification?email=${email}`);
+    const response = await api.post('/auth/send-verification', { email });
     return response.data;
     // biome-ignore lint/suspicious/noExplicitAny: <explanation>
   } catch (error: any) {
@@ -197,9 +197,7 @@ export const sendVerificationEmailService = async (email: string) => {
 
 export const requestPasswordResetService = async (email: string) => {
   try {
-    const response = await api.post(
-      `/auth/request-password-reset?email=${encodeURIComponent(email)}`
-    );
+    const response = await api.post('/auth/request-password-reset', { email });
     return response.data;
     // biome-ignore lint/suspicious/noExplicitAny: external error shape
   } catch (error: any) {
@@ -226,11 +224,10 @@ export const validateResetTokenService = async ({
   email: string;
 }) => {
   try {
-    const response = await api.get(
-      `/auth/validate-reset-token?token=${encodeURIComponent(
-        token
-      )}&email=${encodeURIComponent(email)}`
-    );
+    const response = await api.post('/auth/validate-reset-token', {
+      token,
+      email,
+    });
     return response.data;
     // biome-ignore lint/suspicious/noExplicitAny: external error shape
   } catch (error: any) {
@@ -251,17 +248,19 @@ export const validateResetTokenService = async ({
 
 export const resetPasswordService = async ({
   token,
+  email,
   newPassword,
 }: {
   token: string;
+  email: string;
   newPassword: string;
 }) => {
   try {
-    const response = await api.post(
-      `/auth/reset-password?token=${encodeURIComponent(
-        token
-      )}&newPassword=${encodeURIComponent(newPassword)}`
-    );
+    const response = await api.post('/auth/reset-password', {
+      token,
+      email,
+      newPassword,
+    });
     return response.data;
     // biome-ignore lint/suspicious/noExplicitAny: external error shape
   } catch (error: any) {

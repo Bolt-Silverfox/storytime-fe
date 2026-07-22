@@ -7,9 +7,11 @@ import {
   FormControl,
   FormField,
   FormItem,
+  FormLabel,
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { PasswordInputToggle } from '@/components/ui/password-input-toggle';
 import { useAuth } from '@/context/auth-context';
 import {
   clearUserFromStorage,
@@ -18,7 +20,6 @@ import {
 } from '@/lib/services';
 import { cn } from '@/lib/utils';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { EyeIcon, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -38,7 +39,6 @@ const Page = () => {
   const { registrationData } = useAuth();
   const [passwordType, setPasswordType] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
-  const EyeComponent = passwordType ? EyeOff : EyeIcon;
 
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
@@ -123,8 +123,14 @@ const Page = () => {
               name='email'
               render={({ field }) => (
                 <FormItem className='px-1'>
+                  <FormLabel>Email address</FormLabel>
                   <FormControl>
-                    <Input placeholder='Enter your email address' {...field} />
+                    <Input
+                      type='email'
+                      placeholder='Enter your email address'
+                      aria-required='true'
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -136,19 +142,18 @@ const Page = () => {
               name='password'
               render={({ field }) => (
                 <FormItem className='relative px-1'>
+                  <FormLabel>Password</FormLabel>
                   <FormControl>
-                    <div className='relative group'>
+                    <div className='relative'>
                       <Input
                         type={passwordType ? 'password' : 'text'}
                         placeholder='Enter your password'
+                        aria-required='true'
                         {...field}
                       />
-                      <EyeComponent
-                        className='absolute z-10 right-[15px] -translate-y-1/2 top-1/2 cursor-pointer hidden group-hover:block'
-                        size={20}
-                        onClick={() => {
-                          setPasswordType((prev) => !prev);
-                        }}
+                      <PasswordInputToggle
+                        visible={!passwordType}
+                        onToggle={() => setPasswordType((prev) => !prev)}
                       />
                     </div>
                   </FormControl>

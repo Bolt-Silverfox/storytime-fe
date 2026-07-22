@@ -6,6 +6,7 @@ import {
   FormControl,
   FormField,
   FormItem,
+  FormLabel,
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -92,12 +93,13 @@ export const DetailsStep = () => {
             name='title'
             render={({ field }) => (
               <FormItem>
+                <FormLabel>Title</FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   defaultValue={field.value}
                 >
                   <FormControl>
-                    <SelectTrigger className='w-full'>
+                    <SelectTrigger className='w-full' aria-required='true'>
                       <SelectValue placeholder='Select title' />
                     </SelectTrigger>
                   </FormControl>
@@ -126,8 +128,13 @@ export const DetailsStep = () => {
             name='name'
             render={({ field }) => (
               <FormItem>
+                <FormLabel>Full name</FormLabel>
                 <FormControl>
-                  <Input placeholder='Enter your full name' {...field} />
+                  <Input
+                    placeholder='Enter your full name'
+                    aria-required='true'
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>

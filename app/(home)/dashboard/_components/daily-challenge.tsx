@@ -186,7 +186,7 @@ const DailyChallenge = () => {
         </div>
       </div>
       {/* Challenge card */}
-      <div className='w-full flex items-center bg-[#5E20F8] p-4 rounded-[3.125rem] border-[0.5px] border-solid border-[#A583FB] mt-2 relative font-abeezee'>
+      <div className='w-full flex flex-col md:flex-row md:items-center gap-4 md:gap-0 bg-[#5E20F8] p-4 rounded-[3.125rem] border-[0.5px] border-solid border-[#A583FB] mt-2 relative font-abeezee'>
         <div className='flex items-center gap-3'>
           <Image src={timer} alt='timer' width={56} height={56} />
           <div className='flex flex-col'>
@@ -198,7 +198,7 @@ const DailyChallenge = () => {
             </span>
           </div>
         </div>
-        <div className='ml-auto flex items-center gap-4'>
+        <div className='md:ml-auto flex items-center gap-4'>
           <span className='text-[#ECC607] text-center text-xl not-italic font-bold leading-6 font-qilka mr-8'>
             20:01
           </span>

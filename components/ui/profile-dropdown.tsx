@@ -19,7 +19,7 @@ const menuItems = [
   },
   {
     label: 'Library',
-    icon: '/profile.svg',
+    icon: '/library.svg',
     link: '/library',
   },
   {
@@ -37,7 +37,6 @@ const menuItems = [
     icon: '/ai-voice.svg',
     link: '/dashboard/ai-voice',
   },
-  { label: 'Logout', icon: '/logout.svg', link: '/dashboard/logout' },
 ];
 
 export default function ProfileDropdown({
@@ -113,34 +112,30 @@ export default function ProfileDropdown({
           role='menu'
           aria-label='Profile menu'
         >
-          {menuItems.map((item) =>
-            item.label === 'Logout' ? (
-              <button
-                key={item.label}
-                role='menuitem'
-                className='flex items-center gap-3 py-6 px-4 hover:bg-gray-50  rounded-[1.6875rem] cursor-pointer transition-colors border-b-[0.5px] border-solid border-stone-100 w-full text-left'
-                onClick={handleLogout}
-                type='button'
-              >
-                <Image src={item.icon} alt='' width={24} height={24} />
-                <span className='text-[#4A413F] not-italic leading-6 font-abeezee text-base'>
-                  {item.label}
-                </span>
-              </button>
-            ) : (
-              <Link
-                key={item.label}
-                role='menuitem'
-                className='flex items-center gap-3 py-6 px-4 hover:bg-gray-50  rounded-[1.6875rem] cursor-pointer transition-colors border-b-[0.5px] border-solid border-stone-100'
-                href={item.link}
-              >
-                <Image src={item.icon} alt='' width={24} height={24} />
-                <span className='text-[#4A413F] not-italic leading-6 font-abeezee text-base'>
-                  {item.label}
-                </span>
-              </Link>
-            )
-          )}
+          {menuItems.map((item) => (
+            <Link
+              key={item.label}
+              role='menuitem'
+              className='flex items-center gap-3 py-6 px-4 hover:bg-gray-50  rounded-[1.6875rem] cursor-pointer transition-colors border-b-[0.5px] border-solid border-stone-100'
+              href={item.link}
+            >
+              <Image src={item.icon} alt='' width={24} height={24} />
+              <span className='text-[#4A413F] not-italic leading-6 font-abeezee text-base'>
+                {item.label}
+              </span>
+            </Link>
+          ))}
+          <button
+            role='menuitem'
+            className='flex items-center gap-3 py-6 px-4 hover:bg-gray-50  rounded-[1.6875rem] cursor-pointer transition-colors border-b-[0.5px] border-solid border-stone-100 w-full text-left'
+            onClick={handleLogout}
+            type='button'
+          >
+            <Image src='/logout.svg' alt='' width={24} height={24} />
+            <span className='text-[#4A413F] not-italic leading-6 font-abeezee text-base'>
+              Logout
+            </span>
+          </button>
         </motion.div>
       )}
     </AnimatePresence>

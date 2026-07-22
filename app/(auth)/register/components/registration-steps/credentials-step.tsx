@@ -50,7 +50,7 @@ const FormSchema = z
         'Password must contain at least one number'
       )
       .refine(
-        (value) => /[!$%&*?@]/.test(value),
+        (value) => /[^A-Za-z0-9\s]/.test(value),
         'Password must contain at least one special character'
       ),
     confirm_password: z

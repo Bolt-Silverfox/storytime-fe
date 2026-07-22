@@ -62,7 +62,7 @@ const DailyChallenge = () => {
 
   if (loading) {
     return (
-      <div className='px-[6.25rem] py-[3.9375rem] rounded-[2.625rem] bg-[#4807EC] w-full max-w-full flex flex-col gap-8 mt-[5.25rem]'>
+      <div className='px-6 py-8 md:px-[6.25rem] md:py-[3.9375rem] rounded-[2.625rem] bg-[#4807EC] w-full max-w-full flex flex-col gap-8 mt-12 md:mt-[5.25rem]'>
         <div className='text-center text-white'>
           Loading daily challenges...
         </div>
@@ -72,17 +72,17 @@ const DailyChallenge = () => {
 
   if (error) {
     return (
-      <div className='px-[6.25rem] py-[3.9375rem] rounded-[2.625rem] bg-[#4807EC] w-full max-w-full flex flex-col gap-8 mt-[5.25rem]'>
+      <div className='px-6 py-8 md:px-[6.25rem] md:py-[3.9375rem] rounded-[2.625rem] bg-[#4807EC] w-full max-w-full flex flex-col gap-8 mt-12 md:mt-[5.25rem]'>
         <div className='text-center text-red-300'>{error}</div>
       </div>
     );
   }
 
   return (
-    <div className='px-[6.25rem] py-[3.9375rem] rounded-[2.625rem] bg-[#4807EC] w-full max-w-full flex flex-col gap-8 mt-[5.25rem]'>
-      <div className='flex flex-row justify-between items-start w-full'>
+    <div className='px-6 py-8 md:px-[6.25rem] md:py-[3.9375rem] rounded-[2.625rem] bg-[#4807EC] w-full max-w-full flex flex-col gap-8 mt-12 md:mt-[5.25rem]'>
+      <div className='flex flex-col md:flex-row justify-between items-start gap-8 md:gap-6 w-full'>
         <div className='flex flex-col gap-2'>
-          <h2 className='text-white text-[2.75rem] not-italic font-bold leading-[3.125rem] font-qilka'>
+          <h2 className='text-white text-3xl md:text-[2.75rem] not-italic font-bold leading-tight md:leading-[3.125rem] font-qilka'>
             Your daily story
             <br />
             challenge
@@ -96,7 +96,7 @@ const DailyChallenge = () => {
             <p className='text-[#EDE6FE] text-xs not-italic font-normal leading-6 mb-2 font-abeezee opacity-80'>
               Daily challenge tracker
             </p>
-            <div className='flex flex-row flex-wrap gap-2 w-3/5 font-abeezee'>
+            <div className='flex flex-row flex-wrap gap-2 w-full md:w-3/5 font-abeezee'>
               {days.map((day, idx) => {
                 const isCompleted = getDayStatus(idx);
                 return (
@@ -148,7 +148,7 @@ const DailyChallenge = () => {
             </div>
           </div>
         </div>
-        <div className='relative flex'>
+        <div className='relative flex self-center md:self-auto'>
           <div className='absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2'>
             <p className='text-[#EDE6FE] text-center text-base not-italic font-normal leading-5 font-abeezee'>
               Week
@@ -186,7 +186,7 @@ const DailyChallenge = () => {
         </div>
       </div>
       {/* Challenge card */}
-      <div className='w-full flex items-center bg-[#5E20F8] p-4 rounded-[3.125rem] border-[0.5px] border-solid border-[#A583FB] mt-2 relative font-abeezee'>
+      <div className='w-full flex flex-col md:flex-row md:items-center gap-4 md:gap-0 bg-[#5E20F8] p-4 rounded-[3.125rem] border-[0.5px] border-solid border-[#A583FB] mt-2 relative font-abeezee'>
         <div className='flex items-center gap-3'>
           <Image src={timer} alt='timer' width={56} height={56} />
           <div className='flex flex-col'>
@@ -198,7 +198,7 @@ const DailyChallenge = () => {
             </span>
           </div>
         </div>
-        <div className='ml-auto flex items-center gap-4'>
+        <div className='md:ml-auto flex items-center gap-4'>
           <span className='text-[#ECC607] text-center text-xl not-italic font-bold leading-6 font-qilka mr-8'>
             20:01
           </span>

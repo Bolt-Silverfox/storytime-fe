@@ -15,22 +15,22 @@ import {
 } from '@/components/ui/select';
 import { countries } from '@/data/countries';
 import {
+  type SystemAvatar,
+  clearUserFromStorage,
+  deleteAccountService,
   deleteKidService,
   getKidsService,
+  getSystemAvatarsService,
   getUserFromStorage,
   updateKidService,
+  updateParentAvatarService,
   updateParentProfileService,
+  uploadParentAvatarService,
 } from '@/lib/services';
 import { cn } from '@/lib/utils';
 import avatar from '@/public/avatar-big.png';
-import danny from '@/public/danny.png';
-import ella from '@/public/ella.png';
-import henry from '@/public/henry.png';
 import kidAvatar1 from '@/public/kid-3.svg';
 import kidAvatar2 from '@/public/kid-4.svg';
-import noah from '@/public/noah.png';
-import oliva from '@/public/oliva.png';
-import stella from '@/public/stella.png';
 import Image from 'next/image';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -54,33 +54,28 @@ const PersonalSettingsPage = () => {
   const [_addKidOpen, setAddKidOpen] = useState(false);
   const [editKidOpen, setEditKidOpen] = useState(false);
   const [selectedKid, setSelectedKid] = useState<MappedKid | null>(null);
-  const [kidForm, setKidForm] = useState({ name: '', age: '', img: '' });
+  const [kidForm, setKidForm] = useState({
+    name: '',
+    age: '',
+    img: '',
+    avatarId: '',
+  });
   const [showAvatarSelector, setShowAvatarSelector] = useState(false);
+  const [systemAvatars, setSystemAvatars] = useState<SystemAvatar[]>([]);
+  const [showParentAvatarModal, setShowParentAvatarModal] = useState(false);
   const [form, setForm] = useState({
-    title: user?.title || 'Mrs',
     name: user?.name || '',
     language: user?.profile?.language || 'English',
     country: user?.profile?.country || 'Nigeria',
-    kids: kids.length ? String(kids.length) : '1',
   });
   const [showRemoveKidModal, setShowRemoveKidModal] = useState(false);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [showDeleteReasonModal, setShowDeleteReasonModal] = useState(false);
-  const [_showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [deleteReason, setDeleteReason] = useState('');
   const [otherReason, setOtherReason] = useState('');
   const [emailInput, setEmailInput] = useState(user?.email || '');
   const [_deleteStep, _setDeleteStep] = useState(1);
   const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false);
-
-  const avatarOptions = [
-    { name: 'Stella', avatar: stella },
-    { name: 'Danny', avatar: danny },
-    { name: 'Olivia', avatar: oliva },
-    { name: 'Henry', avatar: henry },
-    { name: 'Ella', avatar: ella },
-    { name: 'Noah', avatar: noah },
-  ];
 
   const deleteReasons = [
     'I am not sure about the privacy',
@@ -116,8 +111,68 @@ const PersonalSettingsPage = () => {
     fetchKids();
   }, [fetchKids]);
 
+  useEffect(() => {
+    getSystemAvatarsService()
+      .then(setSystemAvatars)
+      .catch(() => setSystemAvatars([]));
+  }, []);
+
+  // Close the hand-rolled (non-Modal) dialogs on Escape.
+  useEffect(() => {
+    const anyOpen =
+      showRemoveKidModal || showDeleteAccountModal || showConfirmDeleteModal;
+    if (!anyOpen) {
+      return;
+    }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowRemoveKidModal(false);
+        setShowDeleteAccountModal(false);
+        setShowConfirmDeleteModal(false);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showRemoveKidModal, showDeleteAccountModal, showConfirmDeleteModal]);
+
   const handleFormChange = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // Persist a new parent avatar url to local `user` state + localStorage.
+  const applyParentAvatar = (avatarUrl: string | null) => {
+    const current = getUserFromStorage();
+    if (current) {
+      const updated = { ...current, avatarUrl };
+      localStorage.setItem('user', JSON.stringify(updated));
+      setUser(updated);
+    }
+  };
+
+  const handleSelectSystemAvatar = async (avatarId: string) => {
+    try {
+      const updated = await updateParentAvatarService(avatarId);
+      applyParentAvatar(updated?.avatarUrl ?? null);
+      toast.success('Avatar updated');
+      setShowParentAvatarModal(false);
+    } catch (err) {
+      toast.error(
+        (err as { message?: string })?.message || 'Failed to update avatar'
+      );
+    }
+  };
+
+  const handleUploadParentAvatar = async (file: File) => {
+    try {
+      const updated = await uploadParentAvatarService(file);
+      applyParentAvatar(updated?.avatarUrl ?? null);
+      toast.success('Avatar updated');
+      setShowParentAvatarModal(false);
+    } catch (err) {
+      toast.error(
+        (err as { message?: string })?.message || 'Failed to upload avatar'
+      );
+    }
   };
 
   const handleSave = async () => {
@@ -152,7 +207,7 @@ const PersonalSettingsPage = () => {
 
   const handleEditKid = (kid: MappedKid) => {
     setSelectedKid(kid);
-    setKidForm({ name: kid.name, age: kid.age, img: kid.img });
+    setKidForm({ name: kid.name, age: kid.age, img: kid.img, avatarId: '' });
     setEditKidOpen(true);
   };
 
@@ -169,6 +224,7 @@ const PersonalSettingsPage = () => {
       await updateKidService(selectedKid.id, {
         name: kidForm.name,
         ageRange: kidForm.age,
+        ...(kidForm.avatarId ? { avatarId: kidForm.avatarId } : {}),
       });
       toast.success('Child updated');
       setEditKidOpen(false);
@@ -220,11 +276,18 @@ const PersonalSettingsPage = () => {
     setDeleteReason('');
     setOtherReason('');
   };
-  const handleDeleteConfirmCancel = () => setShowDeleteConfirmModal(false);
-  const handleDeleteConfirm = () => {
-    setShowDeleteConfirmModal(false);
-    // Placeholder: log out user here
-    window.location.href = '/login';
+  const handleDeleteConfirmCancel = () => setShowConfirmDeleteModal(false);
+  const handleDeleteConfirm = async () => {
+    try {
+      await deleteAccountService();
+      clearUserFromStorage();
+      setShowConfirmDeleteModal(false);
+      window.location.href = '/login';
+    } catch (err) {
+      toast.error(
+        (err as { message?: string })?.message || 'Failed to delete account'
+      );
+    }
   };
 
   return (
@@ -247,9 +310,13 @@ const PersonalSettingsPage = () => {
             height={100}
             className='rounded-full'
           />
-          <p className='text-[#0731EC] text-base not-italic font-normal leading-5 rounded-[1.6875rem] font-abeezee cursor-pointer hover:scale-105 transition-all duration-300'>
+          <button
+            type='button'
+            className='text-[#0731EC] text-base not-italic font-normal leading-5 rounded-[1.6875rem] font-abeezee cursor-pointer hover:scale-105 transition-all duration-300'
+            onClick={() => setShowParentAvatarModal(true)}
+          >
             Change image
-          </p>
+          </button>
         </div>
         <button
           type='button'
@@ -260,14 +327,6 @@ const PersonalSettingsPage = () => {
         </button>
       </div>
       <div className='grid grid-cols-3 gap-y-16 gap-x-12 mt-8'>
-        <div>
-          <p className='text-[#4A413F] text-xs not-italic font-normal leading-4 font-abeezee'>
-            Title
-          </p>
-          <p className='text-[#221D1D] text-xl not-italic font-normal leading-6 font-abeezee'>
-            {user?.title || 'Mrs'}
-          </p>
-        </div>
         <div>
           <p className='text-[#4A413F] text-xs not-italic font-normal leading-4 font-abeezee'>
             Full name
@@ -365,28 +424,6 @@ const PersonalSettingsPage = () => {
         <form className='flex flex-col gap-6'>
           <div>
             <label
-              htmlFor='edit-title'
-              className='block mb-1 text-[#4A413F] text-sm font-abeezee'
-            >
-              Title
-            </label>
-            <Select
-              value={form.title}
-              onValueChange={(v) => handleFormChange('title', v)}
-            >
-              <SelectTrigger id='edit-title' className='w-full'>
-                <SelectValue placeholder='Select title' />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='Mr'>Mr</SelectItem>
-                <SelectItem value='Mrs'>Mrs</SelectItem>
-                <SelectItem value='Ms'>Ms</SelectItem>
-                <SelectItem value='Dr'>Dr</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label
               htmlFor='edit-fullname'
               className='block mb-1 text-[#4A413F] text-sm font-abeezee'
             >
@@ -443,29 +480,6 @@ const PersonalSettingsPage = () => {
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <label
-              htmlFor='edit-kids'
-              className='block mb-1 text-[#4A413F] text-sm font-abeezee'
-            >
-              No of Kids
-            </label>
-            <Select
-              value={form.kids}
-              onValueChange={(v) => handleFormChange('kids', v)}
-            >
-              <SelectTrigger id='edit-kids' className='w-full'>
-                <SelectValue placeholder='Select number of kids' />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='1'>1</SelectItem>
-                <SelectItem value='2'>2</SelectItem>
-                <SelectItem value='3'>3</SelectItem>
-                <SelectItem value='4'>4</SelectItem>
-                <SelectItem value='5'>5</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
           <Button
             type='button'
             className='w-1/2 mx-auto mt-[30%] mr-0 bg-[#EC4007] text-white rounded-full py-6 cursor-pointer hover:scale-105 transition-all duration-300 font-abeezee text-base'
@@ -474,6 +488,68 @@ const PersonalSettingsPage = () => {
             Save changes
           </Button>
         </form>
+      </Modal>
+      <Modal
+        open={showParentAvatarModal}
+        onClose={() => setShowParentAvatarModal(false)}
+        title='Change profile image'
+      >
+        <div className='flex flex-col gap-6'>
+          <p className='text-[#4A413F] text-xs font-abeezee px-8'>
+            Select a system avatar
+          </p>
+          <div className='grid grid-cols-2 gap-4 px-8'>
+            {systemAvatars.map((option) => (
+              <button
+                key={option.id}
+                type='button'
+                className='flex items-center gap-2.5 rounded-2xl border border-[#FAF4F2] bg-white p-6 w-full hover:border-[#FB9583]'
+                onClick={() => handleSelectSystemAvatar(option.id)}
+              >
+                <Image
+                  src={option.url}
+                  className='rounded-full'
+                  height={40}
+                  width={40}
+                  alt={option.displayName || option.name || 'Avatar'}
+                />
+                <span className='text-[#221D1D] truncate font-abeezee'>
+                  {option.displayName || option.name || 'Avatar'}
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className='flex items-center gap-[5px] my-2 px-8'>
+            <div className='flex-1 h-px bg-[#F5F5F4]' />
+            <span className='uppercase text-[10px] text-[#4A413F] font-abeezee'>
+              OR
+            </span>
+            <div className='flex-1 h-px bg-[#F5F5F4]' />
+          </div>
+          <div className='px-8 space-y-2'>
+            <h2 className='text-lg font-bold font-qilka mb-1'>Upload image</h2>
+            <p className='text-[#4A413F] text-xs font-abeezee mb-2'>
+              Upload your own image instead
+            </p>
+            <label className='block rounded-[20px] border border-dashed border-[#FB9583] bg-[#FFF6F3] py-8 text-center cursor-pointer'>
+              <input
+                type='file'
+                accept='image/*'
+                className='hidden'
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    handleUploadParentAvatar(file);
+                  }
+                }}
+              />
+              <span className='text-[#EC4007] font-semibold'>Upload image</span>
+            </label>
+            <p className='text-[#4A413F] text-xs font-abeezee mt-2'>
+              Accepted files: PNG, JPEG, JPG not more than 5MB
+            </p>
+          </div>
+        </div>
       </Modal>
       <Modal
         open={editKidOpen}
@@ -567,109 +643,44 @@ const PersonalSettingsPage = () => {
                   Select customized avatar to save time
                 </p>
                 <div className='grid grid-cols-2 gap-4 px-8'>
-                  {avatarOptions.map((option) => (
+                  {systemAvatars.map((option) => (
                     <button
-                      key={option.name}
+                      key={option.id}
                       type='button'
                       className={`flex items-center gap-2.5 rounded-2xl border border-[#FAF4F2] bg-white p-6 shadow-[0_0_17px_0_#221D29]/5 w-full ${
-                        kidForm.img === option.avatar.src
+                        kidForm.avatarId === option.id
                           ? 'border-[#FB9583] ring-2 ring-[#FB9583]/50'
                           : ''
                       }`}
                       onClick={() => {
                         setKidForm((prev) => ({
                           ...prev,
-                          img: option.avatar.src,
+                          avatarId: option.id,
+                          img: option.url,
                         }));
                         setShowAvatarSelector(false);
                       }}
                     >
                       <Image
-                        src={option.avatar}
+                        src={option.url}
                         className='rounded-full'
                         height={40}
                         width={40}
-                        alt={option.name}
+                        alt={option.displayName || option.name || 'Avatar'}
                       />
                       <span className='text-[#221D1D] truncate font-abeezee'>
-                        {option.name}
+                        {option.displayName || option.name || 'Avatar'}
                       </span>
                       <span className='ml-auto'>
                         <input
                           type='radio'
-                          checked={kidForm.img === option.avatar.src}
+                          checked={kidForm.avatarId === option.id}
                           readOnly
                         />
                       </span>
                     </button>
                   ))}
                 </div>
-                <div className='flex items-center gap-[5px] my-4 px-8'>
-                  <div className='flex-1 h-px bg-[#F5F5F4]' />
-                  <span className='uppercase text-[10px] text-[#F5F5F4] font-abeezee'>
-                    OR
-                  </span>
-                  <div className='flex-1 h-px bg-[#F5F5F4]' />
-                </div>
-                <div className='px-8 space-y-2'>
-                  <h2 className='text-lg font-bold font-qilka mb-1'>
-                    Upload image
-                  </h2>
-                  <p className='text-[#4A413F] text-xs font-abeezee mb-2'>
-                    Upload your child image instead
-                  </p>
-                  <label className='block rounded-[20px] border border-dashed border-[#FB9583] bg-[#FFF6F3] py-8 text-center cursor-pointer'>
-                    <input
-                      type='file'
-                      accept='image/*'
-                      className='hidden'
-                      onChange={(e) => {
-                        if (e.target.files?.[0]) {
-                          const url = URL.createObjectURL(e.target.files[0]);
-                          setKidForm((prev) => ({ ...prev, img: url }));
-                          setShowAvatarSelector(false);
-                        }
-                      }}
-                    />
-                    <span className='flex flex-col items-center justify-center'>
-                      <svg
-                        width='32'
-                        height='32'
-                        fill='none'
-                        xmlns='http://www.w3.org/2000/svg'
-                      >
-                        <title>Upload image</title>
-                        <path
-                          d='M16 21.333a5.333 5.333 0 1 0 0-10.666 5.333 5.333 0 0 0 0 10.666Z'
-                          stroke='#EC4007'
-                          strokeWidth='2'
-                          strokeLinecap='round'
-                          strokeLinejoin='round'
-                        />
-                        <path
-                          d='M28 16c0 6.627-5.373 12-12 12S4 22.627 4 16 9.373 4 16 4s12 5.373 12 12Z'
-                          stroke='#EC4007'
-                          strokeWidth='2'
-                          strokeLinecap='round'
-                          strokeLinejoin='round'
-                        />
-                      </svg>
-                      <span className='text-[#EC4007] font-semibold'>
-                        Upload image
-                      </span>
-                    </span>
-                  </label>
-                  <p className='text-[#4A413F] text-xs font-abeezee mt-2'>
-                    Accepted files: PNG, JPEG, JPG not more than 5MB
-                  </p>
-                </div>
-                <Button
-                  type='button'
-                  className='w-1/2 mx-auto mt-8 bg-[#EC4007]/10 text-[#EC4007] rounded-full py-4 font-abeezee text-base cursor-not-allowed'
-                  disabled
-                >
-                  Upload avatar
-                </Button>
               </div>
             )}
           </form>
@@ -677,16 +688,25 @@ const PersonalSettingsPage = () => {
       </Modal>
       {showRemoveKidModal && (
         <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/30'>
-          <div className='bg-white rounded-2xl shadow-lg p-8 w-full max-w-md mx-4 relative'>
+          <div
+            className='bg-white rounded-2xl shadow-lg p-8 w-full max-w-md mx-4 relative'
+            // biome-ignore lint/a11y/useSemanticElements: native <dialog> is not used here; this is a hand-rolled overlay dialog
+            role='dialog'
+            aria-modal='true'
+            aria-labelledby='remove-kid-title'
+          >
             <button
               type='button'
-              className='absolute top-4 right-4 text-xl text-gray-400 hover:text-gray-600'
+              className='absolute top-4 right-4 text-xl text-[#4A413F] hover:text-gray-600'
               onClick={cancelRemoveKid}
               aria-label='Close'
             >
               &times;
             </button>
-            <h2 className='text-[#221D1D] text-base font-abeezee mb-4'>
+            <h2
+              id='remove-kid-title'
+              className='text-[#221D1D] text-base font-abeezee mb-4'
+            >
               Remove child
             </h2>
             <p className='text-[#221D1D] text-sm font-abeezee mb-8'>
@@ -715,16 +735,25 @@ const PersonalSettingsPage = () => {
       )}
       {showDeleteAccountModal && (
         <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/30'>
-          <div className='bg-white rounded-2xl shadow-lg p-8 w-full max-w-md mx-4 relative'>
+          <div
+            className='bg-white rounded-2xl shadow-lg p-8 w-full max-w-md mx-4 relative'
+            // biome-ignore lint/a11y/useSemanticElements: native <dialog> is not used here; this is a hand-rolled overlay dialog
+            role='dialog'
+            aria-modal='true'
+            aria-labelledby='delete-account-title'
+          >
             <button
               type='button'
-              className='absolute top-4 right-4 text-xl text-gray-400 hover:text-gray-600'
+              className='absolute top-4 right-4 text-xl text-[#4A413F] hover:text-gray-600'
               onClick={handleDeleteAccountCancel}
               aria-label='Close'
             >
               &times;
             </button>
-            <h2 className='text-[#221D1D] text-base font-abeezee mb-4'>
+            <h2
+              id='delete-account-title'
+              className='text-[#221D1D] text-base font-abeezee mb-4'
+            >
               Delete account
             </h2>
             <p className='text-[#221D1D] text-sm font-abeezee mb-8'>
@@ -810,14 +839,23 @@ const PersonalSettingsPage = () => {
       </Modal>
       {showConfirmDeleteModal && (
         <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/30'>
-          <div className='bg-white rounded-4xl shadow-lg p-8 w-full max-w-md mx-4 relative'>
+          <div
+            className='bg-white rounded-4xl shadow-lg p-8 w-full max-w-md mx-4 relative'
+            // biome-ignore lint/a11y/useSemanticElements: native <dialog> is not used here; this is a hand-rolled overlay dialog
+            role='dialog'
+            aria-modal='true'
+            aria-labelledby='confirm-delete-title'
+          >
             <div className='flex items-center justify-between'>
-              <h2 className='text-[#221D1D] text-base font-abeezee'>
+              <h2
+                id='confirm-delete-title'
+                className='text-[#221D1D] text-base font-abeezee'
+              >
                 Confirm account deletion
               </h2>
               <button
                 type='button'
-                className='text-xl text-gray-400 hover:text-gray-600'
+                className='text-xl text-[#4A413F] hover:text-gray-600'
                 onClick={handleDeleteConfirmCancel}
                 aria-label='Close'
               >
@@ -826,11 +864,15 @@ const PersonalSettingsPage = () => {
             </div>
 
             <div className='flex flex-col gap-4 p-2'>
-              <p className='text-[#221D1D] text-sm font-abeezee mb-4'>
+              <label
+                htmlFor='confirm-delete-email'
+                className='text-[#221D1D] text-sm font-abeezee mb-4'
+              >
                 To finalize your account deletion request, kindly provide your
                 registered email address
-              </p>
+              </label>
               <input
+                id='confirm-delete-email'
                 type='email'
                 className='w-full border rounded-full p-3 text-base font-abeezee mb-4'
                 value={emailInput}

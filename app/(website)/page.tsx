@@ -330,7 +330,7 @@ export default function Home() {
                 <h2 className='font-qilka font-bold text-[#221D1D] md:text-[44px] text-[34px]'>
                   Stay in control always
                 </h2>
-                <p className='font-abeezee text-xl text-[#4A413F] text-center'>
+                <p className='font-abeezee text-xl text-[#4A413F]'>
                   Access to features that help your kids stay safe.
                 </p>
               </div>
@@ -339,10 +339,12 @@ export default function Home() {
                 {parentalFeatures.map((feature) => (
                   <div
                     key={`parental-${feature}`}
-                    className='flex items-center gap-3 w-full'
+                    className='flex items-start gap-3 w-full'
                   >
-                    <Icons.check />
-                    <p className='font-abeezee text-xl text-[#4A413F] text-center'>
+                    <span className='shrink-0'>
+                      <Icons.check />
+                    </span>
+                    <p className='font-abeezee text-xl text-[#4A413F] text-left'>
                       {feature}
                     </p>
                   </div>
@@ -353,7 +355,7 @@ export default function Home() {
             <Button
               variant='primary'
               type='submit'
-              className='px-[100px] h-auto py-2.5'
+              className='w-full sm:w-auto px-8 sm:px-[100px] h-auto py-2.5'
               href='/register'
             >
               Start listening

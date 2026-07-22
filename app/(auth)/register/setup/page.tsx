@@ -92,7 +92,9 @@ const Page = () => {
       const response = await addKidsService(data.kidsInfo);
 
       toast.success(response.message || 'Kids successfully added!');
-      router.push('/register/setup/success');
+      // Next: let the parent explicitly choose a story voice (changeable later
+      // in Settings), then finish onboarding.
+      router.push('/register/setup/voice');
       // biome-ignore lint/suspicious/noExplicitAny: <explanation>
     } catch (err: any) {
       toast.error(err.message || 'Something went wrong while adding kids');

@@ -162,6 +162,16 @@ const VoiceSetupPage = () => {
       >
         {saving ? 'Saving…' : 'Continue'}
       </Button>
+
+      {voices.length === 0 && (
+        <button
+          type='button'
+          onClick={() => router.push('/register/setup/success')}
+          className='block mx-auto text-sm font-abeezee text-[#4A413F] underline'
+        >
+          Skip for now
+        </button>
+      )}
     </div>
   );
 };

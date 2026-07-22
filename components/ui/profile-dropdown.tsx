@@ -19,7 +19,7 @@ const menuItems = [
   },
   {
     label: 'Library',
-    icon: '/profile.svg',
+    icon: '/library.svg',
     link: '/library',
   },
   {

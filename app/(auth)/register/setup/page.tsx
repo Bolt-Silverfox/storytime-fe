@@ -18,13 +18,7 @@ import {
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/context/auth-context';
-import {
-  addKidsService,
-  getAvailableVoicesService,
-  getPreferredVoiceService,
-  getVoiceAccessService,
-  setPreferredVoiceService,
-} from '@/lib/services';
+import { addKidsService } from '@/lib/services';
 import {
   cn,
   countryOptions,
@@ -91,42 +85,16 @@ const Page = () => {
     !errors.country &&
     !errors.kids;
 
-  // Pick a sensible default narration voice at the end of onboarding so the
-  // first story plays straight away without prompting for a voice. Premium
-  // users get a saved preferred voice (the account default, or the first
-  // available voice); non-premium accounts can't set one (the backend 403s and
-  // they fall back to the account default), so any failure is ignored.
-  async function ensureDefaultPreferredVoice() {
-    try {
-      const preferred = await getPreferredVoiceService();
-      if (preferred?.id) {
-        return;
-      }
-      const [access, voices] = await Promise.all([
-        getVoiceAccessService(),
-        getAvailableVoicesService(),
-      ]);
-      const targetId =
-        access.defaultVoice ?? access.lockedVoiceId ?? voices?.[0]?.id;
-      if (targetId) {
-        await setPreferredVoiceService(targetId);
-      }
-    } catch (err) {
-      // Non-premium (403) or transient errors are non-fatal — playback falls
-      // back to the account default voice.
-      console.error('Could not set a default voice during onboarding:', err);
-    }
-  }
-
   async function onSubmit(data: z.infer<typeof FormSchema>) {
     setIsLoading(true);
 
     try {
       const response = await addKidsService(data.kidsInfo);
-      await ensureDefaultPreferredVoice();
 
       toast.success(response.message || 'Kids successfully added!');
-      router.push('/register/setup/success');
+      // Next: let the parent explicitly choose a story voice (changeable later
+      // in Settings), then finish onboarding.
+      router.push('/register/setup/voice');
       // biome-ignore lint/suspicious/noExplicitAny: <explanation>
     } catch (err: any) {
       toast.error(err.message || 'Something went wrong while adding kids');

@@ -230,7 +230,7 @@ const PersonalSettingsPage = () => {
   return (
     <div
       className={cn(
-        'bg-white rounded-[2.5625rem] border-[0.5px] border-solid border-[#FAF4F2]  px-10 py-[2.125rem] max-w-[85vw] mx-auto my-12'
+        'bg-white rounded-[2.5625rem] border-[0.5px] border-solid border-[#FAF4F2]  px-4 sm:px-6 md:px-10 py-6 md:py-[2.125rem] w-full max-w-6xl mx-auto my-6 md:my-12'
       )}
     >
       <Header white={false} />
@@ -238,8 +238,8 @@ const PersonalSettingsPage = () => {
         <BackButton />
         <span className='font-abeezee text-sm text-[#4A413F]'>Back</span>
       </div>
-      <div className='flex items-center justify-between'>
-        <div className='flex items-center gap-8'>
+      <div className='flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:justify-between'>
+        <div className='flex items-center gap-4 sm:gap-8'>
           <Image
             src={user?.avatarUrl || avatar}
             alt='avatar'
@@ -253,13 +253,13 @@ const PersonalSettingsPage = () => {
         </div>
         <button
           type='button'
-          className='bg-[#EC4007] text-white px-[3.12rem] font-abeezee py-4 cursor-pointer hover:scale-105 transition-all duration-300 rounded-[3.125rem] font-semibold'
+          className='bg-[#EC4007] text-white px-8 sm:px-[3.12rem] font-abeezee py-4 cursor-pointer hover:scale-105 transition-all duration-300 rounded-[3.125rem] font-semibold whitespace-nowrap'
           onClick={() => setEditOpen(true)}
         >
           Edit profile
         </button>
       </div>
-      <div className='grid grid-cols-3 gap-y-16 gap-x-12 mt-8'>
+      <div className='grid grid-cols-2 md:grid-cols-3 gap-y-8 md:gap-y-16 gap-x-6 md:gap-x-12 mt-8'>
         <div>
           <p className='text-[#4A413F] text-xs not-italic font-normal leading-4 font-abeezee'>
             Title
@@ -313,7 +313,7 @@ const PersonalSettingsPage = () => {
         <h2 className='text-[#4A413F] text-base not-italic font-normal leading-5 font-abeezee mb-4 uppercase'>
           Kids Details
         </h2>
-        <div className='grid grid-cols-2 gap-y-8 gap-x-12'>
+        <div className='grid grid-cols-1 sm:grid-cols-2 gap-y-8 gap-x-6 md:gap-x-12'>
           {kids.map((kid) => (
             <KidsCard
               key={kid.id}
@@ -566,7 +566,7 @@ const PersonalSettingsPage = () => {
                 <p className='text-[#4A413F] text-xs font-abeezee px-8 mb-2'>
                   Select customized avatar to save time
                 </p>
-                <div className='grid grid-cols-2 gap-4 px-8'>
+                <div className='grid grid-cols-2 gap-4 px-4 sm:px-8'>
                   {avatarOptions.map((option) => (
                     <button
                       key={option.name}

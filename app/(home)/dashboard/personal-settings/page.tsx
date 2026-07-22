@@ -163,6 +163,14 @@ const PersonalSettingsPage = () => {
   };
 
   const handleUploadParentAvatar = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please choose an image file (PNG, JPEG, or JPG)');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be 5MB or smaller');
+      return;
+    }
     try {
       const updated = await uploadParentAvatarService(file);
       applyParentAvatar(updated?.avatarUrl ?? null);
@@ -647,6 +655,7 @@ const PersonalSettingsPage = () => {
                     <button
                       key={option.id}
                       type='button'
+                      aria-pressed={kidForm.avatarId === option.id}
                       className={`flex items-center gap-2.5 rounded-2xl border border-[#FAF4F2] bg-white p-6 shadow-[0_0_17px_0_#221D29]/5 w-full ${
                         kidForm.avatarId === option.id
                           ? 'border-[#FB9583] ring-2 ring-[#FB9583]/50'
@@ -671,13 +680,14 @@ const PersonalSettingsPage = () => {
                       <span className='text-[#221D1D] truncate font-abeezee'>
                         {option.displayName || option.name || 'Avatar'}
                       </span>
-                      <span className='ml-auto'>
-                        <input
-                          type='radio'
-                          checked={kidForm.avatarId === option.id}
-                          readOnly
-                        />
-                      </span>
+                      <span
+                        aria-hidden='true'
+                        className={`ml-auto h-4 w-4 shrink-0 rounded-full border-2 ${
+                          kidForm.avatarId === option.id
+                            ? 'border-[#FB9583] bg-[#FB9583]'
+                            : 'border-[#D9D9D9]'
+                        }`}
+                      />
                     </button>
                   ))}
                 </div>

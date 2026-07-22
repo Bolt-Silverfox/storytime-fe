@@ -323,9 +323,10 @@ export const uploadParentAvatarService = async (file: File) => {
   try {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await api.post('user/me/upload-avatar', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    // Let axios set Content-Type (incl. the multipart boundary) from the
+    // FormData — manually setting 'multipart/form-data' drops the boundary and
+    // the server can't parse the upload.
+    const response = await api.post('user/me/upload-avatar', formData);
     return response.data;
   } catch (error: unknown) {
     if (error instanceof AxiosError) {

@@ -7,6 +7,7 @@ import {
   FormControl,
   FormField,
   FormItem,
+  FormLabel,
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -92,8 +93,14 @@ const Page = () => {
             name='email'
             render={({ field }) => (
               <FormItem className='px-1'>
+                <FormLabel>Email address</FormLabel>
                 <FormControl>
-                  <Input placeholder='Enter your email address' {...field} />
+                  <Input
+                    type='email'
+                    placeholder='Enter your email address'
+                    aria-required='true'
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>

@@ -7,14 +7,15 @@ import {
   FormControl,
   FormField,
   FormItem,
+  FormLabel,
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { PasswordInputToggle } from '@/components/ui/password-input-toggle';
 import { useAuth } from '@/context/auth-context';
 import { registerService } from '@/lib/services';
 import { cn } from '@/lib/utils';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { EyeIcon, EyeOff } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -72,7 +73,6 @@ export const CredentialsStep = () => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [passwordType, setPasswordType] = useState(true);
-  const EyeComponent = passwordType ? EyeOff : EyeIcon;
 
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
@@ -132,8 +132,14 @@ export const CredentialsStep = () => {
             name='email'
             render={({ field }) => (
               <FormItem className='px-1'>
+                <FormLabel>Email address</FormLabel>
                 <FormControl>
-                  <Input placeholder='Enter your email address' {...field} />
+                  <Input
+                    type='email'
+                    placeholder='Enter your email address'
+                    aria-required='true'
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -145,20 +151,19 @@ export const CredentialsStep = () => {
             name='password'
             render={({ field }) => (
               <FormItem className='bg-background dark:bg-background z-[1] relative px-1'>
+                <FormLabel>Password</FormLabel>
                 <FormControl>
-                  <div className='relative group'>
+                  <div className='relative'>
                     <Input
                       type={passwordType ? 'password' : 'text'}
                       placeholder='Enter your password'
                       autoComplete='new-password'
+                      aria-required='true'
                       {...field}
                     />
-                    <EyeComponent
-                      className='absolute z-10 right-[15px] -translate-y-1/2 top-1/2 cursor-pointer hidden group-hover:block'
-                      size={20}
-                      onClick={() => {
-                        setPasswordType((prev) => !prev);
-                      }}
+                    <PasswordInputToggle
+                      visible={!passwordType}
+                      onToggle={() => setPasswordType((prev) => !prev)}
                     />
                   </div>
                 </FormControl>
@@ -179,10 +184,12 @@ export const CredentialsStep = () => {
             render={({ field }) => (
               <FormItem className='px-1'>
                 <FormControl>
-                  <div className='relative group'>
+                  <div className='relative'>
                     <Input
                       type={passwordType ? 'password' : 'text'}
                       placeholder='Confirm your password'
+                      aria-label='Confirm password'
+                      aria-required='true'
                       className={cn(
                         'transition-[translate] duration-500',
                         !(
@@ -193,12 +200,9 @@ export const CredentialsStep = () => {
                       )}
                       {...field}
                     />
-                    <EyeComponent
-                      className='absolute z-10 right-[15px] -translate-y-1/2 top-1/2 cursor-pointer hidden group-hover:block'
-                      size={20}
-                      onClick={() => {
-                        setPasswordType((prev) => !prev);
-                      }}
+                    <PasswordInputToggle
+                      visible={!passwordType}
+                      onToggle={() => setPasswordType((prev) => !prev)}
                     />
                   </div>
                 </FormControl>

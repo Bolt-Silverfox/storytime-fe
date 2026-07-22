@@ -43,19 +43,14 @@ const Header = ({ white = false }: { white?: boolean }) => {
             <Image src={heart} alt='heart' />
           </Link>
           <div className='relative'>
-            <div
+            <button
+              type='button'
+              aria-haspopup='menu'
+              aria-expanded={dropdownOpen}
               className='border-stone-100 bg-white shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] p-1.5 rounded-[2.25rem] border-[0.5px] border-solid flex items-center justify-between w-[11rem] cursor-pointer'
               onClick={() => {
                 if (!dropdownOpen) {
                   setDropdownOpen(true);
-                }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  if (!dropdownOpen) {
-                    setDropdownOpen(true);
-                  }
                 }
               }}
             >
@@ -82,7 +77,7 @@ const Header = ({ white = false }: { white?: boolean }) => {
                   dropdownOpen ? 'rotate-180' : ''
                 } transition-all duration-300`}
               />
-            </div>
+            </button>
             <ProfileDropdown
               open={dropdownOpen}
               onClose={() => setDropdownOpen(false)}

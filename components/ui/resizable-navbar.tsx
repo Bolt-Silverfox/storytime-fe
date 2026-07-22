@@ -7,6 +7,7 @@ import {
   useMotionValueEvent,
   useScroll,
 } from 'motion/react';
+import { usePathname } from 'next/navigation';
 
 import React, { useRef, useState } from 'react';
 
@@ -114,12 +115,14 @@ export const NavBody = ({ children, className, visible }: NavBodyProps) => {
 
 export const NavItems = ({ items, className, onItemClick }: NavItemsProps) => {
   const [hovered, setHovered] = useState<number | null>(null);
+  const pathname = usePathname();
 
   return (
-    <motion.div
+    <motion.nav
+      aria-label='Main'
       onMouseLeave={() => setHovered(null)}
       className={cn(
-        'absolute inset-0 hidden flex-1 flex-row items-center justify-center space-x-2 text-sm font-medium text-zinc-600 transition duration-200 hover:text-zinc-800 lg:flex lg:space-x-2',
+        'hidden min-w-0 flex-1 flex-row items-center justify-center space-x-2 px-4 text-sm font-medium text-zinc-600 transition duration-200 hover:text-zinc-800 lg:flex lg:space-x-2',
         className
       )}
     >
@@ -130,6 +133,7 @@ export const NavItems = ({ items, className, onItemClick }: NavItemsProps) => {
           className='relative px-4 py-2 text-neutral-600 dark:text-neutral-300'
           key={item.link}
           href={item.link}
+          aria-current={pathname === item.link ? 'page' : undefined}
         >
           {hovered === idx && (
             <motion.div
@@ -140,7 +144,7 @@ export const NavItems = ({ items, className, onItemClick }: NavItemsProps) => {
           <span className='relative z-20'>{item.name}</span>
         </a>
       ))}
-    </motion.div>
+    </motion.nav>
   );
 };
 
@@ -221,10 +225,20 @@ export const MobileNavToggle = ({
   isOpen: boolean;
   onClick: () => void;
 }) => {
-  return isOpen ? (
-    <IconX className='text-black dark:text-white' onClick={onClick} />
-  ) : (
-    <IconMenu2 className='text-black dark:text-white' onClick={onClick} />
+  return (
+    <button
+      type='button'
+      onClick={onClick}
+      aria-label='Toggle menu'
+      aria-expanded={isOpen}
+      className='flex items-center justify-center'
+    >
+      {isOpen ? (
+        <IconX className='text-black dark:text-white' aria-hidden='true' />
+      ) : (
+        <IconMenu2 className='text-black dark:text-white' aria-hidden='true' />
+      )}
+    </button>
   );
 };
 

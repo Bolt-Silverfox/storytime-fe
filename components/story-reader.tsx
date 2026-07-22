@@ -13,6 +13,7 @@ import {
 import edit from '@/public/edit.svg';
 import movementSmall from '@/public/movement-small.png';
 import movement from '@/public/movement.png';
+import pause from '@/public/pause.svg';
 import play from '@/public/play.svg';
 import { useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
@@ -579,7 +580,7 @@ const StoryReader = ({
   if (loading) {
     return (
       <div className='flex items-center justify-center h-64'>
-        <div className='text-[#4A413F]'>Loading story...</div>
+        <output className='text-[#4A413F]'>Loading story...</output>
       </div>
     );
   }
@@ -655,19 +656,21 @@ const StoryReader = ({
           <div className='flex flex-col items-center'>
             <Image
               src={movement}
-              alt='movement'
+              alt=''
               className='h-[9rem] max-w-full rounded-[3xl] mb-4 object-cover'
             />
             <div className='bg-white flex justify-center items-center gap-3 shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] px-6 py-2.5 rounded-[3.125rem] border-[0.5px] border-solid border-[#FAF4F2]'>
               <h5 className='text-[#221D1D] text-right text-xl not-italic font-bold leading-6'>
                 {voice}
               </h5>
-              <Image
-                src={edit}
-                alt='edit'
-                className='cursor-pointer'
+              <button
+                type='button'
+                aria-label='Change voice'
                 onClick={() => setStep(1)}
-              />
+                className='cursor-pointer rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EC4007] focus-visible:ring-offset-2'
+              >
+                <Image src={edit} alt='' />
+              </button>
             </div>
             <small className='text-[#4A413F] text-base not-italic font-normal leading-5 font-abeezee mt-2'>
               {audioLoading || audioGenerating
@@ -678,7 +681,7 @@ const StoryReader = ({
         ) : (
           <div className='flex flex-wrap items-center gap-4 justify-between w-full'>
             <div className='flex items-center gap-4'>
-              <Image src={movementSmall} alt='movement' className='' />
+              <Image src={movementSmall} alt='' className='' />
               <small className='text-[#4A413F] text-base not-italic font-normal leading-5 font-abeezee mt-2'>
                 {audioLoading || audioGenerating
                   ? 'Preparing audio…'
@@ -689,12 +692,14 @@ const StoryReader = ({
               <h5 className='text-[#221D1D] text-right text-xl not-italic font-bold leading-6'>
                 {voice}
               </h5>
-              <Image
-                src={edit}
-                alt='edit'
-                className='cursor-pointer'
+              <button
+                type='button'
+                aria-label='Change voice'
                 onClick={() => setStep(1)}
-              />
+                className='cursor-pointer rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EC4007] focus-visible:ring-offset-2'
+              >
+                <Image src={edit} alt='' />
+              </button>
             </div>
           </div>
         )}
@@ -859,20 +864,18 @@ const StoryReader = ({
           type='button'
           onClick={handlePlayPause}
           disabled={!audioUrl || audioLoading}
-          className={`mt-12 ${
+          aria-label={isPlaying ? 'Pause' : 'Play'}
+          aria-pressed={isPlaying}
+          className={`mt-12 rounded-full transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EC4007] focus-visible:ring-offset-2 ${
             !audioUrl || audioLoading
               ? 'opacity-50 cursor-not-allowed'
               : 'cursor-pointer'
           }`}
         >
-          <Image
-            src={play}
-            alt={isPlaying ? 'pause' : 'play'}
-            className={isPlaying ? 'animate-pulse' : ''}
-          />
+          <Image src={isPlaying ? pause : play} alt='' />
         </button>
         {audioError && (
-          <div className='mt-2 flex flex-col items-center gap-2'>
+          <div className='mt-2 flex flex-col items-center gap-2' role='alert'>
             <p className='text-red-500 text-sm text-center'>{audioError}</p>
             <button
               type='button'

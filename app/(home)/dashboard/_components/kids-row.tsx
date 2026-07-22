@@ -46,7 +46,7 @@ const KidsRow = () => {
         <h2 className='text-[#4A413F] text-base not-italic font-normal leading-5 font-abeezee mb-4'>
           Your Kids
         </h2>
-        <div className='grid grid-cols-4 gap-4'>
+        <div className='grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4'>
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className='animate-pulse'>
               <div className='border-stone-100 bg-gray-200 px-4 py-3 rounded-3xl border-[0.5px] border-solid flex items-center gap-3 h-20' />
@@ -62,7 +62,7 @@ const KidsRow = () => {
       <h2 className='text-[#4A413F] text-base not-italic font-normal leading-5 font-abeezee mb-4'>
         Your Kids
       </h2>
-      <div className='grid grid-cols-4 gap-4'>
+      <div className='grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4'>
         {kids.map((kid, index) => (
           <m.div
             key={kid.id}

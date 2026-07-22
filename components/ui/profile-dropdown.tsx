@@ -19,7 +19,7 @@ const menuItems = [
   },
   {
     label: 'Library',
-    icon: '/profile.svg',
+    icon: '/library.svg',
     link: '/library',
   },
   {
@@ -37,7 +37,6 @@ const menuItems = [
     icon: '/ai-voice.svg',
     link: '/dashboard/ai-voice',
   },
-  { label: 'Logout', icon: '/logout.svg', link: '/dashboard/logout' },
 ];
 
 export default function ProfileDropdown({
@@ -45,6 +44,7 @@ export default function ProfileDropdown({
   onClose,
 }: ProfileDropdownProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const previouslyFocused = useRef<HTMLElement | null>(null);
 
   // Close on click outside
   useEffect(() => {
@@ -58,6 +58,35 @@ export default function ProfileDropdown({
     }
     return () => document.removeEventListener('mousedown', handleClick);
   }, [open, onClose]);
+
+  // Close on Escape.
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [open, onClose]);
+
+  // Move focus to the first menu item on open, restore to the trigger on close.
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    previouslyFocused.current = document.activeElement as HTMLElement | null;
+    const id = window.setTimeout(() => {
+      ref.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+    }, 0);
+    return () => {
+      window.clearTimeout(id);
+      previouslyFocused.current?.focus?.();
+    };
+  }, [open]);
 
   const handleLogout = () => {
     // Clear the auth cookies too (accessToken/refreshToken) — otherwise the
@@ -80,33 +109,33 @@ export default function ProfileDropdown({
           transition={{ duration: 0.2 }}
           className='absolute right-0 mt-2 w-72 border-stone-100 bg-white shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] rounded-[1.6875rem] border-[0.5px] border-solid z-50'
           onClick={(e) => e.stopPropagation()}
+          role='menu'
+          aria-label='Profile menu'
         >
-          {menuItems.map((item) =>
-            item.label === 'Logout' ? (
-              <button
-                key={item.label}
-                className='flex items-center gap-3 py-6 px-4 hover:bg-gray-50  rounded-[1.6875rem] cursor-pointer transition-colors border-b-[0.5px] border-solid border-stone-100 w-full text-left'
-                onClick={handleLogout}
-                type='button'
-              >
-                <Image src={item.icon} alt='' width={24} height={24} />
-                <span className='text-[#4A413F] not-italic leading-6 font-abeezee text-base'>
-                  {item.label}
-                </span>
-              </button>
-            ) : (
-              <Link
-                key={item.label}
-                className='flex items-center gap-3 py-6 px-4 hover:bg-gray-50  rounded-[1.6875rem] cursor-pointer transition-colors border-b-[0.5px] border-solid border-stone-100'
-                href={item.link}
-              >
-                <Image src={item.icon} alt='' width={24} height={24} />
-                <span className='text-[#4A413F] not-italic leading-6 font-abeezee text-base'>
-                  {item.label}
-                </span>
-              </Link>
-            )
-          )}
+          {menuItems.map((item) => (
+            <Link
+              key={item.label}
+              role='menuitem'
+              className='flex items-center gap-3 py-6 px-4 hover:bg-gray-50  rounded-[1.6875rem] cursor-pointer transition-colors border-b-[0.5px] border-solid border-stone-100'
+              href={item.link}
+            >
+              <Image src={item.icon} alt='' width={24} height={24} />
+              <span className='text-[#4A413F] not-italic leading-6 font-abeezee text-base'>
+                {item.label}
+              </span>
+            </Link>
+          ))}
+          <button
+            role='menuitem'
+            className='flex items-center gap-3 py-6 px-4 hover:bg-gray-50  rounded-[1.6875rem] cursor-pointer transition-colors border-b-[0.5px] border-solid border-stone-100 w-full text-left'
+            onClick={handleLogout}
+            type='button'
+          >
+            <Image src='/logout.svg' alt='' width={24} height={24} />
+            <span className='text-[#4A413F] not-italic leading-6 font-abeezee text-base'>
+              Logout
+            </span>
+          </button>
         </motion.div>
       )}
     </AnimatePresence>

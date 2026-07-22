@@ -1,5 +1,4 @@
 import { footerLinks } from '@/lib/data';
-import Image from 'next/image';
 import Link from 'next/link';
 import { Logo } from './logo';
 
@@ -38,12 +37,6 @@ export const Footer = () => {
           </Link>
         ))}
       </div>
-      <Image
-        src='/bolt.svg'
-        height={103}
-        width={103}
-        alt='Digital storybook illustration'
-      />
     </footer>
   );
 };

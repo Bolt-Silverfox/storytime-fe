@@ -11,6 +11,7 @@ import {
 import { isUserLoggedIn } from '@/lib/services';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Logo } from './logo';
 import { buttonVariants } from './ui/button';
@@ -21,6 +22,7 @@ export function AppNavbar() {
   // Login/Get started. Read after mount to avoid an SSR/client hydration
   // mismatch (both render logged-out first, then this updates).
   const [loggedIn, setLoggedIn] = useState(false);
+  const pathname = usePathname();
   useEffect(() => {
     setLoggedIn(isUserLoggedIn());
   }, []);
@@ -102,16 +104,19 @@ export function AppNavbar() {
             isOpen={isMobileMenuOpen}
             onClose={() => setIsMobileMenuOpen(false)}
           >
-            {navItems.map((item) => (
-              <a
-                key={`mobile-link-${item.name}`}
-                href={item.link}
-                onClick={() => setIsMobileMenuOpen(false)}
-                className='relative text-neutral-600 dark:text-neutral-300'
-              >
-                <span className='block'>{item.name}</span>
-              </a>
-            ))}
+            <nav aria-label='Mobile' className='flex w-full flex-col gap-4'>
+              {navItems.map((item) => (
+                <a
+                  key={`mobile-link-${item.name}`}
+                  href={item.link}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className='relative text-neutral-600 dark:text-neutral-300'
+                  aria-current={pathname === item.link ? 'page' : undefined}
+                >
+                  <span className='block'>{item.name}</span>
+                </a>
+              ))}
+            </nav>
             <div className='flex w-full flex-col gap-4'>
               {loggedIn ? (
                 <Link

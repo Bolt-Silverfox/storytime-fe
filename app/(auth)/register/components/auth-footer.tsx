@@ -2,7 +2,7 @@ import Link from 'next/link';
 
 export const AuthFooter = () => {
   return (
-    <footer className='max-w-[437px] absolute -translate-x-1/2 left-1/2 bottom-10 text-center mx-auto text-xs font-abeezee '>
+    <footer className='max-w-[437px] mx-auto pt-4 text-center text-xs font-abeezee'>
       By accepting to continue, you agree to storytime's{' '}
       <Link
         href='/terms-and-conditions'

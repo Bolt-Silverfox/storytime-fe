@@ -7,13 +7,14 @@ import {
   FormControl,
   FormField,
   FormItem,
+  FormLabel,
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { PasswordInputToggle } from '@/components/ui/password-input-toggle';
 import { resetPasswordService } from '@/lib/services';
 import { cn } from '@/lib/utils';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { EyeIcon, EyeOff } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -45,7 +46,7 @@ const FormSchema = z
         'Password must contain at least one number'
       )
       .refine(
-        (value) => /[!$%&*?@]/.test(value),
+        (value) => /[^A-Za-z0-9\s]/.test(value),
         'Password must contain at least one special character'
       ),
     confirm_password: z.string({ required_error: 'Please confirm password' }),
@@ -62,8 +63,6 @@ export const CreateNewPasswordContent = () => {
   const email = searchParams.get('email');
   const [passwordType, setPasswordType] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
-
-  const EyeComponent = passwordType ? EyeOff : EyeIcon;
 
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
@@ -127,19 +126,18 @@ export const CreateNewPasswordContent = () => {
               name='password'
               render={({ field }) => (
                 <FormItem>
+                  <FormLabel>New password</FormLabel>
                   <FormControl>
-                    <div className='relative group'>
+                    <div className='relative'>
                       <Input
                         type={passwordType ? 'password' : 'text'}
                         placeholder='Enter your password'
+                        aria-required='true'
                         {...field}
                       />
-                      <EyeComponent
-                        className='absolute z-10 right-[15px] -translate-y-1/2 top-1/2 cursor-pointer hidden group-hover:block'
-                        size={20}
-                        onClick={() => {
-                          setPasswordType((prev) => !prev);
-                        }}
+                      <PasswordInputToggle
+                        visible={!passwordType}
+                        onToggle={() => setPasswordType((prev) => !prev)}
                       />
                     </div>
                   </FormControl>
@@ -152,19 +150,18 @@ export const CreateNewPasswordContent = () => {
               name='confirm_password'
               render={({ field }) => (
                 <FormItem>
+                  <FormLabel>Confirm new password</FormLabel>
                   <FormControl>
-                    <div className='relative group'>
+                    <div className='relative'>
                       <Input
                         type={passwordType ? 'password' : 'text'}
                         placeholder='Enter your password'
+                        aria-required='true'
                         {...field}
                       />
-                      <EyeComponent
-                        className='absolute z-10 right-[15px] -translate-y-1/2 top-1/2 cursor-pointer hidden group-hover:block'
-                        size={20}
-                        onClick={() => {
-                          setPasswordType((prev) => !prev);
-                        }}
+                      <PasswordInputToggle
+                        visible={!passwordType}
+                        onToggle={() => setPasswordType((prev) => !prev)}
                       />
                     </div>
                   </FormControl>

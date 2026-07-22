@@ -293,6 +293,86 @@ export const getSystemAvatarsService = async (): Promise<SystemAvatar[]> => {
   }
 };
 
+// Set the parent's avatar to a system avatar (POST /user/me/avatar).
+export const updateParentAvatarService = async (avatarId: string) => {
+  try {
+    const response = await api.post('user/me/avatar', { avatarId });
+    return response.data;
+  } catch (error: unknown) {
+    if (error instanceof AxiosError) {
+      if (error.response) {
+        throw {
+          message: error.response.data?.message || 'Failed to update avatar',
+          status: error.response.status,
+          data: error.response.data,
+        };
+      }
+      if (error.request) {
+        throw { message: 'No response from server', status: null };
+      }
+    }
+    throw {
+      message: error instanceof Error ? error.message : 'Unexpected error',
+      status: null,
+    };
+  }
+};
+
+// Upload a custom parent avatar (POST /user/me/upload-avatar, multipart `file`).
+export const uploadParentAvatarService = async (file: File) => {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    // Let axios set Content-Type (incl. the multipart boundary) from the
+    // FormData — manually setting 'multipart/form-data' drops the boundary and
+    // the server can't parse the upload.
+    const response = await api.post('user/me/upload-avatar', formData);
+    return response.data;
+  } catch (error: unknown) {
+    if (error instanceof AxiosError) {
+      if (error.response) {
+        throw {
+          message: error.response.data?.message || 'Failed to upload avatar',
+          status: error.response.status,
+          data: error.response.data,
+        };
+      }
+      if (error.request) {
+        throw { message: 'No response from server', status: null };
+      }
+    }
+    throw {
+      message: error instanceof Error ? error.message : 'Unexpected error',
+      status: null,
+    };
+  }
+};
+
+// Delete the signed-in user's account (DELETE /user/me, soft delete by default).
+export const deleteAccountService = async () => {
+  try {
+    const response = await api.delete('user/me');
+    return response.data;
+  } catch (error: unknown) {
+    if (error instanceof AxiosError) {
+      if (error.response) {
+        throw {
+          message: error.response.data?.message || 'Failed to delete account',
+          status: error.response.status,
+          data: error.response.data,
+        };
+      }
+      if (error.request) {
+        throw { message: 'No response from server', status: null };
+      }
+    }
+    throw {
+      message: error instanceof Error ? error.message : 'Unexpected error',
+      status: null,
+    };
+  }
+};
+
 export const addKidsService = async (kids: KidsPayload[]) => {
   try {
     // CreateKidDto only whitelists name/ageRange/avatarId (forbidNonWhitelisted

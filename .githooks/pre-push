@@ -1,0 +1,24 @@
+#!/bin/sh
+# Local CodeRabbit review before pushing (advisory by default).
+#
+# Requires the CodeRabbit CLI:  https://cli.coderabbit.ai
+#   curl -fsSL https://cli.coderabbit.ai/install.sh | sh && coderabbit auth login
+#
+# Skip once:      git push --no-verify
+# Make blocking:  CODERABBIT_BLOCK=1 git push
+
+if ! command -v coderabbit >/dev/null 2>&1; then
+  printf "\033[33m[pre-push] CodeRabbit CLI not installed - skipping local review.\033[0m\n"
+  printf "           Install: curl -fsSL https://cli.coderabbit.ai/install.sh | sh && coderabbit auth login\n"
+  exit 0
+fi
+
+printf "\033[36m[pre-push] Running CodeRabbit review on your changes...\033[0m\n"
+coderabbit review --plain
+status=$?
+
+if [ "$status" -ne 0 ] && [ "${CODERABBIT_BLOCK:-0}" = "1" ]; then
+  printf "\033[31m[pre-push] CodeRabbit found issues and CODERABBIT_BLOCK=1 - push aborted. Use --no-verify to override.\033[0m\n"
+  exit 1
+fi
+exit 0

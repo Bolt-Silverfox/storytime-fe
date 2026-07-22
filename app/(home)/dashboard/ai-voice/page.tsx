@@ -147,7 +147,8 @@ const AiVoicePage = () => {
           AI voice
         </h2>
         <p className='mb-6 text-[#4A413F] text-sm not-italic font-normal leading-5 font-abeezee'>
-          Choose the voice that reads stories aloud.
+          This is the default voice used for all your stories. Change it here
+          any time — every new story reads with your latest choice.
         </p>
 
         {!loggedIn ? (

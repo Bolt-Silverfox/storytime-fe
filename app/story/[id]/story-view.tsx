@@ -10,6 +10,7 @@ import {
   addFavoriteService,
   getPreferredVoiceService,
   getStoryByIdService,
+  getVoiceAccessService,
   isUserLoggedIn,
   listFavoritesService,
   removeFavoriteService,
@@ -106,25 +107,46 @@ export default function StoryView({ storyId }: { storyId: string }) {
         return;
       }
 
-      const [detail, preferred] = await Promise.all([
+      const [detail, preferred, access] = await Promise.all([
         getStoryByIdService(storyId),
         getPreferredVoiceService(),
+        getVoiceAccessService(),
       ]);
       setStoryDetail(detail);
 
       const hasQuestions =
         Array.isArray(detail?.questions) && detail.questions.length > 0;
-      setShowInteractive(!!detail?.isInteractive && hasQuestions);
+      const interactive = !!detail?.isInteractive && hasQuestions;
+      setShowInteractive(interactive);
+
+      // A preferred voice was explicitly chosen (onboarding or Settings). When
+      // there's none, the account may still have a locked/default voice —
+      // StoryReader falls back to it when voiceId is null. Either way the voice
+      // is settled and we skip the per-story voice picker (removing the
+      // repetitive "pick a voice every time" friction). Only when there's
+      // genuinely no voice anywhere do we prompt.
+      const hasAccountDefault = !!(access.lockedVoiceId ?? access.defaultVoice);
 
       if (preferred?.id) {
         setSelectedVoice({
           id: preferred.id,
           name: preferred.name,
         });
-        setStep(2);
       } else {
         setSelectedVoice(null);
+      }
+
+      if (!(preferred?.id || hasAccountDefault)) {
+        // Edge case: no preferred voice and no account default. Let the user
+        // pick one before reading.
         setStep(1);
+      } else if (interactive) {
+        // Voice is settled; the only remaining choice is plain vs interactive.
+        setStep(2);
+      } else {
+        // Non-interactive story with a known voice: go straight to listening.
+        setSelectedMode('plain');
+        setStep(3);
       }
       setModalOpen(true);
     } catch (err) {

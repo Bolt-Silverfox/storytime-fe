@@ -1,0 +1,165 @@
+'use client';
+
+import { OAuthButtons } from '@/components/auth/oauth-buttons';
+import { Button } from '@/components/ui/button';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useAuth } from '@/context/auth-context';
+import { registrationTitles } from '@/lib/data';
+import { cn } from '@/lib/utils';
+import { zodResolver } from '@hookform/resolvers/zod';
+import Link from 'next/link';
+import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
+import { z } from 'zod';
+
+const FormSchema = z.object({
+  title: z
+    .string({ required_error: 'Your title is required.' })
+    .refine((val) => registrationTitles.includes(val), {
+      message: 'Please select a valid title.',
+    }),
+  name: z
+    .string({ required_error: 'Your full name is required.' })
+    .min(3, 'Your name is too short.')
+    .regex(
+      /^[A-Za-z\s'-]+$/,
+      'Name can only contain letters, spaces, apostrophes and hyphens.'
+    )
+    .refine((val) => val.trim().split(/\s+/).length >= 2, {
+      message: 'Please enter your full name (first and last).',
+    }),
+});
+
+export const DetailsStep = () => {
+  const {
+    registrationData,
+    setRegistrationData,
+    handleRegistrationStepForward,
+  } = useAuth();
+
+  const form = useForm<z.infer<typeof FormSchema>>({
+    resolver: zodResolver(FormSchema),
+    mode: 'onChange',
+    defaultValues: {
+      title: registrationData?.title || '',
+      name: registrationData?.name || '',
+    },
+  });
+
+  function onSubmit(data: z.infer<typeof FormSchema>) {
+    setRegistrationData({
+      ...registrationData,
+      title: data.title,
+      name: data.name,
+    });
+    toast('You submitted the following values', {
+      description: (
+        <pre className='mt-2 w-[320px] rounded-md bg-neutral-950 p-4'>
+          <code className='text-white'>{JSON.stringify(data, null, 2)}</code>
+        </pre>
+      ),
+    });
+
+    handleRegistrationStepForward('credentials');
+  }
+
+  return (
+    <Form {...form}>
+      <form
+        onSubmit={form.handleSubmit(onSubmit)}
+        className='max-w-[539px] mx-auto space-y-10'
+      >
+        <div className='space-y-6'>
+          <h1 className='text-center font-qilka font-bold text-[26px] text-[#221D1D] dark:text-white'>
+            Provide your details
+          </h1>
+
+          <FormField
+            control={form.control}
+            name='title'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Title</FormLabel>
+                <Select
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
+                >
+                  <FormControl>
+                    <SelectTrigger className='w-full' aria-required='true'>
+                      <SelectValue placeholder='Select title' />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {registrationTitles.map((title) => (
+                      <SelectItem key={title} value={title}>
+                        {title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage
+                  className={cn(
+                    'text-[#4A413F] ',
+                    form.formState.errors.title && 'text-destructive'
+                  )}
+                >
+                  Example Mr, Ms, Mrs, Sir or Dr
+                </FormMessage>
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='name'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Full name</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder='Enter your full name'
+                    aria-required='true'
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+        <Button
+          variant='primary'
+          type='submit'
+          disabled={!form.formState.isValid}
+          className='w-full py-[15px] h-auto'
+        >
+          Proceed
+        </Button>
+
+        <OAuthButtons mode='register' />
+
+        <p className='font-abeezee text-[#221D1D] dark:text-white text-center space-x-3'>
+          If you already have an account{' '}
+          <Link href='/login' className='text-[#0731EC] hover:underline'>
+            Login
+          </Link>
+        </p>
+      </form>
+    </Form>
+  );
+};

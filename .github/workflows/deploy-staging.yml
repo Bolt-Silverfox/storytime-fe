@@ -1,0 +1,122 @@
+name: CI/CD - Staging
+
+on:
+  push:
+    branches:
+      - staging
+  pull_request:
+    branches:
+      - staging
+
+env:
+  NODE_VERSION: '24'
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+  deploy:
+    name: Deploy to Staging Server
+    runs-on: ubuntu-latest
+    needs: [lint, build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
+    environment: staging
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # NEXT_PUBLIC_API_URL is inlined at build time — the staging ENV_FILE
+      # secret sets NEXT_PUBLIC_API_URL=https://staging.api.storytimeapp.me
+      - name: Create .env file
+        run: echo "${{ secrets.ENV_FILE }}" > .env
+
+      # Public OAuth client config, per GitHub Environment. These are public
+      # client identifiers (inlined into the browser bundle), so they're stored
+      # as environment *variables*, not secrets. Empty values are harmless — the
+      # Apple button stays hidden until its Services ID/redirect are set.
+      - name: Append public OAuth client config
+        run: |
+          {
+            echo "NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID=${{ vars.NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID }}"
+            echo "NEXT_PUBLIC_APPLE_SERVICE_ID=${{ vars.NEXT_PUBLIC_APPLE_SERVICE_ID }}"
+            echo "NEXT_PUBLIC_APPLE_REDIRECT_URI=${{ vars.NEXT_PUBLIC_APPLE_REDIRECT_URI }}"
+          } >> .env
+
+      - name: Build application
+        run: pnpm build
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Ensure deploy path exists
+        run: |
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "mkdir -p ${{ secrets.DEPLOY_PATH }}"
+
+      - name: Prepare deployment bundle
+        run: |
+          mkdir -p deploy_bundle/.next
+          cp -r .next/standalone/. deploy_bundle/
+          cp -r .next/static deploy_bundle/.next/
+          cp -r public deploy_bundle/
+          cp ecosystem.config.js .env deploy_bundle/
+
+      - name: Deploy with rsync
+        run: |
+          rsync -avz --delete-after \
+            deploy_bundle/ \
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.DEPLOY_PATH }}/
+
+      - name: Restart application with PM2
+        run: |
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+            cd ${{ secrets.DEPLOY_PATH }}
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+            nvm use 24
+            npx pm2 startOrReload ecosystem.config.js --only storytime-fe-staging --update-env
+            npx pm2 save
+          EOF
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_rsa

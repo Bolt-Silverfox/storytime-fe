@@ -233,7 +233,7 @@ const StoryHome = () => {
                   className='absolute inset-0 h-full w-full object-cover transition group-hover:scale-105'
                 />
                 <div className='absolute inset-0 bg-gradient-to-t from-black/60 to-transparent' />
-                <h3 className='relative z-10 p-4 text-white text-lg not-italic font-bold leading-6 font-qilka'>
+                <h3 className='relative z-10 p-3 md:p-4 w-full text-white text-sm sm:text-base lg:text-lg not-italic font-bold leading-tight md:leading-6 font-qilka break-words hyphens-auto'>
                   {category.name}
                 </h3>
               </Link>

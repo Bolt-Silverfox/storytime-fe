@@ -189,6 +189,15 @@ const Page = () => {
               Register
             </Link>
           </p>
+          <p className='font-abeezee text-[#221D1D] dark:text-white text-center'>
+            Need to verify your email?{' '}
+            <Link
+              href='/verify-email'
+              className='text-[#0731EC] hover:underline'
+            >
+              Verify here
+            </Link>
+          </p>
         </form>
       </Form>
     </div>

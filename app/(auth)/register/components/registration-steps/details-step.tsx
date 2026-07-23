@@ -1,5 +1,6 @@
 'use client';
 
+import { OAuthButtons } from '@/components/auth/oauth-buttons';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -149,6 +150,9 @@ export const DetailsStep = () => {
         >
           Proceed
         </Button>
+
+        <OAuthButtons mode='register' />
+
         <p className='font-abeezee text-[#221D1D] dark:text-white text-center space-x-3'>
           If you already have an account{' '}
           <Link href='/login' className='text-[#0731EC] hover:underline'>

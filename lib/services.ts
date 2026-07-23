@@ -122,6 +122,67 @@ export const loginService = async (payload: LoginPayload) => {
   }
 };
 
+// Shared error-normaliser for the OAuth token exchanges below. Mirrors the
+// login/register catch blocks but preserves the backend `error` code (e.g.
+// ACCOUNT_EXISTS_LINK_REQUIRED) and any `existingProviders` array so the UI can
+// tell the user to sign in with their password instead.
+const normaliseAuthError = (error: unknown, fallback: string) => {
+  if (error instanceof AxiosError) {
+    if (error.response) {
+      const data = error.response.data;
+      return {
+        message: data?.message || fallback,
+        status: error.response.status,
+        code: data?.error as string | undefined,
+        data,
+      };
+    }
+    if (error.request) {
+      return { message: 'No response from server', status: null };
+    }
+  }
+  return {
+    message: error instanceof Error ? error.message : 'Unexpected error',
+    status: null,
+  };
+};
+
+// Exchange a Google ID token (the `credential` from Google Identity Services)
+// for our own session. Backend verifies the token's audience against the web
+// client id, upserts the user, and returns the same { jwt, refreshToken, user }
+// as email/password login.
+export const googleLoginService = async (idToken: string) => {
+  try {
+    const response = await api.post('auth/google', { id_token: idToken });
+    const { jwt, refreshToken, user } = response.data;
+    setTokens(jwt, refreshToken, user);
+    return response.data;
+  } catch (error: unknown) {
+    throw normaliseAuthError(error, 'Google sign-in failed');
+  }
+};
+
+// Exchange an Apple identity token for our own session. firstName/lastName are
+// only supplied by Apple on the very first authorization, so they're optional.
+export const appleLoginService = async (payload: {
+  idToken: string;
+  firstName?: string;
+  lastName?: string;
+}) => {
+  try {
+    const response = await api.post('auth/apple', {
+      id_token: payload.idToken,
+      ...(payload.firstName ? { firstName: payload.firstName } : {}),
+      ...(payload.lastName ? { lastName: payload.lastName } : {}),
+    });
+    const { jwt, refreshToken, user } = response.data;
+    setTokens(jwt, refreshToken, user);
+    return response.data;
+  } catch (error: unknown) {
+    throw normaliseAuthError(error, 'Apple sign-in failed');
+  }
+};
+
 export const verifyEmailService = async (token: string) => {
   try {
     const response = await api.post('auth/verify-email', { token });

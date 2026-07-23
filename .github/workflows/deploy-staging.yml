@@ -66,6 +66,18 @@ jobs:
       - name: Create .env file
         run: echo "${{ secrets.ENV_FILE }}" > .env
 
+      # Public OAuth client config, per GitHub Environment. These are public
+      # client identifiers (inlined into the browser bundle), so they're stored
+      # as environment *variables*, not secrets. Empty values are harmless — the
+      # Apple button stays hidden until its Services ID/redirect are set.
+      - name: Append public OAuth client config
+        run: |
+          {
+            echo "NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID=${{ vars.NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID }}"
+            echo "NEXT_PUBLIC_APPLE_SERVICE_ID=${{ vars.NEXT_PUBLIC_APPLE_SERVICE_ID }}"
+            echo "NEXT_PUBLIC_APPLE_REDIRECT_URI=${{ vars.NEXT_PUBLIC_APPLE_REDIRECT_URI }}"
+          } >> .env
+
       - name: Build application
         run: pnpm build
 

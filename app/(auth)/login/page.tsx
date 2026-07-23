@@ -1,5 +1,6 @@
 'use client';
 
+import { OAuthButtons } from '@/components/auth/oauth-buttons';
 import { PageLoader } from '@/components/page-loader';
 import { Button } from '@/components/ui/button';
 import {
@@ -183,10 +184,26 @@ const Page = () => {
           >
             Login
           </Button>
+
+          <OAuthButtons mode='login' />
+
           <p className='font-abeezee text-[#221D1D] dark:text-white text-center space-x-3'>
             Don't have an account?{' '}
             <Link href='/register' className='text-[#0731EC] hover:underline'>
               Register
+            </Link>
+          </p>
+          <p className='font-abeezee text-[#221D1D] dark:text-white text-center'>
+            Need to verify your email?{' '}
+            <Link
+              href={
+                form.watch('email')
+                  ? `/verify-email?email=${encodeURIComponent(form.watch('email'))}`
+                  : '/verify-email'
+              }
+              className='text-[#0731EC] hover:underline'
+            >
+              Verify here
             </Link>
           </p>
         </form>

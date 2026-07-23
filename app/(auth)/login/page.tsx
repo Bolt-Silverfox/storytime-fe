@@ -192,7 +192,11 @@ const Page = () => {
           <p className='font-abeezee text-[#221D1D] dark:text-white text-center'>
             Need to verify your email?{' '}
             <Link
-              href='/verify-email'
+              href={
+                form.watch('email')
+                  ? `/verify-email?email=${encodeURIComponent(form.watch('email'))}`
+                  : '/verify-email'
+              }
               className='text-[#0731EC] hover:underline'
             >
               Verify here

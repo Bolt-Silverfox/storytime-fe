@@ -20,6 +20,7 @@ import {
   verifyEmailService,
 } from '@/lib/services';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { REGEXP_ONLY_DIGITS } from 'input-otp';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -88,8 +89,10 @@ const VerifyEmailPage = () => {
 
   const onSendSubmit = form.handleSubmit((data) => sendCode(data.email));
 
+  const isValidOtp = /^\d{6}$/.test(otp);
+
   const verify = async () => {
-    if (otp.length < 6) {
+    if (!isValidOtp) {
       return;
     }
     setVerifying(true);
@@ -161,7 +164,13 @@ const VerifyEmailPage = () => {
         </Form>
       ) : (
         <div className='space-y-6 flex flex-col items-center'>
-          <InputOTP maxLength={6} value={otp} onChange={setOtp}>
+          <InputOTP
+            maxLength={6}
+            pattern={REGEXP_ONLY_DIGITS}
+            inputMode='numeric'
+            value={otp}
+            onChange={setOtp}
+          >
             <InputOTPGroup className='gap-[9px] justify-center items-center'>
               {OTP_SLOTS.map((slot, i) => (
                 <InputOTPSlot key={slot} index={i} />
@@ -183,7 +192,7 @@ const VerifyEmailPage = () => {
             variant='primary'
             type='button'
             onClick={verify}
-            disabled={otp.length < 6 || verifying}
+            disabled={!isValidOtp || verifying}
             className='w-full py-[15px] h-auto'
           >
             {verifying ? 'Verifying…' : 'Verify email'}

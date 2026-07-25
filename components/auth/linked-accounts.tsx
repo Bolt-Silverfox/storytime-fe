@@ -138,6 +138,8 @@ export const LinkedAccounts = () => {
   // Render the official Google button into the row while Google isn't linked.
   // onGoogleCredential is stable (depends only on the stable `refresh`), so
   // passing it directly keeps the effect pure — no ref-mutation-in-render.
+  // googleReady is a re-trigger only (body reads window.google directly).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: googleReady re-triggers render after the GSI script loads
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID || googleLinked) {
       return;

@@ -135,11 +135,9 @@ export const LinkedAccounts = () => {
     },
     [refresh]
   );
-  const credentialHandler = useRef(onGoogleCredential);
-  credentialHandler.current = onGoogleCredential;
-
   // Render the official Google button into the row while Google isn't linked.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: googleReady re-triggers render after the script loads
+  // onGoogleCredential is stable (depends only on the stable `refresh`), so
+  // passing it directly keeps the effect pure — no ref-mutation-in-render.
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID || googleLinked) {
       return;
@@ -150,7 +148,7 @@ export const LinkedAccounts = () => {
     }
     gsi.initialize({
       client_id: GOOGLE_CLIENT_ID,
-      callback: (r) => credentialHandler.current(r),
+      callback: onGoogleCredential,
       ux_mode: 'popup',
       auto_select: false,
     });
@@ -163,7 +161,7 @@ export const LinkedAccounts = () => {
       text: 'continue_with',
       width: 200,
     });
-  }, [googleReady, googleLinked]);
+  }, [googleReady, googleLinked, onGoogleCredential]);
 
   const linkApple = useCallback(async () => {
     if (!(APPLE_SERVICE_ID && APPLE_REDIRECT_URI && appleReady)) {
@@ -301,7 +299,7 @@ export const LinkedAccounts = () => {
                   <div
                     ref={googleBtnRef}
                     className={
-                      busy === 'google' ? 'pointer-events-none opacity-60' : ''
+                      busy !== null ? 'pointer-events-none opacity-60' : ''
                     }
                   />
                 )
@@ -323,7 +321,9 @@ export const LinkedAccounts = () => {
                   <button
                     type='button'
                     onClick={linkApple}
-                    disabled={busy !== null || !appleReady}
+                    disabled={
+                      busy !== null || !appleReady || !APPLE_REDIRECT_URI
+                    }
                     className='flex items-center gap-2 rounded-full bg-black px-5 py-2 font-abeezee text-sm text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60'
                   >
                     {busy === 'apple' ? 'Linking…' : 'Continue with Apple'}

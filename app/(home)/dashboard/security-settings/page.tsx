@@ -1,5 +1,6 @@
 'use client';
 
+import { LinkedAccounts } from '@/components/auth/linked-accounts';
 import BackButton from '@/components/back-button';
 import Header from '@/components/header';
 import { Button } from '@/components/ui/button';
@@ -93,71 +94,75 @@ const SecuritySettingsPage = () => {
             </Link>
           </div>
         ) : (
-          <form
-            className='flex max-w-md flex-col gap-6'
-            onSubmit={handleSubmit}
-          >
-            <div>
-              <label
-                htmlFor='current-password'
-                className='block mb-1 text-[#4A413F] text-sm font-abeezee'
-              >
-                Current password
-              </label>
-              <Input
-                id='current-password'
-                type='password'
-                value={oldPassword}
-                onChange={(e) => setOldPassword(e.target.value)}
-                placeholder='Enter your current password'
-                autoComplete='current-password'
-              />
-            </div>
-            <div>
-              <label
-                htmlFor='new-password'
-                className='block mb-1 text-[#4A413F] text-sm font-abeezee'
-              >
-                New password
-              </label>
-              <Input
-                id='new-password'
-                type='password'
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder='Enter a new password'
-                autoComplete='new-password'
-              />
-              <p className='mt-1 text-[#4A413F] text-xs not-italic font-normal leading-4 font-abeezee'>
-                At least 8 characters with uppercase, lowercase, a number, and a
-                symbol.
-              </p>
-            </div>
-            <div>
-              <label
-                htmlFor='confirm-password'
-                className='block mb-1 text-[#4A413F] text-sm font-abeezee'
-              >
-                Confirm new password
-              </label>
-              <Input
-                id='confirm-password'
-                type='password'
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder='Re-enter your new password'
-                autoComplete='new-password'
-              />
-            </div>
-            <Button
-              type='submit'
-              variant='primary'
-              className='w-fit px-12'
-              disabled={submitting}
+          <>
+            <form
+              className='flex max-w-md flex-col gap-6'
+              onSubmit={handleSubmit}
             >
-              {submitting ? 'Saving…' : 'Change password'}
-            </Button>
-          </form>
+              <div>
+                <label
+                  htmlFor='current-password'
+                  className='block mb-1 text-[#4A413F] text-sm font-abeezee'
+                >
+                  Current password
+                </label>
+                <Input
+                  id='current-password'
+                  type='password'
+                  value={oldPassword}
+                  onChange={(e) => setOldPassword(e.target.value)}
+                  placeholder='Enter your current password'
+                  autoComplete='current-password'
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor='new-password'
+                  className='block mb-1 text-[#4A413F] text-sm font-abeezee'
+                >
+                  New password
+                </label>
+                <Input
+                  id='new-password'
+                  type='password'
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder='Enter a new password'
+                  autoComplete='new-password'
+                />
+                <p className='mt-1 text-[#4A413F] text-xs not-italic font-normal leading-4 font-abeezee'>
+                  At least 8 characters with uppercase, lowercase, a number, and
+                  a symbol.
+                </p>
+              </div>
+              <div>
+                <label
+                  htmlFor='confirm-password'
+                  className='block mb-1 text-[#4A413F] text-sm font-abeezee'
+                >
+                  Confirm new password
+                </label>
+                <Input
+                  id='confirm-password'
+                  type='password'
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder='Re-enter your new password'
+                  autoComplete='new-password'
+                />
+              </div>
+              <Button
+                type='submit'
+                variant='primary'
+                className='w-fit px-12'
+                disabled={submitting}
+              >
+                {submitting ? 'Saving…' : 'Change password'}
+              </Button>
+            </form>
+
+            <LinkedAccounts />
+          </>
         )}
       </section>
     </div>

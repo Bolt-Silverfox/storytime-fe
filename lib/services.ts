@@ -183,6 +183,49 @@ export const appleLoginService = async (payload: {
   }
 };
 
+// ---- Account linking (authenticated) --------------------------------------
+// Backend exposes the linked sign-in methods via a dedicated endpoint; the
+// user DTO does NOT carry googleId/appleId. `provider: 'email'` appears only
+// when the account has a local password.
+export type LinkedProvider = 'email' | 'google' | 'apple';
+export interface LinkedAccount {
+  provider: LinkedProvider;
+  email: string | null;
+  linkedAt: string | null;
+}
+
+export const getLinkedAccountsService = async (): Promise<LinkedAccount[]> => {
+  const response = await api.get('auth/linked-accounts');
+  return Array.isArray(response.data) ? response.data : [];
+};
+
+export const linkGoogleService = async (idToken: string) => {
+  try {
+    const response = await api.post('auth/link/google', { id_token: idToken });
+    return response.data;
+  } catch (error: unknown) {
+    throw normaliseAuthError(error, 'Could not link your Google account');
+  }
+};
+
+export const linkAppleService = async (idToken: string) => {
+  try {
+    const response = await api.post('auth/link/apple', { id_token: idToken });
+    return response.data;
+  } catch (error: unknown) {
+    throw normaliseAuthError(error, 'Could not link your Apple account');
+  }
+};
+
+export const unlinkProviderService = async (provider: 'google' | 'apple') => {
+  try {
+    const response = await api.delete(`auth/unlink/${provider}`);
+    return response.data;
+  } catch (error: unknown) {
+    throw normaliseAuthError(error, 'Could not unlink your account');
+  }
+};
+
 export const verifyEmailService = async (token: string) => {
   try {
     const response = await api.post('auth/verify-email', { token });

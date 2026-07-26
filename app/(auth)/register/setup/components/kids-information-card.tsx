@@ -28,18 +28,28 @@ export const KidsInformationCard = ({ index }: KidsInformationCardProps) => {
     control,
     name: `kidsInfo.${index}.avatar`,
   });
+  const avatarId = useWatch({
+    control,
+    name: `kidsInfo.${index}.avatarId`,
+  });
 
   return (
     <div className='p-6 rounded-[23px] border-[#F5F5F4] space-y-5 bg-white shadow-[0_0_17px_0_#221D29]/5'>
       <KidsAvatarSheet
         avatar={avatar}
-        setAvatar={(newAvatar) =>
+        avatarId={avatarId}
+        setAvatar={(newAvatar, newAvatarId) => {
           setValue(`kidsInfo.${index}.avatar`, newAvatar, {
             shouldDirty: true,
             shouldTouch: true,
             shouldValidate: true,
-          })
-        }
+          });
+          setValue(`kidsInfo.${index}.avatarId`, newAvatarId, {
+            shouldDirty: true,
+            shouldTouch: true,
+            shouldValidate: true,
+          });
+        }}
       />
       <div className='flex gap-4 items-center'>
         <FormField

@@ -44,7 +44,11 @@ const KidsFormSchema = z.object({
   ageRange: z
     .string({ required_error: 'Age range is required' })
     .min(1, 'Age range is required.'),
+  // Display value shown in the card (system avatar URL, uploaded avatar URL, or
+  // the default placeholder). Not sent to the backend.
   avatar: z.string({ required_error: 'Avatar is required' }),
+  // The persisted backend avatar id — this is what addKidsService forwards.
+  avatarId: z.string().optional(),
 });
 
 const FormSchema = z.object({

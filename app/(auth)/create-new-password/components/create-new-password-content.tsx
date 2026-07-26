@@ -75,6 +75,12 @@ export const CreateNewPasswordContent = () => {
       toast.error('Reset link is missing its token or email');
       return;
     }
+    if (!email) {
+      toast.error(
+        'Email is missing from the URL. Please restart the password reset flow.'
+      );
+      return;
+    }
     setIsLoading(true);
 
     try {

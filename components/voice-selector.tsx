@@ -67,19 +67,10 @@ const VoiceSelector = ({ setStep, expand }: VoiceSelectorProps) => {
   const handleSetVoice = async () => {
     if (!selectedVoice) return;
 
-    // Get the selected kid from localStorage
-    const selectedKidData = localStorage.getItem('selectedKid');
-    if (!selectedKidData) {
-      alert('No kid selected. Please select a kid first.');
-      return;
-    }
-
-    const selectedKid = JSON.parse(selectedKidData);
-    const kidId = selectedKid.id;
-
     setSettingVoice(true);
     try {
-      await setKidPreferredVoiceService(kidId, selectedVoice);
+      // Preferred voice is user-scoped in blue (no per-kid endpoint).
+      await setKidPreferredVoiceService(selectedVoice);
       // Voice set successfully, proceed to next step
       setStep(2);
     } catch (error) {

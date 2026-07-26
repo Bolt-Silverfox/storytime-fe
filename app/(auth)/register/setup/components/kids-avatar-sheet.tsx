@@ -1,29 +1,14 @@
 'use client';
 
+import { PageLoader } from '@/components/page-loader';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { Icons } from '@/components/ui/icons';
-import Image from 'next/image';
 import {
-  Sheet,
-  SheetContent,
-  SheetFooter,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet';
-import { Separator } from '@/components/ui/separator';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { avatarOptions, cn } from '@/lib/utils';
-import {
-  Dropzone,
   DropZoneArea,
-  DropzoneFileList,
-  DropzoneFileListItem,
-  DropzoneTrigger,
+  Dropzone,
   DropzoneMessage,
-  DropzoneRemoveFile,
+  DropzoneTrigger,
   useDropzone,
 } from '@/components/ui/dropzone';
-import { Trash2Icon } from 'lucide-react';
 import {
   Form,
   FormControl,
@@ -32,76 +17,148 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import { Icons } from '@/components/ui/icons';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Separator } from '@/components/ui/separator';
+import {
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
+import {
+  type SystemAvatar,
+  getSystemAvatarsService,
+  uploadAvatarService,
+} from '@/lib/services';
+import { cn } from '@/lib/utils';
 import { zodResolver } from '@hookform/resolvers/zod';
+import Image from 'next/image';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { useState } from 'react';
-import { PageLoader } from '@/components/page-loader';
 
 const FormSchema = z.object({
-  avatar: z.string({
-    required_error: 'You need to select a notification type.',
-  }),
+  // The selected avatar's backend id (system avatar or freshly-uploaded one).
+  avatarId: z.string({ required_error: 'Please select an avatar.' }),
 });
 
 export const KidsAvatarSheet = ({
   avatar,
+  avatarId,
   setAvatar,
 }: {
   avatar: string;
-  setAvatar: (avatar: string) => void;
+  avatarId?: string;
+  setAvatar: (avatar: string, avatarId?: string) => void;
 }) => {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  // Predefined avatars from the backend + any the user uploads this session.
+  const [systemAvatars, setSystemAvatars] = useState<SystemAvatar[]>([]);
+  const [uploadedAvatars, setUploadedAvatars] = useState<SystemAvatar[]>([]);
+  const [avatarsLoading, setAvatarsLoading] = useState(false);
+  const [avatarsError, setAvatarsError] = useState<string | null>(null);
+
+  const form = useForm<z.infer<typeof FormSchema>>({
+    resolver: zodResolver(FormSchema),
+    mode: 'onChange',
+    defaultValues: { avatarId: avatarId ?? '' },
+  });
+
+  const allAvatars = [...systemAvatars, ...uploadedAvatars];
+
   const dropzone = useDropzone({
     onDropFile: async (file: File) => {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      const url = URL.createObjectURL(file);
-      form.setValue('avatar', url, {
-        shouldValidate: true,
-        shouldDirty: true,
-      });
-      return {
-        status: 'success',
-        result: URL.createObjectURL(file),
-      };
+      try {
+        const uploaded = await uploadAvatarService(file, file.name);
+        setUploadedAvatars((prev) =>
+          prev.some((a) => a.id === uploaded.id) ? prev : [...prev, uploaded]
+        );
+        // Auto-select the just-uploaded avatar.
+        form.setValue('avatarId', uploaded.id, {
+          shouldValidate: true,
+          shouldDirty: true,
+        });
+        return { status: 'success' as const, result: uploaded.url };
+      } catch (err) {
+        const message =
+          err && typeof err === 'object' && 'message' in err
+            ? String((err as { message?: unknown }).message)
+            : 'Failed to upload image';
+        toast.error(message);
+        return { status: 'error' as const, error: message };
+      }
     },
     validation: {
       accept: {
         'image/*': ['.png', '.jpg', '.jpeg'],
       },
-      maxSize: 10 * 1024 * 1024,
-      maxFiles: 2,
+      maxSize: 5 * 1024 * 1024,
+      maxFiles: 1,
     },
   });
 
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const form = useForm<z.infer<typeof FormSchema>>({
-    resolver: zodResolver(FormSchema),
-  });
+  // Load system avatars the first time the sheet opens.
+  useEffect(() => {
+    if (!open || systemAvatars.length > 0) {
+      return;
+    }
 
-  const handleResetDropzone = async () => {
-    await Promise.all(
-      dropzone.fileStatuses.map((file) => dropzone.onRemoveFile(file.id))
-    );
-  };
+    let cancelled = false;
+    setAvatarsLoading(true);
+    setAvatarsError(null);
+    getSystemAvatarsService()
+      .then((avatars) => {
+        if (!cancelled) {
+          setSystemAvatars(avatars);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setAvatarsError(
+            err?.message || 'Could not load avatars. Please try again.'
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setAvatarsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, systemAvatars.length]);
+
+  // Keep the selection in sync if the parent already has an avatarId.
+  useEffect(() => {
+    if (avatarId) {
+      form.setValue('avatarId', avatarId);
+    }
+  }, [avatarId, form]);
 
   async function onSubmit(data: z.infer<typeof FormSchema>) {
+    const selected = allAvatars.find((a) => a.id === data.avatarId);
+    if (!selected) {
+      toast.error('Please select an avatar.');
+      return;
+    }
+
     setLoading(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
       setOpen(false);
-      setAvatar(data.avatar);
-      form.reset();
-      handleResetDropzone();
-
-      toast.success('🎉 Avatar uploaded!', {
+      // Push both the display URL and the persisted id up to the kid form.
+      setAvatar(selected.url, selected.id);
+      toast.success('🎉 Avatar selected!', {
         description: 'Your kid’s profile now looks even cooler 😎',
         duration: 4000,
       });
     } finally {
-      setLoading(false); // End loading
+      setLoading(false);
     }
   }
 
@@ -130,7 +187,7 @@ export const KidsAvatarSheet = ({
       </div>
       <SheetContent className='py-8 overflow-auto'>
         <SheetTitle className='text-[#221D1D] px-8 font-normal font-abeezee'>
-          Upload your kids avatar
+          Choose your kid’s avatar
         </SheetTitle>
 
         <Separator className='mb-2' />
@@ -142,99 +199,60 @@ export const KidsAvatarSheet = ({
             <div className='space-y-0.5 px-8'>
               <h2 className='text-lg font-bold font-qilka'>Select avatar</h2>
               <p className='text-[#4A413F] text-xs font-abeezee'>
-                Select customized avatar to save time
+                Select a customized avatar to save time
               </p>
             </div>
             <FormField
               control={form.control}
-              name='avatar'
+              name='avatarId'
               render={({ field }) => (
                 <FormItem className='px-8'>
-                  <FormControl>
-                    <RadioGroup
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                      className='grid grid-cols-2 gap-4 mt-4'
-                    >
-                      {avatarOptions.map((option) => (
-                        <FormItem key={Math.random()}>
-                          <FormLabel className='w-full cursor-pointer flex items-center justify-between gap-3 rounded-2xl border border-[#FAF4F2] bg-white p-6 shadow-[0_0_17px_0_#221D29]/5 [&:has(>button[data-state=checked])]:border-[#FB9583] [&:has(>button[data-state=checked])]:ring-2 [&:has(>button[data-state=checked])]:ring-[#FB9583]/50'>
-                            <div className='flex items-center gap-2.5'>
-                              <Image
-                                src={option.avatar}
-                                className='rounded-full'
-                                height={40}
-                                width={40}
-                                alt=''
-                              />
-                              <span
-                                title={option.name}
-                                className='text-[#221D1D] truncate font-abeezee'
-                              >
-                                {option.name}
-                              </span>
-                            </div>
-                            <FormControl>
-                              <RadioGroupItem value={option.avatar} />
-                            </FormControl>
-                          </FormLabel>
-                        </FormItem>
-                      ))}
-
-                      <Dropzone {...dropzone}>
-                        <DropzoneFileList className='col-span-2'>
-                          {dropzone.fileStatuses.map((file) => (
-                            <DropzoneFileListItem
-                              className='w-full !p-0'
-                              key={file.id}
-                              file={file}
-                            >
-                              <FormItem key={Math.random()}>
-                                <FormLabel
-                                  htmlFor={file.id}
-                                  className='w-full cursor-pointer flex items-center justify-between gap-3 rounded-2xl border border-[#FAF4F2] bg-white p-6 shadow-[0_0_17px_0_#221D29]/5 [&:has(>button[data-state=checked])]:border-[#FB9583] [&:has(>button[data-state=checked])]:ring-2 [&:has(>button[data-state=checked])]:ring-[#FB9583]/50'
+                  {avatarsLoading ? (
+                    <p className='text-[#4A413F] text-sm font-abeezee py-4'>
+                      Loading avatars…
+                    </p>
+                  ) : avatarsError ? (
+                    <p className='text-destructive text-sm font-abeezee py-4'>
+                      {avatarsError}
+                    </p>
+                  ) : allAvatars.length === 0 ? (
+                    <p className='text-[#4A413F] text-sm font-abeezee py-4'>
+                      No avatars available — upload one below.
+                    </p>
+                  ) : (
+                    <FormControl>
+                      <RadioGroup
+                        onValueChange={field.onChange}
+                        value={field.value}
+                        className='grid grid-cols-2 gap-4 mt-4'
+                      >
+                        {allAvatars.map((option) => (
+                          <FormItem key={option.id}>
+                            <FormLabel className='w-full cursor-pointer flex items-center justify-between gap-3 rounded-2xl border border-[#FAF4F2] bg-white p-6 shadow-[0_0_17px_0_#221D29]/5 [&:has(>button[data-state=checked])]:border-[#FB9583] [&:has(>button[data-state=checked])]:ring-2 [&:has(>button[data-state=checked])]:ring-[#FB9583]/50'>
+                              <div className='flex items-center gap-2.5 min-w-0'>
+                                <Image
+                                  src={option.url}
+                                  className='rounded-full size-10 object-cover'
+                                  height={40}
+                                  width={40}
+                                  alt={option.name ?? 'avatar'}
+                                />
+                                <span
+                                  title={option.name}
+                                  className='text-[#221D1D] truncate font-abeezee'
                                 >
-                                  <div className='flex items-center gap-2.5'>
-                                    {file.status === 'pending' && (
-                                      <div className='size-10 rounded-full bg-black/20' />
-                                    )}
-                                    {file.status === 'success' && (
-                                      <Image
-                                        height={40}
-                                        width={40}
-                                        src={file.result}
-                                        alt={`uploaded-${file.fileName}`}
-                                        className='rounded-full !size-10'
-                                      />
-                                    )}
-                                    <div className='min-w-0'>
-                                      {/* <p className='truncate text-sm'>{file.fileName}</p> */}
-                                      <p className='text-xs text-muted-foreground'>
-                                        {(
-                                          file.file.size /
-                                          (1024 * 1024)
-                                        ).toFixed(2)}{' '}
-                                        MB
-                                      </p>
-                                    </div>
-                                  </div>
-
-                                  <DropzoneRemoveFile className='shrink-0 hover:outline'>
-                                    <Trash2Icon className='size-4' />
-                                  </DropzoneRemoveFile>
-                                  <RadioGroupItem
-                                    className='hidden'
-                                    value={file.result ?? ''}
-                                    id={file.id}
-                                  />
-                                </FormLabel>
-                              </FormItem>
-                            </DropzoneFileListItem>
-                          ))}
-                        </DropzoneFileList>
-                      </Dropzone>
-                    </RadioGroup>
-                  </FormControl>
+                                  {option.name ?? 'Avatar'}
+                                </span>
+                              </div>
+                              <FormControl>
+                                <RadioGroupItem value={option.id} />
+                              </FormControl>
+                            </FormLabel>
+                          </FormItem>
+                        ))}
+                      </RadioGroup>
+                    </FormControl>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
@@ -250,7 +268,7 @@ export const KidsAvatarSheet = ({
               <div className='space-y-0.5'>
                 <h2 className='text-lg font-bold font-qilka'>Upload image</h2>
                 <p className='text-[#4A413F] text-xs font-abeezee'>
-                  Upload your child image instead
+                  Upload your child’s image instead
                 </p>
               </div>
               <div className='not-prose flex flex-col gap-4'>
@@ -284,7 +302,7 @@ export const KidsAvatarSheet = ({
                 disabled={!form.formState.isValid}
                 className='flex-1 py-[15px] px-[50px] w-max h-auto ml-auto'
               >
-                Upload avatar
+                Save avatar
               </Button>
             </SheetFooter>
           </form>

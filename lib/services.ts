@@ -12,11 +12,26 @@ interface LoginPayload {
   password: string;
 }
 
+// Mirrors blue's CreateKidDto. Blue's ValidationPipe is `forbidNonWhitelisted`,
+// so ANY extra property (e.g. `avatar`, `avatarUrl`) causes a 400. Callers may
+// pass richer objects; `addKidsService` maps them down to only these fields.
 interface KidsPayload {
   name: string;
   ageRange: string;
+  avatarId?: string;
+  preferredCategoryIds?: string[];
+}
+
+// The shape web callers currently build (setup wizard, kid-picker) — avatar is a
+// local asset path / blob URL / display value, not a backend avatar id.
+interface KidInput {
+  name: string;
+  ageRange: string;
+  avatarId?: string;
+  // Non-whitelisted display-only values that MUST be stripped before sending.
   avatar?: string;
   avatarUrl?: string;
+  preferredCategoryIds?: string[];
 }
 
 interface UserProfile {
@@ -256,6 +271,7 @@ export const resetPasswordService = async ({
   newPassword: string;
 }) => {
   try {
+    // Blue's ResetPasswordDto = { token, email, newPassword } — all required.
     const response = await api.post('/auth/reset-password', {
       token,
       email,
@@ -278,9 +294,26 @@ export const resetPasswordService = async ({
   }
 };
 
-export const addKidsService = async (kids: KidsPayload[]) => {
+export const addKidsService = async (kids: KidInput[]) => {
   try {
-    const response = await api.post('/auth/kids', kids);
+    // Whitelist to blue's CreateKidDto fields only. `avatar`/`avatarUrl` in the
+    // web flows are local asset paths or blob URLs (not backend avatar ids), so
+    // they are dropped entirely — only a genuine `avatarId` is forwarded.
+    const payload: KidsPayload[] = kids.map((kid) => {
+      const mapped: KidsPayload = {
+        name: kid.name,
+        ageRange: kid.ageRange,
+      };
+      if (kid.avatarId) {
+        mapped.avatarId = kid.avatarId;
+      }
+      if (kid.preferredCategoryIds?.length) {
+        mapped.preferredCategoryIds = kid.preferredCategoryIds;
+      }
+      return mapped;
+    });
+
+    const response = await api.post('/auth/kids', payload);
     return response.data;
     // biome-ignore lint/suspicious/noExplicitAny: <explanation>
   } catch (error: any) {
@@ -318,9 +351,91 @@ export const getKidsService = async () => {
   }
 };
 
+// ---------------------------------------------------------------------------
+// Avatars — persisted, backend-owned. A kid's avatar must be a real avatar `id`
+// (blue's CreateKidDto.avatarId), NOT a local asset path or blob URL.
+// ---------------------------------------------------------------------------
+
+export interface SystemAvatar {
+  id: string;
+  name?: string;
+  url: string;
+}
+
+/**
+ * Fetch the predefined system avatars. Blue: `GET /avatars/system` (public),
+ * responding `{ data: [{ id, name, url, isSystemAvatar, ... }] }`.
+ */
+export const getSystemAvatarsService = async (): Promise<SystemAvatar[]> => {
+  try {
+    const response = await api.get('/avatars/system');
+    const list = Array.isArray(response.data?.data)
+      ? response.data.data
+      : Array.isArray(response.data)
+        ? response.data
+        : [];
+    return list
+      .filter((a: unknown): a is SystemAvatar => {
+        const av = a as SystemAvatar;
+        return !!av && typeof av.id === 'string' && typeof av.url === 'string';
+      })
+      .map((a: SystemAvatar) => ({ id: a.id, name: a.name, url: a.url }));
+    // biome-ignore lint/suspicious/noExplicitAny: external error shape
+  } catch (error: any) {
+    if (error.response) {
+      throw {
+        message: error.response.data?.message || 'Failed to load avatars',
+        status: error.response.status,
+        data: error.response.data,
+      };
+    }
+    if (error.request) {
+      throw { message: 'No response from server', status: null };
+    }
+    throw { message: error.message || 'Unexpected error', status: null };
+  }
+};
+
+/**
+ * Upload a custom avatar image and persist it, returning the created avatar so
+ * its `id` can be attached to a kid. Blue: `POST /avatars` (multipart, field
+ * `image`) → `{ data: { id, url, ... } }`. Non-admin uploads become custom
+ * (non-system) avatars.
+ */
+export const uploadAvatarService = async (
+  file: File,
+  name?: string
+): Promise<SystemAvatar> => {
+  try {
+    const formData = new FormData();
+    formData.append('image', file);
+    if (name) formData.append('name', name);
+
+    const response = await api.post('/avatars', formData);
+    const avatar = response.data?.data ?? response.data;
+    if (!avatar || typeof avatar.id !== 'string' || typeof avatar.url !== 'string') {
+      throw { message: 'Avatar upload returned an unexpected response', status: null };
+    }
+    return { id: avatar.id, name: avatar.name, url: avatar.url };
+    // biome-ignore lint/suspicious/noExplicitAny: external error shape
+  } catch (error: any) {
+    if (error.response) {
+      throw {
+        message: error.response.data?.message || 'Failed to upload avatar',
+        status: error.response.status,
+        data: error.response.data,
+      };
+    }
+    if (error.request) {
+      throw { message: 'No response from server', status: null };
+    }
+    throw { message: error.message || 'Unexpected error', status: null };
+  }
+};
+
 export const getAvailableVoicesService = async (): Promise<Voice[]> => {
   try {
-    const response = await api.get('/stories/voices/available');
+    const response = await api.get('/voice/available');
     return response.data;
     // biome-ignore lint/suspicious/noExplicitAny: external error shape
   } catch (error: any) {
@@ -341,7 +456,7 @@ export const getAvailableVoicesService = async (): Promise<Voice[]> => {
 
 export const setPreferredVoiceService = async (voiceId: string) => {
   try {
-    const response = await api.patch('/stories/voices/preferred', {
+    const response = await api.patch('/voice/preferred', {
       voiceId: voiceId,
     });
     return response.data;
@@ -515,13 +630,13 @@ export const getStoriesByThemeAndKidService = async (
   }
 };
 
-export const setKidPreferredVoiceService = async (
-  kidId: string,
-  voiceType: string
-) => {
+// Blue exposes no per-kid voice endpoint; preferred voice is user-scoped.
+// Repointed from the removed `PATCH /user/kids/:kidId/voice` to
+// `PATCH /voice/preferred` (SetPreferredVoiceDto = { voiceId }).
+export const setKidPreferredVoiceService = async (voiceId: string) => {
   try {
-    const response = await api.patch(`/user/kids/${kidId}/voice`, {
-      voiceType,
+    const response = await api.patch('/voice/preferred', {
+      voiceId,
     });
     return response.data;
     // biome-ignore lint/suspicious/noExplicitAny: external error shape
@@ -569,24 +684,282 @@ export const clearSelectedModeFromStorage = () => {
   }
 };
 
-export const getStoryAudioService = async (
-  storyId: string
-): Promise<{
+export interface StoryAudioParagraph {
+  index: number;
+  text?: string;
+  audioUrl: string | null;
+}
+
+/** One paragraph of the reading-order outline: text is known up-front, audio isn't. */
+export interface StoryAudioOutlineItem {
+  index: number;
+  text: string;
+}
+
+/**
+ * Result of enqueuing a story-audio batch. The reader lays out `outline`
+ * immediately, plays the already-`ready` paragraphs, and — when `batchJobId`
+ * is present — streams the rest in over SSE (see `subscribeToStoryAudioBatch`).
+ */
+export interface StoryAudioBatch {
   message: string;
-  audioUrl: string;
-  voiceType: string;
+  voiceId: string;
+  totalParagraphs: number;
+  outline: StoryAudioOutlineItem[];
+  /** Paragraphs already carrying audio (eager + cache hits). */
+  ready: StoryAudioParagraph[];
+  /** Present only while background paragraphs are still generating. */
+  batchJobId?: string;
+  pendingParagraphs?: number;
   statusCode: number;
-}> => {
+}
+
+/**
+ * Blue serves story audio asynchronously. Enqueue with
+ * `POST /voice/story/audio/batch { storyId, voiceId }`: Blue returns the first
+ * paragraphs EAGERLY (already carrying `audioUrl`), the full paragraph `outline`
+ * (text for every position, ready or not), and — when paragraphs remain — a
+ * `batchJobId`. The caller subscribes to `GET /events/jobs/:batchJobId` to
+ * receive the remaining paragraphs as they finish, rather than polling.
+ */
+export const startStoryAudioBatch = async (
+  storyId: string,
+  voiceId?: string
+): Promise<StoryAudioBatch> => {
   try {
-    const response = await api.get(
-      `/stories/story/audio/${storyId}?voiceType=MILO`
-    );
-    return response.data;
+    const { data } = await api.post('/voice/story/audio/batch', {
+      storyId,
+      ...(voiceId ? { voiceId } : {}),
+    });
+
+    const rawParagraphs: StoryAudioParagraph[] = Array.isArray(data.paragraphs)
+      ? data.paragraphs
+      : [];
+    const ready = rawParagraphs
+      .filter((p) => !!p.audioUrl)
+      .sort((a, b) => a.index - b.index);
+
+    const outline: StoryAudioOutlineItem[] = Array.isArray(data.outline)
+      ? [...data.outline]
+          .filter(
+            (o): o is StoryAudioOutlineItem =>
+              !!o &&
+              typeof o.index === 'number' &&
+              typeof o.text === 'string'
+          )
+          .sort((a, b) => a.index - b.index)
+      : [];
+
+    const totalParagraphs =
+      typeof data.totalParagraphs === 'number'
+        ? data.totalParagraphs
+        : outline.length || rawParagraphs.length;
+
+    return {
+      message: data.message || 'Story audio',
+      voiceId: data.voiceId ?? voiceId ?? '',
+      totalParagraphs,
+      outline,
+      ready,
+      ...(data.batchJobId ? { batchJobId: data.batchJobId } : {}),
+      ...(typeof data.pendingParagraphs === 'number'
+        ? { pendingParagraphs: data.pendingParagraphs }
+        : {}),
+      statusCode: data.statusCode ?? 200,
+    };
     // biome-ignore lint/suspicious/noExplicitAny: external error shape
   } catch (error: any) {
     if (error.response) {
       throw {
         message: error.response.data?.message || 'Failed to fetch story audio',
+        status: error.response.status,
+        data: error.response.data,
+      };
+    }
+    if (error.request) {
+      throw { message: 'No response from server', status: null };
+    }
+    throw { message: error.message || 'Unexpected error', status: null };
+  }
+};
+
+/** A completed paragraph as reported by the batch-status endpoint. */
+export interface StoryAudioBatchStatus {
+  status: 'processing' | 'completed' | 'failed' | string;
+  completedParagraphs: Array<{ index: number; audioUrl: string }>;
+  failedParagraphs?: number[];
+  totalQueued?: number;
+}
+
+/**
+ * Poll a background TTS batch's status. Used ONLY as the SSE fallback in
+ * `subscribeToStoryAudioBatch`; the happy path is push-based over SSE.
+ */
+export const getStoryAudioBatchStatus = async (
+  batchJobId: string
+): Promise<StoryAudioBatchStatus> => {
+  const { data } = await api.get(
+    `/voice/story/audio/batch/status/${batchJobId}`
+  );
+  return {
+    status: data.status ?? 'processing',
+    completedParagraphs: Array.isArray(data.completedParagraphs)
+      ? data.completedParagraphs
+      : [],
+    failedParagraphs: Array.isArray(data.failedParagraphs)
+      ? data.failedParagraphs
+      : [],
+    totalQueued: data.totalQueued,
+  };
+};
+
+// ---------------------------------------------------------------------------
+// Async, queue-based story generation (blue: POST /stories/generate/async)
+// ---------------------------------------------------------------------------
+
+// Mirrors blue's StoryJobStatus enum.
+export type StoryJobStatus =
+  | 'queued'
+  | 'processing'
+  | 'generating_content'
+  | 'generating_image'
+  | 'generating_audio'
+  | 'persisting'
+  | 'completed'
+  | 'failed';
+
+// GenerateStoryDto — every field is optional (blue mirrors the sync defaults).
+export interface GenerateStoryPayload {
+  kidId?: string;
+  kidName?: string;
+  themes?: string[];
+  categories?: string[];
+  seasonIds?: string[];
+  ageMin?: number;
+  ageMax?: number;
+  language?: string;
+  additionalContext?: string;
+}
+
+export interface EnqueueStoryJobResponse {
+  queued: boolean;
+  jobId: string;
+  estimatedWaitTime?: number;
+  error?: string;
+}
+
+export interface StoryJobResultData {
+  id: string;
+  title: string;
+  description: string;
+  language: string;
+  coverImageUrl: string;
+  audioUrl: string;
+  textContent: string | null;
+  ageMin: number;
+  ageMax: number;
+  // biome-ignore lint/suspicious/noExplicitAny: partial Story shape from blue
+  [key: string]: any;
+}
+
+export interface StoryJobStatusResponse {
+  jobId: string;
+  status: StoryJobStatus;
+  progress: number;
+  progressMessage?: string;
+  createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
+  result?: StoryJobResultData;
+  error?: string;
+  estimatedTimeRemaining?: number;
+}
+
+export interface CancelStoryJobResponse {
+  cancelled: boolean;
+  reason?: string;
+}
+
+export const generateStoryAsyncService = async (
+  payload: GenerateStoryPayload
+): Promise<EnqueueStoryJobResponse> => {
+  try {
+    const response = await api.post('/stories/generate/async', payload);
+    return response.data;
+    // biome-ignore lint/suspicious/noExplicitAny: external error shape
+  } catch (error: any) {
+    if (error.response) {
+      throw {
+        message:
+          error.response.data?.message || 'Failed to start story generation',
+        status: error.response.status,
+        data: error.response.data,
+      };
+    }
+    if (error.request) {
+      throw { message: 'No response from server', status: null };
+    }
+    throw { message: error.message || 'Unexpected error', status: null };
+  }
+};
+
+export const getStoryJobStatusService = async (
+  jobId: string
+): Promise<StoryJobStatusResponse> => {
+  try {
+    const response = await api.get(`/stories/generate/jobs/${jobId}`);
+    return response.data;
+    // biome-ignore lint/suspicious/noExplicitAny: external error shape
+  } catch (error: any) {
+    if (error.response) {
+      throw {
+        message: error.response.data?.message || 'Failed to fetch job status',
+        status: error.response.status,
+        data: error.response.data,
+      };
+    }
+    if (error.request) {
+      throw { message: 'No response from server', status: null };
+    }
+    throw { message: error.message || 'Unexpected error', status: null };
+  }
+};
+
+export const getStoryJobResultService = async (
+  jobId: string
+): Promise<
+  StoryJobResultData | { jobId: string; ready: false; status: StoryJobStatus }
+> => {
+  try {
+    const response = await api.get(`/stories/generate/jobs/${jobId}/result`);
+    return response.data;
+    // biome-ignore lint/suspicious/noExplicitAny: external error shape
+  } catch (error: any) {
+    if (error.response) {
+      throw {
+        message: error.response.data?.message || 'Failed to fetch job result',
+        status: error.response.status,
+        data: error.response.data,
+      };
+    }
+    if (error.request) {
+      throw { message: 'No response from server', status: null };
+    }
+    throw { message: error.message || 'Unexpected error', status: null };
+  }
+};
+
+export const cancelStoryJobService = async (
+  jobId: string
+): Promise<CancelStoryJobResponse> => {
+  try {
+    const response = await api.delete(`/stories/generate/jobs/${jobId}`);
+    return response.data;
+    // biome-ignore lint/suspicious/noExplicitAny: external error shape
+  } catch (error: any) {
+    if (error.response) {
+      throw {
+        message: error.response.data?.message || 'Failed to cancel job',
         status: error.response.status,
         data: error.response.data,
       };

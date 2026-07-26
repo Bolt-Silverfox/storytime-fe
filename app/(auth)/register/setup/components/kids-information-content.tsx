@@ -34,6 +34,7 @@ export const KidsInformationContent = () => {
           name: '',
           ageRange: '',
           avatar: '/avatar.svg',
+          avatarId: undefined,
         });
       }
     } else if (parsedAmount < currentLength) {

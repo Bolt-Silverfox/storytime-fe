@@ -71,8 +71,8 @@ export const CreateNewPasswordContent = () => {
   });
 
   async function onSubmit(data: z.infer<typeof FormSchema>) {
-    if (!token) {
-      toast.error('Token is missing from the URL');
+    if (!(token && email)) {
+      toast.error('Reset link is missing its token or email');
       return;
     }
     if (!email) {

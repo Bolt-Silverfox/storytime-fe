@@ -30,6 +30,8 @@ const StoryCard = ({
   const router = useRouter();
   return (
     <div
+      role={link ? 'link' : setModal ? 'button' : undefined}
+      tabIndex={link || setModal ? 0 : undefined}
       onClick={() => {
         if (link) {
           router.push(link);

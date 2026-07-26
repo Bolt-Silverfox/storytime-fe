@@ -133,6 +133,7 @@ const StoryHome = () => {
               <button
                 key={group.label}
                 type='button'
+                aria-pressed={active}
                 onClick={() => setAgeGroup(group.label)}
                 className={`rounded-full px-4 py-2 text-sm font-semibold font-abeezee transition ${
                   active

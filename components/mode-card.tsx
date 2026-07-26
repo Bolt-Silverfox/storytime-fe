@@ -14,19 +14,14 @@ const ModeCard = ({
   img: StaticImageData;
 }) => {
   return (
-    <div
-      className={`rounded-[1.5625rem] border-[0.5px] border-solid cursor-pointer hover:scale-105 transition-all duration-300 ${
+    <button
+      type='button'
+      className={`block text-left w-full rounded-[1.5625rem] border-[0.5px] border-solid cursor-pointer hover:scale-105 transition-all duration-300 ${
         active
           ? 'bg-[#EC4007] shadow-[0px_0px_0px_4px_rgba(236,64,7,0.15)] rounded-3xl border-[#F84020] text-white'
           : 'bg-white shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] border-stone-100'
       }`}
       onClick={onClick}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onClick();
-        }
-      }}
     >
       <Image src={img} alt='background' className='w-full max-w-full' />
       <div className='p-4 sm:p-6'>
@@ -45,7 +40,7 @@ const ModeCard = ({
           {description}
         </p>
       </div>
-    </div>
+    </button>
   );
 };
 

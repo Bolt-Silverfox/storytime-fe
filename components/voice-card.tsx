@@ -41,6 +41,8 @@ const VoiceCard = ({
 
   return (
     <div
+      role={selectable ? 'button' : undefined}
+      tabIndex={selectable ? 0 : undefined}
       className={` p-4 sm:p-6 min-w-0 rounded-[1.5625rem] border-[0.5px] border-solid text-center flex flex-col items-center transition-all duration-300 ${
         selectable ? 'cursor-pointer hover:scale-105' : 'cursor-default'
       } ${
@@ -95,7 +97,8 @@ const VoiceCard = ({
       >
         {description}
       </p>
-      <div
+      <button
+        type='button'
         className={` mt-6 shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] px-4 sm:px-6 py-2.5 rounded-[3.125rem] border-[0.5px] border-solid border-[#FAF4F2] hover:scale-105 transition-all duration-300 flex items-center justify-center gap-3 w-fit max-w-full text-center cursor-pointer ${
           highlight
             ? 'bg-[#F84020] text-white border-[#F84020]'
@@ -104,13 +107,6 @@ const VoiceCard = ({
         onClick={(e) => {
           onListen(e);
           handleCardSelect();
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            onListen(e as unknown as React.MouseEvent);
-            handleCardSelect();
-          }
         }}
       >
         <Image
@@ -125,7 +121,7 @@ const VoiceCard = ({
         >
           Listen
         </p>
-      </div>
+      </button>
     </div>
   );
 };

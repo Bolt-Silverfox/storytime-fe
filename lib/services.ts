@@ -608,96 +608,82 @@ export interface StoryAudioParagraph {
   audioUrl: string | null;
 }
 
-export interface StoryAudioResponse {
-  message: string;
-  audioUrl: string;
-  voiceType: string;
-  statusCode: number;
-  paragraphs: StoryAudioParagraph[];
+/** One paragraph of the reading-order outline: text is known up-front, audio isn't. */
+export interface StoryAudioOutlineItem {
+  index: number;
+  text: string;
 }
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+/**
+ * Result of enqueuing a story-audio batch. The reader lays out `outline`
+ * immediately, plays the already-`ready` paragraphs, and — when `batchJobId`
+ * is present — streams the rest in over SSE (see `subscribeToStoryAudioBatch`).
+ */
+export interface StoryAudioBatch {
+  message: string;
+  voiceId: string;
+  totalParagraphs: number;
+  outline: StoryAudioOutlineItem[];
+  /** Paragraphs already carrying audio (eager + cache hits). */
+  ready: StoryAudioParagraph[];
+  /** Present only while background paragraphs are still generating. */
+  batchJobId?: string;
+  pendingParagraphs?: number;
+  statusCode: number;
+}
 
 /**
- * Blue serves story audio asynchronously only. There is no
- * `GET /stories/story/audio/:id` endpoint anymore.
- *
- * Flow:
- *  1. Enqueue with `POST /voice/story/audio/batch { storyId, voiceId }`. Blue
- *     returns the first few paragraphs EAGERLY (already carrying `audioUrl`),
- *     plus an optional `batchJobId` for the remaining paragraphs generated in
- *     the background.
- *  2. If no eager paragraph has audio yet but a `batchJobId` exists, poll
- *     `GET /voice/story/audio/batch/status/:batchJobId` until a completed
- *     paragraph appears or the batch finishes.
- *
- * The reader plays a single audio element, so we surface the first available
- * paragraph's `audioUrl` while also returning the full paragraph list.
+ * Blue serves story audio asynchronously. Enqueue with
+ * `POST /voice/story/audio/batch { storyId, voiceId }`: Blue returns the first
+ * paragraphs EAGERLY (already carrying `audioUrl`), the full paragraph `outline`
+ * (text for every position, ready or not), and — when paragraphs remain — a
+ * `batchJobId`. The caller subscribes to `GET /events/jobs/:batchJobId` to
+ * receive the remaining paragraphs as they finish, rather than polling.
  */
-export const getStoryAudioService = async (
+export const startStoryAudioBatch = async (
   storyId: string,
   voiceId?: string
-): Promise<StoryAudioResponse> => {
+): Promise<StoryAudioBatch> => {
   try {
     const { data } = await api.post('/voice/story/audio/batch', {
       storyId,
       ...(voiceId ? { voiceId } : {}),
     });
 
-    const paragraphs: StoryAudioParagraph[] = Array.isArray(data.paragraphs)
+    const rawParagraphs: StoryAudioParagraph[] = Array.isArray(data.paragraphs)
       ? data.paragraphs
       : [];
+    const ready = rawParagraphs
+      .filter((p) => !!p.audioUrl)
+      .sort((a, b) => a.index - b.index);
 
-    // Pick the LOWEST-index paragraph that actually has audio, so the eager
-    // path and the polling path below agree on which paragraph is "first" even
-    // when the backend returns paragraphs out of array order.
-    const firstReady = [...paragraphs]
-      .sort((a, b) => a.index - b.index)
-      .find((p) => !!p.audioUrl);
-
-    // Poll the background batch if the eager response has no audio yet.
-    if (!firstReady && data.batchJobId) {
-      const maxAttempts = 20;
-      for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        await sleep(2000);
-        const { data: status } = await api.get(
-          `/voice/story/audio/batch/status/${data.batchJobId}`
-        );
-
-        const completed: StoryAudioParagraph[] = (
-          status.completedParagraphs ?? []
-        ).map((p: { index: number; audioUrl: string }) => ({
-          index: p.index,
-          audioUrl: p.audioUrl,
-        }));
-
-        const ready = [...completed]
+    const outline: StoryAudioOutlineItem[] = Array.isArray(data.outline)
+      ? [...data.outline]
+          .filter(
+            (o): o is StoryAudioOutlineItem =>
+              !!o &&
+              typeof o.index === 'number' &&
+              typeof o.text === 'string'
+          )
           .sort((a, b) => a.index - b.index)
-          .find((p) => !!p.audioUrl);
-        if (ready) {
-          return {
-            message: data.message || 'Story audio ready',
-            // audioUrl is nullable on a paragraph; the `.find` above guarantees
-            // it's set here, but coalesce rather than an unsafe cast.
-            audioUrl: ready.audioUrl ?? '',
-            voiceType: data.voiceId ?? voiceId ?? '',
-            statusCode: 200,
-            paragraphs: completed,
-          };
-        }
+      : [];
 
-        if (status.status === 'completed' || status.status === 'failed') {
-          break;
-        }
-      }
-    }
+    const totalParagraphs =
+      typeof data.totalParagraphs === 'number'
+        ? data.totalParagraphs
+        : outline.length || rawParagraphs.length;
 
     return {
       message: data.message || 'Story audio',
-      audioUrl: firstReady?.audioUrl ?? '',
-      voiceType: data.voiceId ?? voiceId ?? '',
+      voiceId: data.voiceId ?? voiceId ?? '',
+      totalParagraphs,
+      outline,
+      ready,
+      ...(data.batchJobId ? { batchJobId: data.batchJobId } : {}),
+      ...(typeof data.pendingParagraphs === 'number'
+        ? { pendingParagraphs: data.pendingParagraphs }
+        : {}),
       statusCode: data.statusCode ?? 200,
-      paragraphs,
     };
     // biome-ignore lint/suspicious/noExplicitAny: external error shape
   } catch (error: any) {
@@ -713,6 +699,36 @@ export const getStoryAudioService = async (
     }
     throw { message: error.message || 'Unexpected error', status: null };
   }
+};
+
+/** A completed paragraph as reported by the batch-status endpoint. */
+export interface StoryAudioBatchStatus {
+  status: 'processing' | 'completed' | 'failed' | string;
+  completedParagraphs: Array<{ index: number; audioUrl: string }>;
+  failedParagraphs?: number[];
+  totalQueued?: number;
+}
+
+/**
+ * Poll a background TTS batch's status. Used ONLY as the SSE fallback in
+ * `subscribeToStoryAudioBatch`; the happy path is push-based over SSE.
+ */
+export const getStoryAudioBatchStatus = async (
+  batchJobId: string
+): Promise<StoryAudioBatchStatus> => {
+  const { data } = await api.get(
+    `/voice/story/audio/batch/status/${batchJobId}`
+  );
+  return {
+    status: data.status ?? 'processing',
+    completedParagraphs: Array.isArray(data.completedParagraphs)
+      ? data.completedParagraphs
+      : [],
+    failedParagraphs: Array.isArray(data.failedParagraphs)
+      ? data.failedParagraphs
+      : [],
+    totalQueued: data.totalQueued,
+  };
 };
 
 // ---------------------------------------------------------------------------

@@ -7,9 +7,10 @@ import { Switch } from './ui/switch';
 import { useState, useEffect, useRef } from 'react';
 import {
   getStoryByIdService,
-  getStoryAudioService,
-  type StoryAudioResponse,
+  startStoryAudioBatch,
+  type StoryAudioOutlineItem,
 } from '@/lib/services';
+import { subscribeToStoryAudioBatch } from '@/lib/story-audio-events';
 
 interface Question {
   id: string;
@@ -58,13 +59,27 @@ const StoryReader = ({
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showAnswer, setShowAnswer] = useState(false);
 
-  // Audio states
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  // Audio states — a per-paragraph playlist rather than one file.
+  // `audioByIndex` fills in as paragraphs arrive (eager/cache up-front, the rest
+  // streamed over SSE). `currentIndex` is the paragraph we want to be playing.
+  const [outline, setOutline] = useState<StoryAudioOutlineItem[]>([]);
+  const [audioByIndex, setAudioByIndex] = useState<Record<number, string>>({});
+  const [totalParagraphs, setTotalParagraphs] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [audioLoading, setAudioLoading] = useState(false);
   const [audioError, setAudioError] = useState<string | null>(null);
+  // True once every paragraph that will ever arrive has arrived (batch done).
+  const [audioComplete, setAudioComplete] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const currentUrl = audioByIndex[currentIndex] ?? null;
+  const readyCount = Object.keys(audioByIndex).length;
+  // Whether we're stalled waiting on the current paragraph to finish generating
+  // (as opposed to a hard failure). Drives a "still generating" hint, not an error.
+  const waitingForCurrent =
+    isPlaying && !currentUrl && !audioError && !audioComplete;
 
   useEffect(() => {
     const fetchStory = async () => {
@@ -86,52 +101,124 @@ const StoryReader = ({
     fetchStory();
   }, [storyId]);
 
+  // Enqueue the audio batch, seed the ready paragraphs, then stream the rest in
+  // over SSE (no polling). Returns a cleanup that tears down the subscription.
   useEffect(() => {
-    const fetchAudio = async () => {
-      if (!storyId) return;
+    if (!storyId) return;
 
-      setAudioLoading(true);
-      setAudioError(null);
+    let unsubscribe: (() => void) | undefined;
+    let cancelled = false;
+
+    // Reset per-story audio state so switching stories doesn't leak playback.
+    setOutline([]);
+    setAudioByIndex({});
+    setTotalParagraphs(0);
+    setCurrentIndex(0);
+    setAudioComplete(false);
+    setAudioError(null);
+    setIsPlaying(false);
+    setAudioLoading(true);
+
+    (async () => {
       try {
-        // Blue generates audio asynchronously: this enqueues a batch job and
-        // resolves once the first paragraph's audio is ready (or the batch
-        // completes). `audioLoading` keeps the UI in a "generating" state.
-        const audioData: StoryAudioResponse =
-          await getStoryAudioService(storyId);
-        if (audioData.audioUrl) {
-          setAudioUrl(audioData.audioUrl);
+        const batch = await startStoryAudioBatch(storyId);
+        if (cancelled) return;
+
+        setOutline(batch.outline);
+        setTotalParagraphs(
+          batch.totalParagraphs || batch.outline.length || batch.ready.length
+        );
+
+        const seeded: Record<number, string> = {};
+        for (const p of batch.ready) {
+          if (p.audioUrl) seeded[p.index] = p.audioUrl;
+        }
+        setAudioByIndex(seeded);
+
+        if (batch.batchJobId) {
+          // Paragraphs still generating — subscribe for the rest.
+          unsubscribe = subscribeToStoryAudioBatch(batch.batchJobId, {
+            onParagraphReady: (index, audioUrl) => {
+              setAudioByIndex((prev) =>
+                prev[index] ? prev : { ...prev, [index]: audioUrl }
+              );
+            },
+            onCompleted: () => setAudioComplete(true),
+            onFailed: (err) => {
+              // A hard batch failure only strands us if we have no audio at all;
+              // partial narration already played stays usable.
+              setAudioError(err || 'Audio generation failed.');
+              setAudioComplete(true);
+            },
+          });
         } else {
-          setAudioError('Audio is still being generated. Please try again.');
+          // Nothing pending — every paragraph is already in `seeded`.
+          setAudioComplete(true);
+        }
+
+        if (batch.ready.length === 0 && !batch.batchJobId) {
+          setAudioError('No audio is available for this story yet.');
         }
       } catch (error) {
-        console.error('Failed to fetch audio:', error);
-        setAudioError('Failed to load audio');
+        if (!cancelled) {
+          console.error('Failed to start story audio:', error);
+          setAudioError('Failed to load audio');
+        }
       } finally {
-        setAudioLoading(false);
+        if (!cancelled) setAudioLoading(false);
       }
-    };
-
-    fetchAudio();
-  }, [storyId]);
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    const updateTime = () => setCurrentTime(audio.currentTime);
-    const updateDuration = () => setDuration(audio.duration);
-    const handleEnded = () => setIsPlaying(false);
-
-    audio.addEventListener('timeupdate', updateTime);
-    audio.addEventListener('loadedmetadata', updateDuration);
-    audio.addEventListener('ended', handleEnded);
+    })();
 
     return () => {
-      audio.removeEventListener('timeupdate', updateTime);
-      audio.removeEventListener('loadedmetadata', updateDuration);
-      audio.removeEventListener('ended', handleEnded);
+      cancelled = true;
+      unsubscribe?.();
     };
-  }, []);
+  }, [storyId]);
+
+  // Drive playback: whenever we intend to play and the desired paragraph's audio
+  // is available, play it. If it isn't ready yet, do nothing — this effect
+  // re-runs the moment SSE fills `currentUrl` in, resuming seamlessly.
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !isPlaying || !currentUrl) return;
+
+    const p = audio.play();
+    if (p) {
+      p.catch((err: unknown) => {
+        // AbortError just means a newer paragraph's src interrupted this play()
+        // (normal during auto-advance) — not a real playback failure.
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        console.error('Failed to play audio:', err);
+        setAudioError('Failed to play audio');
+        setIsPlaying(false);
+      });
+    }
+  }, [isPlaying, currentUrl]);
+
+  // Auto-advance: when a paragraph ends, move to the next one. If it isn't ready
+  // yet the playback effect above will wait for it; when we run past the last
+  // paragraph, stop.
+  const handleParagraphEnded = () => {
+    setCurrentTime(0);
+    setDuration(0);
+    setCurrentIndex((idx) => {
+      const next = idx + 1;
+      if (totalParagraphs > 0 && next >= totalParagraphs) {
+        setIsPlaying(false);
+        return idx;
+      }
+      return next;
+    });
+  };
+
+  // Jump to a specific paragraph (click-to-play), only if its audio is ready.
+  const handleSelectParagraph = (index: number) => {
+    if (!audioByIndex[index]) return;
+    setCurrentTime(0);
+    setDuration(0);
+    setCurrentIndex(index);
+    setIsPlaying(true);
+  };
 
   const getModeDescription = () => {
     switch (mode) {
@@ -165,17 +252,14 @@ const StoryReader = ({
     }
   };
 
+  // `isPlaying` is user intent; the playback effect turns it into actual play()
+  // calls once audio is available. Pressing play while the first paragraph is
+  // still generating simply buffers until it arrives.
   const handlePlayPause = () => {
-    if (!audioRef.current || !audioUrl) return;
-
     if (isPlaying) {
-      audioRef.current.pause();
+      audioRef.current?.pause();
       setIsPlaying(false);
     } else {
-      audioRef.current.play().catch((error) => {
-        console.error('Failed to play audio:', error);
-        setAudioError('Failed to play audio');
-      });
       setIsPlaying(true);
     }
   };
@@ -212,17 +296,36 @@ const StoryReader = ({
 
   const currentQuestion = story?.questions?.[currentQuestionIndex];
 
+  // Definitively no audio (batch finished or failed with nothing playable).
+  const noAudioEver = (audioComplete || !!audioError) && readyCount === 0;
+  const playDisabled = audioLoading || noAudioEver;
+
+  // Status line beneath the voice chip.
+  const audioStatusText =
+    audioError && readyCount === 0
+      ? 'Audio unavailable'
+      : audioLoading
+        ? 'Loading audio...'
+        : waitingForCurrent
+          ? 'Generating audio...'
+          : `${formatTime(currentTime)} / ${formatTime(duration)}`;
+
   return (
     <div>
-      {/* Hidden audio element */}
-      {audioUrl && (
-        <audio
-          ref={audioRef}
-          src={audioUrl}
-          preload='metadata'
-          onError={() => setAudioError('Failed to load audio')}
-        />
-      )}
+      {/* Hidden audio element — one element, its src swaps per paragraph. */}
+      <audio
+        ref={audioRef}
+        src={currentUrl ?? undefined}
+        preload='metadata'
+        onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+        onEnded={handleParagraphEnded}
+        onError={() => {
+          // Only surface an element-level load error if this paragraph has no
+          // usable URL; a transient blip mid-playlist shouldn't nuke the reader.
+          if (!currentUrl) setAudioError('Failed to load audio');
+        }}
+      />
 
       <div className='mb-16'>
         <img src={displayImage} alt={displayTitle} />
@@ -260,11 +363,7 @@ const StoryReader = ({
               />
             </div>
             <small className='text-[#4A413F] text-base not-italic font-normal leading-5 font-abeezee mt-2'>
-              {audioError
-                ? 'Audio unavailable'
-                : audioLoading
-                  ? 'Loading audio...'
-                  : `${formatTime(currentTime)} / ${formatTime(duration)}`}
+              {audioStatusText}
             </small>
           </div>
         ) : (
@@ -272,11 +371,7 @@ const StoryReader = ({
             <div className='flex items-center gap-4'>
               <Image src={movementSmall} alt='movement' className='' />
               <small className='text-[#4A413F] text-base not-italic font-normal leading-5 font-abeezee mt-2'>
-                {audioError
-                  ? 'Audio unavailable'
-                  : audioLoading
-                    ? 'Loading audio...'
-                    : `${formatTime(currentTime)} / ${formatTime(duration)}`}
+                {audioStatusText}
               </small>
             </div>
             <div className='bg-white flex justify-center items-center gap-3 shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] px-6 py-2.5 rounded-[3.125rem] border-[0.5px] border-solid border-[#FAF4F2] font-qilka'>
@@ -381,6 +476,33 @@ const StoryReader = ({
                   </div>
                 )}
               </div>
+            ) : outline.length > 0 ? (
+              // Per-paragraph read-along: the playing paragraph is highlighted
+              // and ready paragraphs are click-to-play. Audio arrives over SSE,
+              // so a paragraph without audio yet reads dimmed until it lands.
+              <div className='space-y-3'>
+                {outline.map((para) => {
+                  const isReady = !!audioByIndex[para.index];
+                  const isActive = para.index === currentIndex;
+                  return (
+                    <p
+                      key={para.index}
+                      onClick={() => handleSelectParagraph(para.index)}
+                      className={`text-base not-italic font-normal leading-5 font-abeezee rounded-lg px-2 py-1 transition-colors ${
+                        isActive
+                          ? 'bg-[#E6FBFE] text-[#221D1D] font-medium'
+                          : 'text-[#221D1D]'
+                      } ${
+                        isReady
+                          ? 'cursor-pointer hover:bg-[#FAF4F2]'
+                          : 'opacity-60 cursor-default'
+                      }`}
+                    >
+                      {para.text}
+                    </p>
+                  );
+                })}
+              </div>
             ) : (
               <p className='text-[#221D1D] text-base not-italic font-normal leading-5 font-abeezee'>
                 {displayContent}
@@ -390,11 +512,9 @@ const StoryReader = ({
         )}
         <button
           onClick={handlePlayPause}
-          disabled={!audioUrl || audioLoading || !!audioError}
+          disabled={playDisabled}
           className={`mt-12 ${
-            !audioUrl || audioLoading || !!audioError
-              ? 'opacity-50 cursor-not-allowed'
-              : 'cursor-pointer'
+            playDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
           }`}
         >
           <Image
@@ -403,7 +523,16 @@ const StoryReader = ({
             className={isPlaying ? 'animate-pulse' : ''}
           />
         </button>
-        {audioError && (
+        {totalParagraphs > 1 && !noAudioEver && (
+          <p className='text-[#4A413F] text-xs mt-2 text-center font-abeezee'>
+            Paragraph {Math.min(currentIndex + 1, totalParagraphs)} of{' '}
+            {totalParagraphs}
+            {readyCount < totalParagraphs && ` · ${readyCount} ready`}
+          </p>
+        )}
+        {/* Only a hard failure with NO playable audio is an error; a batch that
+            is still generating shows the "Generating audio..." status instead. */}
+        {audioError && readyCount === 0 && (
           <p className='text-red-500 text-sm mt-2 text-center'>{audioError}</p>
         )}
       </div>

@@ -5,6 +5,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 import localFont from 'next/font/local';
 import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/sonner';
+import { Providers } from './providers';
 
 const abeezee = ABeeZee({
   variable: '--font-abeezee',
@@ -36,7 +37,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <Providers>{children}</Providers>
           <Toaster />
         </ThemeProvider>
       </body>

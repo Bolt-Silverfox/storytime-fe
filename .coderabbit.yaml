@@ -1,0 +1,11 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# Auto-review the green default (`dev`) plus every versioned line (e.g. develop-v1.3.0 "blue").
+# Without this, CodeRabbit only reviews PRs into the repo default branch, so blue PRs were skipped.
+language: en-US
+reviews:
+  auto_review:
+    enabled: true
+    base_branches:
+      - "dev"
+      - "develop-v\\d+\\.\\d+\\.\\d+"
+      - "main"

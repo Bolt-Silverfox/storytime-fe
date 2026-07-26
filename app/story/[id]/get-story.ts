@@ -42,15 +42,23 @@ export async function getStory(param: string): Promise<SharedStory | null> {
     return null;
   }
   const id = extractStoryId(param);
-  const apiKey = process.env.NEXT_PUBLIC_API_KEY;
+  if (!UUID_RE.test(id)) {
+    return null;
+  }
+  // Server-only key: this module runs on the server (uses next.revalidate), so
+  // prefer a non-public env var. Fall back to NEXT_PUBLIC_API_KEY for back-compat.
+  const apiKey = process.env.API_KEY ?? process.env.NEXT_PUBLIC_API_KEY;
   try {
-    const res = await fetch(`${base}/api/v1/stories/${id}`, {
-      headers: {
-        Accept: 'application/json',
-        ...(apiKey ? { 'X-API-Key': apiKey } : {}),
-      },
-      next: { revalidate: 3600 },
-    });
+    const res = await fetch(
+      `${base}/api/v1/stories/${encodeURIComponent(id)}`,
+      {
+        headers: {
+          Accept: 'application/json',
+          ...(apiKey ? { 'X-API-Key': apiKey } : {}),
+        },
+        next: { revalidate: 3600 },
+      }
+    );
     if (!res.ok) {
       return null;
     }

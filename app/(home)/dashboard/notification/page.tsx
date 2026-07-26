@@ -43,7 +43,9 @@ const NotificationPage = () => {
           </div>
           <Switch
             checked={enabled}
-            disabled={unsupported || denied || enabling}
+            // Allow turning OFF (device revocation) even when permission is
+            // denied; only block ENABLING while denied/unsupported/in-flight.
+            disabled={unsupported || enabling || (denied && !enabled)}
             onCheckedChange={(next) => {
               if (next) {
                 enable();

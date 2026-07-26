@@ -163,7 +163,7 @@ export const LinkedAccounts = () => {
       text: 'continue_with',
       width: 200,
     });
-  }, [googleReady, googleLinked, onGoogleCredential]);
+  }, [googleReady, googleLinked, loading, onGoogleCredential]);
 
   const linkApple = useCallback(async () => {
     if (!(APPLE_SERVICE_ID && APPLE_REDIRECT_URI && appleReady)) {

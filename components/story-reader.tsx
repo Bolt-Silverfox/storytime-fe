@@ -545,6 +545,7 @@ const StoryReader = ({
       audioRef.current.play().catch((error) => {
         console.error('Failed to play audio:', error);
         setAudioError('Failed to play audio');
+        setIsPlaying(false);
       });
       setIsPlaying(true);
     }
@@ -717,7 +718,10 @@ const StoryReader = ({
             className='data-[state=checked]:bg-[#83E9FB] data-[state=unchecked]:bg-[#000] cursor-pointer'
           />
         </div>
-        {isChecked && (
+        {(isChecked ||
+          (mode === 'interactive' &&
+            story?.questions &&
+            story.questions.length > 0)) && (
           <div className='w-full sm:w-[75%] mx-auto'>
             {mode === 'interactive' &&
             story?.questions &&
@@ -804,49 +808,51 @@ const StoryReader = ({
               </div>
             ) : (
               <div className='space-y-4 text-left'>
-                {readingParagraphs.map((para, i) => {
-                  const active = useAudioParagraphs && i === currentClip;
-                  // Per-paragraph audio state (only meaningful when the clips are
-                  // text-aligned): ready → playable, failed → retry, else loading.
-                  const paraFailed = useAudioParagraphs && failedIndices.has(i);
-                  const paraReady =
-                    !useAudioParagraphs || !!audioParagraphs[i]?.audioUrl;
-                  return (
-                    <div key={`para-${i}-${para.slice(0, 12)}`}>
-                      <p
-                        id={`reading-para-${i}`}
-                        className={`text-lg not-italic font-normal leading-8 font-abeezee -mx-2 rounded-md px-2 transition-colors duration-300 ${
-                          active
-                            ? 'bg-[#FFEFB8] font-medium text-[#221D1D]'
-                            : 'text-[#221D1D]'
-                        }`}
-                      >
-                        {para}
-                      </p>
-                      {paraFailed ? (
-                        <span className='mt-1 flex items-center gap-2 px-2 text-sm text-red-500 font-abeezee'>
-                          Audio unavailable
-                          <button
-                            type='button'
-                            onClick={() => {
-                              setAudioError(null);
-                              setAudioRetry((n) => n + 1);
-                            }}
-                            className='rounded-full border border-[#EC4007] px-3 py-1 text-xs font-semibold text-[#EC4007] transition hover:bg-[#EC4007]/5'
-                          >
-                            Retry
-                          </button>
-                        </span>
-                      ) : null}
-                      {!(paraReady || paraFailed) ? (
-                        <span className='mt-1 flex items-center gap-2 px-2 text-sm text-[#4A413F] font-abeezee'>
-                          <span className='inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#83E9FB] border-t-transparent' />
-                          Preparing audio…
-                        </span>
-                      ) : null}
-                    </div>
-                  );
-                })}
+                {isChecked &&
+                  readingParagraphs.map((para, i) => {
+                    const active = useAudioParagraphs && i === currentClip;
+                    // Per-paragraph audio state (only meaningful when the clips are
+                    // text-aligned): ready → playable, failed → retry, else loading.
+                    const paraFailed =
+                      useAudioParagraphs && failedIndices.has(i);
+                    const paraReady =
+                      !useAudioParagraphs || !!audioParagraphs[i]?.audioUrl;
+                    return (
+                      <div key={`para-${i}-${para.slice(0, 12)}`}>
+                        <p
+                          id={`reading-para-${i}`}
+                          className={`text-lg not-italic font-normal leading-8 font-abeezee -mx-2 rounded-md px-2 transition-colors duration-300 ${
+                            active
+                              ? 'bg-[#FFEFB8] font-medium text-[#221D1D]'
+                              : 'text-[#221D1D]'
+                          }`}
+                        >
+                          {para}
+                        </p>
+                        {paraFailed ? (
+                          <span className='mt-1 flex items-center gap-2 px-2 text-sm text-red-500 font-abeezee'>
+                            Audio unavailable
+                            <button
+                              type='button'
+                              onClick={() => {
+                                setAudioError(null);
+                                setAudioRetry((n) => n + 1);
+                              }}
+                              className='rounded-full border border-[#EC4007] px-3 py-1 text-xs font-semibold text-[#EC4007] transition hover:bg-[#EC4007]/5'
+                            >
+                              Retry
+                            </button>
+                          </span>
+                        ) : null}
+                        {!(paraReady || paraFailed) ? (
+                          <span className='mt-1 flex items-center gap-2 px-2 text-sm text-[#4A413F] font-abeezee'>
+                            <span className='inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#83E9FB] border-t-transparent' />
+                            Preparing audio…
+                          </span>
+                        ) : null}
+                      </div>
+                    );
+                  })}
                 {mode === 'interactive' &&
                   story?.questions &&
                   story.questions.length > 0 && (
@@ -893,7 +899,7 @@ const StoryReader = ({
             </button>
           </div>
         )}
-        {!isGuest && isChecked && (
+        {!isGuest && (
           <div className='mt-8 text-center'>
             {completion === 'done' ? (
               <p className='font-abeezee text-sm font-semibold text-green-600'>

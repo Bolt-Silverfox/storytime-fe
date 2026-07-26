@@ -153,7 +153,7 @@ function StoriesBrowse() {
             stacking one-per-row), wraps normally from sm up. */}
         <div className='mt-6 -mx-1 flex gap-2 overflow-x-auto px-1 pb-2 sm:mx-0 sm:flex-wrap sm:gap-3 sm:overflow-visible sm:px-0 sm:pb-0'>
           {[{ id: ALL, name: ALL }, ...categories].map((cat) => {
-            const active = cat.id === category;
+            const active = cat.id === ALL ? !category : cat.id === category;
             return (
               <button
                 key={cat.id}

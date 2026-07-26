@@ -76,7 +76,7 @@ const VerifyEmailPage = () => {
       toast.success(res?.message || 'Verification code sent');
       setEmail(targetEmail);
       setPhase('code');
-      setTimeLeft(60);
+      setTimeLeft(59);
     } catch (err) {
       toast.error(
         (err as { message?: string })?.message ||

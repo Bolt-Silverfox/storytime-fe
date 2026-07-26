@@ -1250,7 +1250,7 @@ export const listStoriesPageService = async (
     const data = response.data;
     const pagination = data?.pagination;
     return {
-      items: data?.data ?? [],
+      items: data?.data ?? data?.stories ?? data?.items ?? [],
       currentPage: pagination?.currentPage ?? 1,
       totalPages: pagination?.totalPages ?? 1,
       totalCount: pagination?.totalCount ?? 0,

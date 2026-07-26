@@ -37,6 +37,13 @@ api.interceptors.request.use((config) => {
   const token = Cookies.get('accessToken');
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
+  } else if (config.headers) {
+    // Guest mode: forward the guest session so quota/history are tracked
+    // (mirrors the mobile X-Guest-Session-Id header).
+    const guestSessionId = Cookies.get('guestSessionId');
+    if (guestSessionId) {
+      config.headers['X-Guest-Session-Id'] = guestSessionId;
+    }
   }
   return config;
 });

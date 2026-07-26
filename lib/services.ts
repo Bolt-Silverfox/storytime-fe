@@ -970,3 +970,59 @@ export const cancelStoryJobService = async (
     throw { message: error.message || 'Unexpected error', status: null };
   }
 };
+
+// ---------------------------------------------------------------------------
+// Guest mode — browse/read without an account. The backend tracks quota &
+// history via the X-Guest-Session-Id header (injected by the axios interceptor).
+// ---------------------------------------------------------------------------
+
+export interface GuestSession {
+  sessionId: string;
+  expiresIn: number;
+}
+
+export interface GuestStory {
+  id: string;
+  title: string;
+  description?: string | null;
+  coverImageUrl?: string | null;
+  audioUrl?: string | null;
+  textContent?: string | null;
+  isInteractive?: boolean;
+  ageMin?: number | null;
+  ageMax?: number | null;
+}
+
+// Thrown by the guest reader so callers can detect the quota wall (403).
+export interface ServiceError {
+  message: string;
+  status: number | null;
+}
+
+export const createGuestSessionService = async (): Promise<GuestSession> => {
+  const response = await api.post('guest/session');
+  return response.data;
+};
+
+// Reads a story as a guest. Consumes a quota slot for a new story, free for an
+// already-read one. Throws { message, status } — status 403 means quota reached.
+export const getGuestStoryService = async (
+  storyId: string
+): Promise<GuestStory> => {
+  try {
+    const response = await api.get(`guest/stories/${storyId}`);
+    return response.data;
+    // biome-ignore lint/suspicious/noExplicitAny: external error shape
+  } catch (error: any) {
+    if (error.response) {
+      throw {
+        message: error.response.data?.message || 'Failed to load story',
+        status: error.response.status,
+      } satisfies ServiceError;
+    }
+    throw {
+      message: error.message || 'Unexpected error',
+      status: null,
+    } satisfies ServiceError;
+  }
+};

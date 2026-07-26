@@ -74,6 +74,13 @@ export function subscribeToStoryJob(
       }
       try {
         const status = await getStoryJobStatusService(jobId);
+        // Re-check AFTER the await: stop() may have been called while this
+        // request was in flight (e.g. the user cancelled). Without this, a stale
+        // response would still fire onCompleted/onFailed and revive a torn-down
+        // subscription.
+        if (finished) {
+          return;
+        }
         handlers.onProgress?.(status.progress ?? 0, status.progressMessage);
 
         if (status.status === 'completed') {

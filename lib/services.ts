@@ -648,7 +648,12 @@ export const getStoryAudioService = async (
       ? data.paragraphs
       : [];
 
-    const firstReady = paragraphs.find((p) => !!p.audioUrl);
+    // Pick the LOWEST-index paragraph that actually has audio, so the eager
+    // path and the polling path below agree on which paragraph is "first" even
+    // when the backend returns paragraphs out of array order.
+    const firstReady = [...paragraphs]
+      .sort((a, b) => a.index - b.index)
+      .find((p) => !!p.audioUrl);
 
     // Poll the background batch if the eager response has no audio yet.
     if (!firstReady && data.batchJobId) {
@@ -666,11 +671,15 @@ export const getStoryAudioService = async (
           audioUrl: p.audioUrl,
         }));
 
-        if (completed.length > 0) {
-          const ready = [...completed].sort((a, b) => a.index - b.index)[0];
+        const ready = [...completed]
+          .sort((a, b) => a.index - b.index)
+          .find((p) => !!p.audioUrl);
+        if (ready) {
           return {
             message: data.message || 'Story audio ready',
-            audioUrl: ready.audioUrl as string,
+            // audioUrl is nullable on a paragraph; the `.find` above guarantees
+            // it's set here, but coalesce rather than an unsafe cast.
+            audioUrl: ready.audioUrl ?? '',
             voiceType: data.voiceId ?? voiceId ?? '',
             statusCode: 200,
             paragraphs: completed,

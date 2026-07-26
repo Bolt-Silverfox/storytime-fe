@@ -1,16 +1,22 @@
+import { setSelectedModeToStorage } from '@/lib/services';
+import interactive from '@/public/interactive.png';
+import plain from '@/public/plain.png';
 import { useState } from 'react';
 import ModeCard from './mode-card';
-import plain from '@/public/plain.png';
-import interactive from '@/public/interactive.png';
-import { setSelectedModeToStorage } from '@/lib/services';
 
 interface ModeSelectorProps {
   setStep: (step: number) => void;
   expand: boolean;
   onModeSelect?: (mode: string) => void;
+  // Interactive mode is only offered when the story has questions.
+  showInteractive?: boolean;
 }
 
-const ModeSelector = ({ setStep, expand, onModeSelect }: ModeSelectorProps) => {
+const ModeSelector = ({
+  setStep,
+  onModeSelect,
+  showInteractive = true,
+}: ModeSelectorProps) => {
   const [selectedMode, setSelectedMode] = useState<string | null>(null);
 
   const handleModeSelect = (mode: string) => {
@@ -38,7 +44,11 @@ const ModeSelector = ({ setStep, expand, onModeSelect }: ModeSelectorProps) => {
         <p className='text-[#4A413F] text-xs not-italic font-normal leading-4'>
           Select the type of story you want to read
         </p>
-        <div className={`grid grid-cols-2 gap-4 mb-8 mt-4`}>
+        <div
+          className={`grid gap-3 sm:gap-4 mb-8 mt-4 ${
+            showInteractive ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'
+          }`}
+        >
           <ModeCard
             title='Plain story mode'
             description='Just sit back and listen! The story is told from start to finish no interruptions, just imagination and fun.'
@@ -46,16 +56,19 @@ const ModeSelector = ({ setStep, expand, onModeSelect }: ModeSelectorProps) => {
             onClick={() => handleModeSelect('plain')}
             img={plain}
           />
-          <ModeCard
-            title='Interactive story mode'
-            description={`Get ready to join the adventure! You'll be asked questions, make choices, and help shape how the story goes.`}
-            active={selectedMode === 'interactive'}
-            onClick={() => handleModeSelect('interactive')}
-            img={interactive}
-          />
+          {showInteractive && (
+            <ModeCard
+              title='Interactive story mode'
+              description={`Get ready to join the adventure! You'll be asked questions, make choices, and help shape how the story goes.`}
+              active={selectedMode === 'interactive'}
+              onClick={() => handleModeSelect('interactive')}
+              img={interactive}
+            />
+          )}
         </div>
       </div>
       <button
+        type='button'
         className={`w-full justify-self-end py-4 cursor-pointer hover:scale-105 transition-all duration-300 rounded-[3.125rem] font-semibold ${
           selectedMode
             ? 'bg-[#EC4007] text-white'

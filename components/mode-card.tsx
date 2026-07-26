@@ -1,4 +1,4 @@
-import Image, { StaticImageData } from 'next/image';
+import Image, { type StaticImageData } from 'next/image';
 
 const ModeCard = ({
   title,
@@ -21,9 +21,15 @@ const ModeCard = ({
           : 'bg-white shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] border-stone-100'
       }`}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
     >
-      <Image src={img} alt='background' />
-      <div className='p-6'>
+      <Image src={img} alt='background' className='w-full max-w-full' />
+      <div className='p-4 sm:p-6'>
         <h3
           className={` text-xl not-italic font-normal leading-5 font-qilka ${
             active ? 'text-white' : 'text-[#221D1D]'

@@ -1471,3 +1471,56 @@ export const getStoryAudioBatchStatusService = async (
     };
   }
 };
+
+// ----- Web push device registration (FCM tokens) -----
+// Blue exposes these on DeviceTokenController @Controller('devices')
+// (AuthSessionGuard): POST /devices/register (RegisterDeviceTokenDto
+// { token, platform, deviceName? }; platform enum includes 'web') and
+// DELETE /devices (UnregisterDeviceDto { token }). Auth header is added by the
+// axios interceptor.
+export const registerWebPushTokenService = async (token: string) => {
+  try {
+    const deviceName =
+      typeof navigator !== 'undefined' ? navigator.userAgent : undefined;
+    const response = await api.post('/devices/register', {
+      token,
+      platform: 'web',
+      ...(deviceName ? { deviceName } : {}),
+    });
+    return response.data;
+    // biome-ignore lint/suspicious/noExplicitAny: external error shape
+  } catch (error: any) {
+    if (error.response) {
+      throw {
+        message: error.response.data?.message || 'Failed to register device',
+        status: error.response.status,
+        data: error.response.data,
+      };
+    }
+    if (error.request) {
+      throw { message: 'No response from server', status: null };
+    }
+    throw { message: error.message || 'Unexpected error', status: null };
+  }
+};
+
+// DELETE /devices — unregister the browser's FCM token (204 No Content).
+export const unregisterWebPushTokenService = async (token: string) => {
+  try {
+    const response = await api.delete('/devices', { data: { token } });
+    return response.data;
+    // biome-ignore lint/suspicious/noExplicitAny: external error shape
+  } catch (error: any) {
+    if (error.response) {
+      throw {
+        message: error.response.data?.message || 'Failed to unregister device',
+        status: error.response.status,
+        data: error.response.data,
+      };
+    }
+    if (error.request) {
+      throw { message: 'No response from server', status: null };
+    }
+    throw { message: error.message || 'Unexpected error', status: null };
+  }
+};

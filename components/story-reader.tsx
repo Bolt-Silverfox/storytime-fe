@@ -5,7 +5,11 @@ import play from '@/public/play.svg';
 import Image from 'next/image';
 import { Switch } from './ui/switch';
 import { useState, useEffect, useRef } from 'react';
-import { getStoryByIdService, getStoryAudioService } from '@/lib/services';
+import {
+  getStoryByIdService,
+  getStoryAudioService,
+  type StoryAudioResponse,
+} from '@/lib/services';
 
 interface Question {
   id: string;
@@ -24,13 +28,6 @@ interface Story {
   isInteractive?: boolean;
   questions?: Question[];
   [key: string]: any;
-}
-
-interface AudioResponse {
-  message: string;
-  audioUrl: string;
-  voiceType: string;
-  statusCode: number;
 }
 
 const StoryReader = ({
@@ -96,11 +93,15 @@ const StoryReader = ({
       setAudioLoading(true);
       setAudioError(null);
       try {
-        const audioData: AudioResponse = await getStoryAudioService(storyId);
+        // Blue generates audio asynchronously: this enqueues a batch job and
+        // resolves once the first paragraph's audio is ready (or the batch
+        // completes). `audioLoading` keeps the UI in a "generating" state.
+        const audioData: StoryAudioResponse =
+          await getStoryAudioService(storyId);
         if (audioData.audioUrl) {
           setAudioUrl(audioData.audioUrl);
         } else {
-          setAudioError('No audio URL received from server');
+          setAudioError('Audio is still being generated. Please try again.');
         }
       } catch (error) {
         console.error('Failed to fetch audio:', error);
@@ -262,8 +263,8 @@ const StoryReader = ({
               {audioError
                 ? 'Audio unavailable'
                 : audioLoading
-                ? 'Loading audio...'
-                : `${formatTime(currentTime)} / ${formatTime(duration)}`}
+                  ? 'Loading audio...'
+                  : `${formatTime(currentTime)} / ${formatTime(duration)}`}
             </small>
           </div>
         ) : (
@@ -274,8 +275,8 @@ const StoryReader = ({
                 {audioError
                   ? 'Audio unavailable'
                   : audioLoading
-                  ? 'Loading audio...'
-                  : `${formatTime(currentTime)} / ${formatTime(duration)}`}
+                    ? 'Loading audio...'
+                    : `${formatTime(currentTime)} / ${formatTime(duration)}`}
               </small>
             </div>
             <div className='bg-white flex justify-center items-center gap-3 shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] px-6 py-2.5 rounded-[3.125rem] border-[0.5px] border-solid border-[#FAF4F2] font-qilka'>

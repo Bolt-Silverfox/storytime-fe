@@ -66,16 +66,17 @@ api.interceptors.response.use(
       const refreshToken = Cookies.get('refreshToken');
 
       try {
+        // Blue's POST /auth/refresh takes { token } (RefreshTokenDto) and
+        // returns { user, jwt } — it does NOT issue a new refresh token, so the
+        // existing refreshToken cookie is preserved as-is.
         const { data } = await axios.post(
-          `${process.env.NEXT_PUBLIC_API_URL}/auth/refresh-token`,
-          { refreshToken }
+          `${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/refresh`,
+          { token: refreshToken }
         );
 
         const newAccessToken = data.jwt;
-        const newRefreshToken = data.refreshToken;
 
         Cookies.set('accessToken', newAccessToken, { expires: 1 / 24 });
-        Cookies.set('refreshToken', newRefreshToken, { expires: 7 });
 
         processQueue(null, newAccessToken);
 

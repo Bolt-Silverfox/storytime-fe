@@ -9,6 +9,8 @@ import StoryCategory from './_components/story-category';
 import Header from '@/components/header';
 import { cn } from '@/lib/utils';
 import KidPicker from '@/components/kid-picker';
+import Link from 'next/link';
+import { buttonVariants } from '@/components/ui/button';
 
 const DashboardPage = () => {
   const [selectedKidId, setSelectedKidId] = useState<string | null>(null);
@@ -43,6 +45,25 @@ const DashboardPage = () => {
         <KidPicker onKidSelect={handleKidSelected} />
       ) : (
         <>
+          <div className='mt-6 flex items-center justify-between rounded-2xl border-[0.5px] border-[#FAF4F2] bg-[#FFF6F3] px-6 py-5'>
+            <div>
+              <h2 className='text-[#221D1D] text-xl font-bold font-qilka'>
+                Create a new story
+              </h2>
+              <p className='text-[#4A413F] font-abeezee'>
+                Personalize a brand-new AI story for your child
+              </p>
+            </div>
+            <Link
+              href='/dashboard/create-story'
+              className={cn(
+                buttonVariants({ variant: 'primary' }),
+                'py-[15px] h-auto px-8'
+              )}
+            >
+              Create a story
+            </Link>
+          </div>
           <DailyChallenge />
           <Recommended />
           <ThemeStory />

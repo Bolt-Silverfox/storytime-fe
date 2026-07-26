@@ -125,6 +125,114 @@ export const loginService = async (payload: LoginPayload) => {
   }
 };
 
+// Shared error-normaliser for the OAuth token exchanges below. Mirrors the
+// login/register catch blocks but preserves the backend `error` code and any
+// extra data so the UI can react (e.g. steer the user to password login).
+// Kept in blue's inline style (no AxiosError import).
+// biome-ignore lint/suspicious/noExplicitAny: axios error shape
+const normaliseAuthError = (error: any, fallback: string) => {
+  if (error?.response) {
+    const data = error.response.data;
+    return {
+      message: data?.message || fallback,
+      status: error.response.status,
+      code: data?.error as string | undefined,
+      data,
+    };
+  }
+  if (error?.request) {
+    return { message: 'No response from server', status: null };
+  }
+  return { message: error?.message || 'Unexpected error', status: null };
+};
+
+// Exchange a Google ID token (the `credential` from Google Identity Services)
+// for our own session. Blue's POST /auth/google verifies the token audience,
+// upserts the user (auto-linking to an existing email account), and returns the
+// same { jwt, refreshToken, user } as email/password login.
+export const googleLoginService = async (idToken: string) => {
+  try {
+    const response = await api.post('/auth/google', { id_token: idToken });
+    const { jwt, refreshToken, user } = response.data;
+    setTokens(jwt, refreshToken, user);
+    return response.data;
+  } catch (error: unknown) {
+    throw normaliseAuthError(error, 'Google sign-in failed');
+  }
+};
+
+// Exchange an Apple identity token for our own session. firstName/lastName are
+// only supplied by Apple on the very first authorization, so they're optional.
+export const appleLoginService = async (payload: {
+  idToken: string;
+  firstName?: string;
+  lastName?: string;
+}) => {
+  try {
+    const response = await api.post('/auth/apple', {
+      id_token: payload.idToken,
+      ...(payload.firstName ? { firstName: payload.firstName } : {}),
+      ...(payload.lastName ? { lastName: payload.lastName } : {}),
+    });
+    const { jwt, refreshToken, user } = response.data;
+    setTokens(jwt, refreshToken, user);
+    return response.data;
+  } catch (error: unknown) {
+    throw normaliseAuthError(error, 'Apple sign-in failed');
+  }
+};
+
+// ---- Account linking (authenticated) --------------------------------------
+// Blue exposes the linked sign-in methods via GET /auth/linked-accounts; the
+// user DTO does NOT carry googleId/appleId. `provider: 'email'` appears only
+// when the account has a local password.
+export type LinkedProvider = 'email' | 'google' | 'apple';
+export interface LinkedAccount {
+  provider: LinkedProvider;
+  email: string | null;
+  linkedAt: string | null;
+}
+
+export const getLinkedAccountsService = async (): Promise<LinkedAccount[]> => {
+  const response = await api.get('/auth/linked-accounts');
+  // Blue's controller returns { success, message, statusCode, data: accounts },
+  // and the global SuccessResponseInterceptor may wrap that again. Dig for the
+  // first array so we tolerate any wrapping depth.
+  // biome-ignore lint/suspicious/noExplicitAny: unwrap arbitrary envelope depth
+  let node: any = response.data;
+  for (let i = 0; i < 3 && node && !Array.isArray(node); i++) {
+    node = node.data;
+  }
+  return Array.isArray(node) ? (node as LinkedAccount[]) : [];
+};
+
+export const linkGoogleService = async (idToken: string) => {
+  try {
+    const response = await api.post('/auth/link/google', { id_token: idToken });
+    return response.data;
+  } catch (error: unknown) {
+    throw normaliseAuthError(error, 'Could not link your Google account');
+  }
+};
+
+export const linkAppleService = async (idToken: string) => {
+  try {
+    const response = await api.post('/auth/link/apple', { id_token: idToken });
+    return response.data;
+  } catch (error: unknown) {
+    throw normaliseAuthError(error, 'Could not link your Apple account');
+  }
+};
+
+export const unlinkProviderService = async (provider: 'google' | 'apple') => {
+  try {
+    const response = await api.delete(`/auth/unlink/${provider}`);
+    return response.data;
+  } catch (error: unknown) {
+    throw normaliseAuthError(error, 'Could not unlink your account');
+  }
+};
+
 export const verifyEmailService = async (token: string) => {
   try {
     const response = await api.post('/auth/verify-email', { token });

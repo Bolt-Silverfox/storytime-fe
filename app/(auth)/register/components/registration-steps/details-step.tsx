@@ -1,16 +1,7 @@
 'use client';
 
+import { OAuthButtons } from '@/components/auth/oauth-buttons';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { registrationTitles } from '@/lib/data';
-import Link from 'next/link';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Form,
   FormControl,
@@ -18,12 +9,22 @@ import {
   FormItem,
   FormMessage,
 } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useAuth } from '@/context/auth-context';
+import { registrationTitles } from '@/lib/data';
+import { cn } from '@/lib/utils';
 import { zodResolver } from '@hookform/resolvers/zod';
+import Link from 'next/link';
+import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { useForm } from 'react-hook-form';
-import { cn } from '@/lib/utils';
-import { useAuth } from '@/context/auth-context';
 
 const FormSchema = z.object({
   title: z
@@ -148,6 +149,7 @@ export const DetailsStep = () => {
             Login
           </Link>
         </p>
+        <OAuthButtons mode='register' />
       </form>
     </Form>
   );

@@ -1,10 +1,13 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { resetFavoritesStore } from '@/lib/favorites-store';
+import { revokeWebPushForLogout } from '@/lib/hooks/use-web-push';
+import { resetProgressStore } from '@/lib/progress-store';
+import { AnimatePresence, motion } from 'framer-motion';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useEffect, useRef } from 'react';
 
 interface ProfileDropdownProps {
   open: boolean;
@@ -56,6 +59,13 @@ export default function ProfileDropdown({
   }, [open, onClose]);
 
   const handleLogout = () => {
+    // Revoke this browser's push device registration before clearing local
+    // state (reads the account-scoped token synchronously up-front).
+    void revokeWebPushForLogout();
+    // Reset in-memory client stores so the next account on this browser can't
+    // inherit the previous account's favorites/reading progress.
+    resetFavoritesStore();
+    resetProgressStore();
     localStorage.clear();
     sessionStorage.clear();
     router.push('/login');

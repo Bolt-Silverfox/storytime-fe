@@ -65,8 +65,15 @@ const loadOnce = () => {
     loading = true;
     Promise.all([getInProgressStoriesService(), getCompletedStoriesService()])
       .then(([inProgress, completed]) => {
-        reading = new Set(inProgress.map((s) => s.id).filter(Boolean));
-        done = new Set(completed.map((s) => s.id).filter(Boolean));
+        // Merge into existing sets rather than replacing them, so marks made by
+        // markReading/markDone while this fetch was in flight aren't dropped.
+        const fetchedDone = completed.map((s) => s.id).filter(Boolean);
+        done = new Set([...done, ...fetchedDone]);
+        reading = new Set(
+          [...reading, ...inProgress.map((s) => s.id).filter(Boolean)].filter(
+            (id) => !done.has(id)
+          )
+        );
         emit();
       })
       .catch(() => {
@@ -83,6 +90,17 @@ const loadOnce = () => {
   reading = new Set(readGuestIds(GUEST_READING_KEY));
   done = new Set(readGuestIds(GUEST_DONE_KEY));
   loaded = true;
+  emit();
+};
+
+// Reset the singleton so a new account (or logout) doesn't inherit the previous
+// account's in-memory reading/done marks. Guest data lives under guest-scoped
+// localStorage keys and is re-hydrated on the next subscribe. Wire into logout.
+export const resetProgressStore = () => {
+  reading = new Set();
+  done = new Set();
+  loaded = false;
+  loading = false;
   emit();
 };
 

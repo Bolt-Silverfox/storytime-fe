@@ -1,7 +1,7 @@
 'use client';
 
-import { isUserLoggedIn } from '@/lib/services';
-import { useSyncExternalStore } from 'react';
+import { getUserFromStorage, isUserLoggedIn } from '@/lib/services';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 
 // Module-singleton store of the current user's favorited story ids. Shared by
 // every FavoriteHeart on the page so a toggle on one card reflects everywhere.
@@ -10,7 +10,15 @@ import { useSyncExternalStore } from 'react';
 // so favorites here are CLIENT-SIDE ONLY — persisted to localStorage. No
 // parent-favorites backend calls are made.
 
-const FAVORITES_KEY = 'favoriteStories';
+const FAVORITES_KEY_BASE = 'favoriteStories';
+
+// Scope persisted favorites by the signed-in user id so a shared browser never
+// leaks one account's favorites to the next account (or after logout). Guests
+// keep the legacy unscoped key so their favorites survive.
+const favoritesKey = (): string => {
+  const userId = getUserFromStorage()?.id;
+  return userId ? `${FAVORITES_KEY_BASE}:${userId}` : FAVORITES_KEY_BASE;
+};
 
 let favorites = new Set<string>();
 const listeners = new Set<() => void>();
@@ -31,7 +39,7 @@ const readIds = (): string[] => {
     return [];
   }
   try {
-    const raw = window.localStorage.getItem(FAVORITES_KEY);
+    const raw = window.localStorage.getItem(favoritesKey());
     if (!raw) {
       return [];
     }
@@ -47,7 +55,7 @@ const writeIds = (ids: Set<string>) => {
     return;
   }
   try {
-    window.localStorage.setItem(FAVORITES_KEY, JSON.stringify([...ids]));
+    window.localStorage.setItem(favoritesKey(), JSON.stringify([...ids]));
   } catch {
     // Ignore — persistence is best-effort.
   }
@@ -65,6 +73,14 @@ const loadOnce = () => {
   }
   loaded = true;
   favorites = new Set(readIds());
+  emit();
+};
+
+// Reset in-memory state so the next account (or a re-hydrate) reads its own
+// namespaced key rather than the previous account's favorites. Wire into logout.
+export const resetFavoritesStore = () => {
+  favorites = new Set();
+  loaded = false;
   emit();
 };
 
@@ -97,9 +113,17 @@ export const useFavorite = (storyId: string) => {
     getServerSnapshot
   );
 
+  // isUserLoggedIn() reads localStorage/cookies, which are unavailable during
+  // SSR/first render — calling it inline would risk a hydration mismatch.
+  // Resolve it after mount so the server snapshot is a stable `false`.
+  const [canFavorite, setCanFavorite] = useState(false);
+  useEffect(() => {
+    setCanFavorite(isUserLoggedIn());
+  }, []);
+
   return {
     isFavorite: current.has(storyId),
-    canFavorite: isUserLoggedIn(),
+    canFavorite,
     toggle: () => toggleFavorite(storyId),
   };
 };

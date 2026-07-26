@@ -30,6 +30,7 @@ import kid4 from '@/public/kid-4.svg';
 import noah from '@/public/noah.png';
 import oliva from '@/public/oliva.png';
 import stella from '@/public/stella.png';
+import Cookies from 'js-cookie';
 import Image from 'next/image';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -173,7 +174,10 @@ const PersonalSettingsPage = () => {
       setShowConfirmDeleteModal(false);
       toast.success('Your account has been deleted');
       // Session is gone server-side; clear local state and return to login.
-      window.location.href = '/login';
+      Cookies.remove('accessToken');
+      Cookies.remove('refreshToken');
+      localStorage.removeItem('user');
+      window.location.href = '/login?loggedOut=1';
     } catch (error) {
       toast.error(
         (error as { message?: string })?.message || 'Failed to delete account'

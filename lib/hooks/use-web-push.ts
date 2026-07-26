@@ -7,26 +7,68 @@ import {
   requestPushPermissionAndToken,
 } from '@/lib/firebase-messaging';
 import {
+  getUserFromStorage,
   registerWebPushTokenService,
   unregisterWebPushTokenService,
 } from '@/lib/services';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
-const STORAGE_KEY = 'webPushToken';
+const STORAGE_KEY_BASE = 'webPushToken';
 
 type PermissionState = NotificationPermission | 'unsupported';
+
+// The stored FCM token is per-account subscription state, not origin-wide: an
+// origin-wide key would let account B inherit account A's "enabled" state and
+// registration on a shared browser. Scope the key by the signed-in user id.
+const storageKey = (): string => {
+  const userId = getUserFromStorage()?.id;
+  return userId ? `${STORAGE_KEY_BASE}:${userId}` : STORAGE_KEY_BASE;
+};
 
 const readStoredToken = (): string | null => {
   if (typeof window === 'undefined') {
     return null;
   }
   try {
-    return localStorage.getItem(STORAGE_KEY);
+    return localStorage.getItem(storageKey());
   } catch {
     return null;
   }
 };
+
+// Called from the logout flow: revoke this browser's backend device
+// registration (and Firebase token) before the account's local state is
+// cleared, so the next account on this browser doesn't inherit A's push.
+export async function revokeWebPushForLogout(): Promise<void> {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  const key = storageKey();
+  let token: string | null = null;
+  try {
+    token = localStorage.getItem(key);
+  } catch {
+    token = null;
+  }
+  if (token) {
+    try {
+      await unregisterWebPushTokenService(token);
+    } catch {
+      // Best-effort — still clear local state below.
+    }
+  }
+  try {
+    await deletePushToken();
+  } catch {
+    // Best-effort.
+  }
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // Ignore storage failures.
+  }
+}
 
 export interface UseWebPush {
   // Whether this browser can receive web push AND config is present.
@@ -112,7 +154,7 @@ export function useWebPush(): UseWebPush {
       }
       await registerWebPushTokenService(token);
       try {
-        localStorage.setItem(STORAGE_KEY, token);
+        localStorage.setItem(storageKey(), token);
       } catch {
         // Ignore storage failures; the token is still registered server-side.
       }
@@ -145,7 +187,7 @@ export function useWebPush(): UseWebPush {
       }
       await deletePushToken();
       try {
-        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(storageKey());
       } catch {
         // Ignore storage failures.
       }

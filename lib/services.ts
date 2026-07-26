@@ -351,6 +351,88 @@ export const getKidsService = async () => {
   }
 };
 
+// ---------------------------------------------------------------------------
+// Avatars — persisted, backend-owned. A kid's avatar must be a real avatar `id`
+// (blue's CreateKidDto.avatarId), NOT a local asset path or blob URL.
+// ---------------------------------------------------------------------------
+
+export interface SystemAvatar {
+  id: string;
+  name?: string;
+  url: string;
+}
+
+/**
+ * Fetch the predefined system avatars. Blue: `GET /avatars/system` (public),
+ * responding `{ data: [{ id, name, url, isSystemAvatar, ... }] }`.
+ */
+export const getSystemAvatarsService = async (): Promise<SystemAvatar[]> => {
+  try {
+    const response = await api.get('/avatars/system');
+    const list = Array.isArray(response.data?.data)
+      ? response.data.data
+      : Array.isArray(response.data)
+        ? response.data
+        : [];
+    return list
+      .filter((a: unknown): a is SystemAvatar => {
+        const av = a as SystemAvatar;
+        return !!av && typeof av.id === 'string' && typeof av.url === 'string';
+      })
+      .map((a: SystemAvatar) => ({ id: a.id, name: a.name, url: a.url }));
+    // biome-ignore lint/suspicious/noExplicitAny: external error shape
+  } catch (error: any) {
+    if (error.response) {
+      throw {
+        message: error.response.data?.message || 'Failed to load avatars',
+        status: error.response.status,
+        data: error.response.data,
+      };
+    }
+    if (error.request) {
+      throw { message: 'No response from server', status: null };
+    }
+    throw { message: error.message || 'Unexpected error', status: null };
+  }
+};
+
+/**
+ * Upload a custom avatar image and persist it, returning the created avatar so
+ * its `id` can be attached to a kid. Blue: `POST /avatars` (multipart, field
+ * `image`) → `{ data: { id, url, ... } }`. Non-admin uploads become custom
+ * (non-system) avatars.
+ */
+export const uploadAvatarService = async (
+  file: File,
+  name?: string
+): Promise<SystemAvatar> => {
+  try {
+    const formData = new FormData();
+    formData.append('image', file);
+    if (name) formData.append('name', name);
+
+    const response = await api.post('/avatars', formData);
+    const avatar = response.data?.data ?? response.data;
+    if (!avatar || typeof avatar.id !== 'string' || typeof avatar.url !== 'string') {
+      throw { message: 'Avatar upload returned an unexpected response', status: null };
+    }
+    return { id: avatar.id, name: avatar.name, url: avatar.url };
+    // biome-ignore lint/suspicious/noExplicitAny: external error shape
+  } catch (error: any) {
+    if (error.response) {
+      throw {
+        message: error.response.data?.message || 'Failed to upload avatar',
+        status: error.response.status,
+        data: error.response.data,
+      };
+    }
+    if (error.request) {
+      throw { message: 'No response from server', status: null };
+    }
+    throw { message: error.message || 'Unexpected error', status: null };
+  }
+};
+
 export const getAvailableVoicesService = async (): Promise<Voice[]> => {
   try {
     const response = await api.get('/voice/available');

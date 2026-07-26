@@ -233,6 +233,28 @@ export const unlinkProviderService = async (provider: 'google' | 'apple') => {
   }
 };
 
+// Delete the signed-in user's account. Blue: DELETE /user/me (soft delete by
+// default; ?permanent=true hard-deletes). Auth header added by the interceptor.
+export const deleteAccountService = async () => {
+  try {
+    const response = await api.delete('/user/me');
+    return response.data;
+    // biome-ignore lint/suspicious/noExplicitAny: external error shape
+  } catch (error: any) {
+    if (error.response) {
+      throw {
+        message: error.response.data?.message || 'Failed to delete account',
+        status: error.response.status,
+        data: error.response.data,
+      };
+    }
+    if (error.request) {
+      throw { message: 'No response from server', status: null };
+    }
+    throw { message: error.message || 'Unexpected error', status: null };
+  }
+};
+
 export const verifyEmailService = async (token: string) => {
   try {
     const response = await api.post('/auth/verify-email', { token });

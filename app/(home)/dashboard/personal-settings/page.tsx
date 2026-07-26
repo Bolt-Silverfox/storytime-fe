@@ -1,33 +1,38 @@
 'use client';
 
 import Header from '@/components/header';
-import { getKidsService, getUserFromStorage } from '@/lib/services';
-import { cn } from '@/lib/utils';
-import avatar from '@/public/avatar-big.png';
-import kid1 from '@/public/kid-3.svg';
-import kid2 from '@/public/kid-4.svg';
-import kid3 from '@/public/kid-3.svg';
-import kid4 from '@/public/kid-4.svg';
-import Image from 'next/image';
-import { useEffect, useState, useRef, useCallback } from 'react';
 import KidsCard from '@/components/kids-card';
-import Modal from '@/components/ui/modal';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import Modal from '@/components/ui/modal';
 import {
   Select,
-  SelectTrigger,
-  SelectValue,
   SelectContent,
   SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
 import { countries } from '@/data/countries';
-import stella from '@/public/stella.png';
+import {
+  deleteAccountService,
+  getKidsService,
+  getUserFromStorage,
+} from '@/lib/services';
+import { cn } from '@/lib/utils';
+import avatar from '@/public/avatar-big.png';
 import danny from '@/public/danny.png';
-import oliva from '@/public/oliva.png';
-import henry from '@/public/henry.png';
 import ella from '@/public/ella.png';
+import henry from '@/public/henry.png';
+import kid1 from '@/public/kid-3.svg';
+import kid3 from '@/public/kid-3.svg';
+import kid2 from '@/public/kid-4.svg';
+import kid4 from '@/public/kid-4.svg';
 import noah from '@/public/noah.png';
+import oliva from '@/public/oliva.png';
+import stella from '@/public/stella.png';
+import Image from 'next/image';
+import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 const PersonalSettingsPage = () => {
   const user = getUserFromStorage();
@@ -55,6 +60,7 @@ const PersonalSettingsPage = () => {
   const [emailInput, setEmailInput] = useState(user?.email || '');
   const [deleteStep, setDeleteStep] = useState(1);
   const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   // Default avatar images to use when avatarUrl is null
   const defaultAvatars = [kid1, kid2, kid3, kid4];
@@ -156,11 +162,25 @@ const PersonalSettingsPage = () => {
     setDeleteReason('');
     setOtherReason('');
   };
-  const handleDeleteConfirmCancel = () => setShowDeleteConfirmModal(false);
-  const handleDeleteConfirm = () => {
-    setShowDeleteConfirmModal(false);
-    // Placeholder: log out user here
-    window.location.href = '/login';
+  const handleDeleteConfirmCancel = () => setShowConfirmDeleteModal(false);
+  const handleDeleteConfirm = async () => {
+    if (deletingAccount) {
+      return;
+    }
+    setDeletingAccount(true);
+    try {
+      await deleteAccountService();
+      setShowConfirmDeleteModal(false);
+      toast.success('Your account has been deleted');
+      // Session is gone server-side; clear local state and return to login.
+      window.location.href = '/login';
+    } catch (error) {
+      toast.error(
+        (error as { message?: string })?.message || 'Failed to delete account'
+      );
+    } finally {
+      setDeletingAccount(false);
+    }
   };
 
   return (
@@ -749,11 +769,13 @@ const PersonalSettingsPage = () => {
                 </button>
                 <button
                   type='button'
-                  className='w-1/2 bg-[#EC4007] text-white rounded-full py-4 font-abeezee text-base'
+                  className='w-1/2 bg-[#EC4007] text-white rounded-full py-4 font-abeezee text-base disabled:cursor-not-allowed disabled:opacity-60'
                   onClick={handleDeleteConfirm}
-                  disabled={!emailInput || emailInput !== user?.email}
+                  disabled={
+                    !emailInput || emailInput !== user?.email || deletingAccount
+                  }
                 >
-                  Delete account
+                  {deletingAccount ? 'Deleting…' : 'Delete account'}
                   <span className='ml-2'>&rarr;</span>
                 </button>
               </div>

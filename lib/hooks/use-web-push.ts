@@ -51,18 +51,16 @@ export async function revokeWebPushForLogout(): Promise<void> {
   } catch {
     token = null;
   }
-  if (token) {
-    try {
-      await unregisterWebPushTokenService(token);
-    } catch {
-      // Best-effort — still clear local state below.
-    }
+  if (!token) {
+    return;
   }
-  try {
-    await deletePushToken();
-  } catch {
-    // Best-effort.
-  }
+  // Let failures propagate: the caller (logout handler) bounds this with a
+  // timeout and proceeds regardless. We only drop the local token once the
+  // server + device cleanup actually succeed, so a failed revocation leaves
+  // the token in place for a later retry instead of orphaning the server
+  // registration with nothing left to unregister.
+  await unregisterWebPushTokenService(token);
+  await deletePushToken();
   try {
     localStorage.removeItem(key);
   } catch {
@@ -155,8 +153,15 @@ export function useWebPush(): UseWebPush {
       await registerWebPushTokenService(token);
       try {
         localStorage.setItem(storageKey(), token);
-      } catch {
-        // Ignore storage failures; the token is still registered server-side.
+      } catch (storageError) {
+        // Persisting the token failed — roll back the server registration so
+        // we don't leave an enabled registration with no local record of it.
+        try {
+          await unregisterWebPushTokenService(token);
+        } catch {
+          // Best-effort rollback.
+        }
+        throw storageError;
       }
       setEnabled(true);
       subscribeForeground();
@@ -178,12 +183,11 @@ export function useWebPush(): UseWebPush {
     setEnabling(true);
     try {
       const token = readStoredToken();
+      // Don't swallow cleanup failures: if the server unregister or device
+      // token deletion fails, let it throw so we keep the stored token (and
+      // the enabled state) rather than orphaning the server registration.
       if (token) {
-        try {
-          await unregisterWebPushTokenService(token);
-        } catch {
-          // Best-effort: still clear the local token below.
-        }
+        await unregisterWebPushTokenService(token);
       }
       await deletePushToken();
       try {

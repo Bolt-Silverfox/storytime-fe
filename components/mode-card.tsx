@@ -16,6 +16,7 @@ const ModeCard = ({
   return (
     <button
       type='button'
+      aria-pressed={active}
       className={`block text-left w-full rounded-[1.5625rem] border-[0.5px] border-solid cursor-pointer hover:scale-105 transition-all duration-300 ${
         active
           ? 'bg-[#EC4007] shadow-[0px_0px_0px_4px_rgba(236,64,7,0.15)] rounded-3xl border-[#F84020] text-white'

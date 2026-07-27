@@ -58,10 +58,19 @@ export default function ProfileDropdown({
     return () => document.removeEventListener('mousedown', handleClick);
   }, [open, onClose]);
 
-  const handleLogout = () => {
-    // Revoke this browser's push device registration before clearing local
-    // state (reads the account-scoped token synchronously up-front).
-    void revokeWebPushForLogout();
+  const handleLogout = async () => {
+    // Revoke this browser's push device registration BEFORE clearing local
+    // state, so the cleanup runs under the old session (not a fast re-login).
+    // Bound it so logout can never hang, and proceed with local cleanup
+    // regardless of whether revocation succeeds, fails, or times out.
+    try {
+      await Promise.race([
+        revokeWebPushForLogout(),
+        new Promise((resolve) => setTimeout(resolve, 3000)),
+      ]);
+    } catch {
+      // Best-effort — continue logging out even if revocation failed.
+    }
     // Reset in-memory client stores so the next account on this browser can't
     // inherit the previous account's favorites/reading progress.
     resetFavoritesStore();

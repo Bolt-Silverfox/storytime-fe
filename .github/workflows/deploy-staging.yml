@@ -76,6 +76,8 @@ jobs:
             echo "NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID=${{ vars.NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID }}"
             echo "NEXT_PUBLIC_APPLE_SERVICE_ID=${{ vars.NEXT_PUBLIC_APPLE_SERVICE_ID }}"
             echo "NEXT_PUBLIC_APPLE_REDIRECT_URI=${{ vars.NEXT_PUBLIC_APPLE_REDIRECT_URI }}"
+            echo "NEXT_PUBLIC_SENTRY_DSN=${{ vars.NEXT_PUBLIC_SENTRY_DSN }}"
+            echo "NEXT_PUBLIC_SENTRY_ENV=${{ vars.NEXT_PUBLIC_SENTRY_ENV }}"
           } >> .env
 
       - name: Build application

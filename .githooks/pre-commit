@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+#
+# pre-commit — local early-warning against the config-injection worm family.
+#
+# Runs the shared structural scanner over STAGED files only. This is a
+# convenience layer: it is bypassable (git commit --no-verify) and only runs for
+# contributors who have enabled it. The authoritative gate is the CI
+# malware-scan (required status check). Enable locally with:
+#
+#   git config core.hooksPath .githooks
+#
+set -uo pipefail
+
+repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+scanner="${repo_root}/scripts/scan-injection.sh"
+
+if [ ! -x "$scanner" ]; then
+  echo "pre-commit: scripts/scan-injection.sh not found/executable — skipping local scan." >&2
+  echo "pre-commit: CI will still scan. To restore local scanning, re-vendor the script." >&2
+  exit 0
+fi
+
+if ! "$scanner" --staged; then
+  echo "" >&2
+  echo "pre-commit: BLOCKED — staged changes contain config-injection indicators." >&2
+  echo "pre-commit: if this is a verified false positive, review then add its hash to" >&2
+  echo "pre-commit: .ci-scan-allow.txt, or bypass with 'git commit --no-verify' (discouraged)." >&2
+  exit 1
+fi

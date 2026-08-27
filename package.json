@@ -73,7 +73,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
-    "@faker-js/faker": "^9.8.0",
+    "@faker-js/faker": "^10.6.0",
     "@tailwindcss/postcss": "^4",
     "@types/js-cookie": "^3.0.6",
     "@types/node": "^20",

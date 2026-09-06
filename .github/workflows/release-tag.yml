@@ -26,6 +26,7 @@ jobs:
 
       - name: Read version from package.json
         id: version
+        shell: bash
         run: |
           set -euo pipefail
           VERSION=$(jq -r '.version // empty' package.json)
@@ -33,13 +34,27 @@ jobs:
             echo "::error file=package.json::package.json has no \"version\" field."
             exit 1
           fi
+
+          # This value becomes a git tag and a $GITHUB_OUTPUT line, so it is
+          # validated before it is used anywhere. grep alone is not enough: it
+          # is line-oriented, so "1.2.3\nskip=true" would match on its first
+          # line and then inject a second line into the step output. Hence a
+          # character whitelist first, then a whole-string bash match.
+          case "$VERSION" in
+            *[!0-9A-Za-z.+-]*)
+              echo "::error file=package.json::version contains characters that are not valid in a SemVer string (newlines or control characters?). Refusing to tag."
+              exit 1
+              ;;
+          esac
+
           # Official SemVer 2.0.0 expression (semver.org): without this, a
           # malformed value would be tagged verbatim as e.g. vrelease-candidate.
           SEMVER='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(\+([0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*))?$'
-          if ! printf '%s' "$VERSION" | grep -Eq "$SEMVER"; then
+          if [[ ! "$VERSION" =~ $SEMVER ]]; then
             echo "::error file=package.json::\"$VERSION\" is not valid SemVer 2.0.0 — refusing to tag."
             exit 1
           fi
+
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Release version: $VERSION"
 

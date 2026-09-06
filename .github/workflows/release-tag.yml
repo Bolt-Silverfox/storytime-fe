@@ -8,6 +8,14 @@ on:
     branches: [main]
     types: [closed]
 
+concurrency:
+  # Serialise tag creation. Two runs on the same version can both observe the
+  # tag as missing, then race on `git push`; the loser fails and never creates
+  # its GitHub Release. cancel-in-progress is false on purpose — a run that has
+  # already pushed a tag must be allowed to finish creating the release.
+  group: release-tag-${{ github.repository }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
 

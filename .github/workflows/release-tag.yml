@@ -1,0 +1,129 @@
+# Tags a release when a PR merges into main, mirroring storytime_be and
+# storytime-mobile so every deployable repo is tagged the same way. There is no
+# app.json here, so package.json is the single source of truth for the version.
+name: Release Tag
+
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+
+concurrency:
+  # Serialise tag creation. Two runs on the same version can both observe the
+  # tag as missing, then race on `git push`; the loser fails and never creates
+  # its GitHub Release. cancel-in-progress is false on purpose — a run that has
+  # already pushed a tag must be allowed to finish creating the release.
+  group: release-tag-${{ github.repository }}
+  cancel-in-progress: false
+  # Default queueing is `single`: only one run may sit pending, and a newer one
+  # cancels it. For release tagging that means a merged release could be
+  # dropped without ever being tagged. `max` keeps up to 100 pending runs in
+  # FIFO order. Valid only because cancel-in-progress is false — GitHub rejects
+  # `queue: max` combined with `cancel-in-progress: true`.
+  queue: max
+
+permissions:
+  contents: read
+
+jobs:
+  tag-release:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Read version from package.json
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Validate INSIDE jq, against the raw JSON string, before the value
+          # ever reaches a shell variable. Bash command substitution silently
+          # drops NUL bytes and trailing newlines, so a manifest carrying a
+          # stray NUL would arrive as a pristine "1.2.3" and satisfy any check
+          # made on this side of the boundary. Validating first means the
+          # assignment below can only ever receive a clean SemVer string.
+          #
+          # \A and \z, not ^ and $: Oniguruma (jq's engine) lets $ match before
+          # a trailing newline, so "1.2.3" plus a newline passes a ^...$ pattern.
+          # Verified against NUL, leading and trailing newline, leading zero,
+          # two-component, empty, missing and embedded-space inputs.
+          SEMVER='\A(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(\+([0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*))?\z'
+          if ! jq --arg re "$SEMVER" -e '(.version // "") | test($re)' package.json >/dev/null; then
+            FOUND=$(jq -r '.version // "<missing>"' package.json | tr -d '\000' | head -c 60)
+            echo "::error file=package.json::version is missing or not valid SemVer 2.0.0 (saw: ${FOUND}) — refusing to tag."
+            exit 1
+          fi
+
+          VERSION=$(jq -r '.version' package.json)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Release version: $VERSION"
+
+      - name: Resolve the release tag
+        id: check_tag
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          TAG="v${VERSION}"
+          # An annotated tag has two refs: refs/tags/X (the tag object) and
+          # refs/tags/X^{} (the commit it points at). Querying the peeled ref
+          # first is what makes the comparison below meaningful — reading
+          # refs/tags/X would yield the tag object SHA, which never equals
+          # GITHUB_SHA. Lightweight tags have no peeled ref, hence the fallback.
+          PEELED=$(git ls-remote --tags origin "refs/tags/${TAG}^{}" | awk 'NR==1{print $1}')
+          PLAIN=$(git ls-remote --tags origin "refs/tags/${TAG}" | awk 'NR==1{print $1}')
+          REMOTE="${PEELED:-$PLAIN}"
+
+          if [ -z "$REMOTE" ]; then
+            echo "missing=true"  >> "$GITHUB_OUTPUT"
+            echo "conflict=false" >> "$GITHUB_OUTPUT"
+            echo "No ${TAG} yet — will tag ${GITHUB_SHA}."
+          elif [ "$REMOTE" = "$GITHUB_SHA" ]; then
+            echo "missing=false" >> "$GITHUB_OUTPUT"
+            echo "conflict=false" >> "$GITHUB_OUTPUT"
+            echo "${TAG} already points at ${GITHUB_SHA} — tag is correct."
+          else
+            echo "missing=false" >> "$GITHUB_OUTPUT"
+            echo "conflict=true"  >> "$GITHUB_OUTPUT"
+            echo "::warning::${TAG} already exists at ${REMOTE:0:8}, but this merge is ${GITHUB_SHA:0:8}. This commit is being released UNTAGGED. Bump the version and merge again if this is a real release."
+            {
+              echo "### :warning: Release is untagged"
+              echo ""
+              echo "\`${TAG}\` already points at \`${REMOTE:0:8}\`, but this merge is \`${GITHUB_SHA:0:8}\`."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Create git tag
+        if: steps.check_tag.outputs.missing == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${VERSION}" -m "Release v${VERSION}"
+          git push origin "v${VERSION}"
+
+      # Runs whenever the tag ends up pointing at this commit, not only when we
+      # just created it. Tag push and release creation are two operations: if
+      # the first succeeds and the second fails, a re-run must still be able to
+      # finish the job rather than skipping it forever.
+      - name: Create GitHub Release
+        if: steps.check_tag.outputs.conflict == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if gh release view "v${VERSION}" >/dev/null 2>&1; then
+            echo "Release v${VERSION} already exists — nothing to do."
+            exit 0
+          fi
+          gh release create "v${VERSION}" --title "v${VERSION}" --generate-notes

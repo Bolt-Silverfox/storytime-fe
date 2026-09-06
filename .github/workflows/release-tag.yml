@@ -15,6 +15,12 @@ concurrency:
   # already pushed a tag must be allowed to finish creating the release.
   group: release-tag-${{ github.repository }}
   cancel-in-progress: false
+  # Default queueing is `single`: only one run may sit pending, and a newer one
+  # cancels it. For release tagging that means a merged release could be
+  # dropped without ever being tagged. `max` keeps up to 100 pending runs in
+  # FIFO order. Valid only because cancel-in-progress is false — GitHub rejects
+  # `queue: max` combined with `cancel-in-progress: true`.
+  queue: max
 
 permissions:
   contents: read
@@ -37,36 +43,25 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # jq -j plus a sentinel: plain $( ) strips trailing newlines, so a
-          # manifest value of "1.2.3\n" would arrive as "1.2.3" and sail past
-          # the whitelist below instead of being reported. -j suppresses jq's
-          # own newline; the x sentinel preserves any the value really carries.
-          VERSION=$(jq -j '.version // empty' package.json; printf 'x'); VERSION=${VERSION%x}
-          if [ -z "$VERSION" ]; then
-            echo "::error file=package.json::package.json has no \"version\" field."
+          # Validate INSIDE jq, against the raw JSON string, before the value
+          # ever reaches a shell variable. Bash command substitution silently
+          # drops NUL bytes and trailing newlines, so a manifest carrying a
+          # stray NUL would arrive as a pristine "1.2.3" and satisfy any check
+          # made on this side of the boundary. Validating first means the
+          # assignment below can only ever receive a clean SemVer string.
+          #
+          # \A and \z, not ^ and $: Oniguruma (jq's engine) lets $ match before
+          # a trailing newline, so "1.2.3" plus a newline passes a ^...$ pattern.
+          # Verified against NUL, leading and trailing newline, leading zero,
+          # two-component, empty, missing and embedded-space inputs.
+          SEMVER='\A(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(\+([0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*))?\z'
+          if ! jq --arg re "$SEMVER" -e '(.version // "") | test($re)' package.json >/dev/null; then
+            FOUND=$(jq -r '.version // "<missing>"' package.json | tr -d '\000' | head -c 60)
+            echo "::error file=package.json::version is missing or not valid SemVer 2.0.0 (saw: ${FOUND}) — refusing to tag."
             exit 1
           fi
 
-          # This value becomes a git tag and a $GITHUB_OUTPUT line, so it is
-          # validated before it is used anywhere. grep alone is not enough: it
-          # is line-oriented, so "1.2.3\nskip=true" would match on its first
-          # line and then inject a second line into the step output. Hence a
-          # character whitelist first, then a whole-string bash match.
-          case "$VERSION" in
-            *[!0-9A-Za-z.+-]*)
-              echo "::error file=package.json::version contains characters that are not valid in a SemVer string (newlines or control characters?). Refusing to tag."
-              exit 1
-              ;;
-          esac
-
-          # Official SemVer 2.0.0 expression (semver.org): without this, a
-          # malformed value would be tagged verbatim as e.g. vrelease-candidate.
-          SEMVER='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(\+([0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*))?$'
-          if [[ ! "$VERSION" =~ $SEMVER ]]; then
-            echo "::error file=package.json::\"$VERSION\" is not valid SemVer 2.0.0 — refusing to tag."
-            exit 1
-          fi
-
+          VERSION=$(jq -r '.version' package.json)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Release version: $VERSION"
 

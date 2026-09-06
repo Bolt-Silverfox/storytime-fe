@@ -11,8 +11,10 @@
 #
 #     @coderabbitai review
 #
-# base_branches lists the branches a requested review should cover; without it
-# CodeRabbit only considers PRs into the repo default branch.
+# base_branches only gates AUTOMATIC reviews, so while auto_review is off it has
+# no effect: a manual `@coderabbitai review` is honoured on any base branch. It
+# is kept, and kept accurate, so that re-enabling auto-review later still covers
+# the non-default release lines instead of only the repo default branch.
 language: en-US
 reviews:
   profile: chill

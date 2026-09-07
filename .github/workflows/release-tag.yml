@@ -137,10 +137,18 @@ jobs:
             echo "Release v${VERSION} already exists — nothing to do."
             exit 0
           fi
-          if ! printf '%s' "$OUT" | grep -qi 'release not found'; then
+          # Here-strings and parameter expansion, never `printf ... | grep -q`
+          # or `... | head -c`: those consumers exit at the match/limit, printf
+          # or tr then takes SIGPIPE, and pipefail turns that into a nonzero
+          # status. Here that would flip a real "not found" into the error
+          # branch, or abort the step under `set -e` before the ::error below
+          # ever prints. No pipeline, no race.
+          if ! grep -qi 'release not found' <<< "$OUT"; then
             # Collapse newlines: this text reaches an ::error annotation, where
             # a newline would start a new workflow command.
-            SAFE=$(printf '%s' "$OUT" | tr '\n\r' '  ' | head -c 200)
+            SAFE=${OUT//$'\n'/ }
+            SAFE=${SAFE//$'\r'/ }
+            SAFE=${SAFE:0:200}
             echo "::error::Could not determine whether release v${VERSION} exists: ${SAFE}"
             exit 1
           fi
@@ -149,3 +157,4 @@ jobs:
           # step would produce a Release pointing at the wrong commit.
           gh release create "v${VERSION}" --title "v${VERSION}" --generate-notes --verify-tag
           echo "created=true" >> "$GITHUB_OUTPUT"
+

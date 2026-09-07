@@ -120,14 +120,33 @@ jobs:
       # the first succeeds and the second fails, a re-run must still be able to
       # finish the job rather than skipping it forever.
       - name: Create GitHub Release
+        id: release
         if: steps.check_tag.outputs.conflict == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          if gh release view "v${VERSION}" >/dev/null 2>&1; then
+          # `gh release view` exits non-zero for BOTH "not found" and transient
+          # API/auth failures. Treating the latter as absence would call
+          # `gh release create` against an existing release and fail the job for
+          # the wrong reason, so match the not-found text and let anything else
+          # surface as a real error.
+          if OUT=$(gh release view "v${VERSION}" 2>&1); then
+            echo "created=false" >> "$GITHUB_OUTPUT"
             echo "Release v${VERSION} already exists — nothing to do."
             exit 0
           fi
-          gh release create "v${VERSION}" --title "v${VERSION}" --generate-notes
+          if ! printf '%s' "$OUT" | grep -qi 'release not found'; then
+            # Collapse newlines: this text reaches an ::error annotation, where
+            # a newline would start a new workflow command.
+            SAFE=$(printf '%s' "$OUT" | tr '\n\r' '  ' | head -c 200)
+            echo "::error::Could not determine whether release v${VERSION} exists: ${SAFE}"
+            exit 1
+          fi
+          # --verify-tag: without it, gh creates the tag from the default branch
+          # when it is missing, so a tag deleted between the push above and this
+          # step would produce a Release pointing at the wrong commit.
+          gh release create "v${VERSION}" --title "v${VERSION}" --generate-notes --verify-tag
+          echo "created=true" >> "$GITHUB_OUTPUT"
+

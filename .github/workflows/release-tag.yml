@@ -8,19 +8,6 @@ on:
     branches: [main]
     types: [closed]
 
-concurrency:
-  # Serialise tag creation. Two runs on the same version can both observe the
-  # tag as missing, then race on `git push`; the loser fails and never creates
-  # its GitHub Release. cancel-in-progress is false on purpose — a run that has
-  # already pushed a tag must be allowed to finish creating the release.
-  group: release-tag-${{ github.repository }}
-  cancel-in-progress: false
-  # Default queueing is `single`: only one run may sit pending, and a newer one
-  # cancels it. For release tagging that means a merged release could be
-  # dropped without ever being tagged. `max` keeps up to 100 pending runs in
-  # FIFO order. Valid only because cancel-in-progress is false — GitHub rejects
-  # `queue: max` combined with `cancel-in-progress: true`.
-  queue: max
 
 permissions:
   contents: read
@@ -28,6 +15,23 @@ permissions:
 jobs:
   tag-release:
     if: github.event.pull_request.merged == true
+    # Scoped to this job, not the workflow: the workflow fires on EVERY
+    # closed pull request, merged or not, and a workflow-level group is
+    # entered by every one of those runs. Here it is only reached once
+    # `if: merged == true` has already selected a real release.
+    concurrency:
+      # Serialise tag creation. Two runs on the same version can both observe the
+      # tag as missing, then race on `git push`; the loser fails and never creates
+      # its GitHub Release. cancel-in-progress is false on purpose — a run that has
+      # already pushed a tag must be allowed to finish creating the release.
+      group: release-tag-${{ github.repository }}
+      cancel-in-progress: false
+      # Default queueing is `single`: only one run may sit pending, and a newer one
+      # cancels it. For release tagging that means a merged release could be
+      # dropped without ever being tagged. `max` keeps up to 100 pending runs in
+      # FIFO order. Valid only because cancel-in-progress is false — GitHub rejects
+      # `queue: max` combined with `cancel-in-progress: true`.
+      queue: max
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

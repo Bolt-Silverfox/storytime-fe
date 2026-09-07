@@ -149,6 +149,11 @@ jobs:
             SAFE=${OUT//$'\n'/ }
             SAFE=${SAFE//$'\r'/ }
             SAFE=${SAFE:0:200}
+            # The runner percent-decodes %0A, %0D and %25 in workflow-command
+            # data, so a literal "%0A" in the text would re-introduce the very
+            # newline the substitutions above just removed. Escape % LAST, after
+            # truncation, or the escape sequences could themselves be cut in half.
+            SAFE=${SAFE//'%'/'%25'}
             echo "::error::Could not determine whether release v${VERSION} exists: ${SAFE}"
             exit 1
           fi

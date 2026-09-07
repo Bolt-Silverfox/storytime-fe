@@ -149,4 +149,3 @@ jobs:
           # step would produce a Release pointing at the wrong commit.
           gh release create "v${VERSION}" --title "v${VERSION}" --generate-notes --verify-tag
           echo "created=true" >> "$GITHUB_OUTPUT"
-

@@ -1,0 +1,16 @@
+name: version-check
+# Thin caller. The reusable workflow lives in Bolt-Silverfox/storytime-ci — a
+# dedicated repo whose history is never rewritten, so this pin cannot be
+# orphaned the way the old malware-scan pin was.
+#
+# Update: bump the pin below to a new storytime-ci full 40-char commit SHA.
+# Never a bare tag; a trailing `# version-check-vN` comment may annotate it.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    uses: Bolt-Silverfox/storytime-ci/.github/workflows/version-check.yml@58020cad60f20b24c238ee31a9a3bbe296dc0cf2

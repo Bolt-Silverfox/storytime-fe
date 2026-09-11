@@ -47,3 +47,7 @@ branch_structure.json
 
 # Claude Code agent worktrees
 .claude/
+
+# Scanner checkout made by the shared malware-scan workflow. Tracking anything
+# here fails that job by design.
+.storytime-ci/

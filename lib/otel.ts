@@ -45,8 +45,9 @@ function parseOtlpHeaderString(raw: string): Record<string, string> {
     try {
       headers[key] = decodeURIComponent(rawValue);
     } catch {
-      diag.warn(
-        `OTEL_EXPORTER_OTLP_HEADERS entry "${key}" has malformed percent-encoding and was ignored`
+      // console.warn for the same reason as above: diag is set to ERROR.
+      console.warn(
+        `[OpenTelemetry] OTEL_EXPORTER_OTLP_HEADERS entry "${key}" has malformed percent-encoding and was ignored`
       );
     }
   }
@@ -74,8 +75,12 @@ function buildOtlpHeaders(): Record<string, string> {
     if (Object.keys(parsed).length > 0) {
       return parsed;
     }
-    diag.warn(
-      'OTEL_EXPORTER_OTLP_HEADERS is set but no "key=value" pair could be parsed from it; falling back to GRAFANA_CLOUD_* credentials'
+    // console.warn, NOT diag.warn: registerTelemetry() sets the diag logger to
+    // DiagLogLevel.ERROR, which filters warn entirely. A configuration mistake
+    // the operator needs to see must not be routed through a logger tuned to
+    // suppress it.
+    console.warn(
+      '[OpenTelemetry] OTEL_EXPORTER_OTLP_HEADERS is set but no "key=value" pair could be parsed from it; falling back to GRAFANA_CLOUD_* credentials'
     );
   }
 

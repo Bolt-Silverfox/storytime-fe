@@ -160,9 +160,28 @@ export function registerTelemetry(): void {
   // the exporter from the environment itself — an explicit `url` is passed
   // through untouched, so a base URL would POST to the collector root and the
   // spans would be dropped.
-  const tracesUrl = usingGenericEndpoint
-    ? `${endpoint.replace(/\/+$/, '')}/v1/traces`
-    : endpoint;
+  // Parsed, not string-concatenated. `${endpoint}/v1/traces` puts the signal
+  // path INSIDE the query string when the endpoint carries one — a collector
+  // URL of `https://host/otlp?api_key=x` becomes `.../otlp?api_key=x/v1/traces`,
+  // which 404s at the gateway and looks exactly like silence.
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(endpoint);
+  } catch {
+    // redactEndpoint, NOT the raw value: an endpoint can fail to parse and
+    // still contain a credential (`https://ot lp.net/otlp?api_key=SECRET`
+    // throws on the space), and interpolating it here would print that key
+    // straight into container logs — the very thing redactEndpoint exists to
+    // stop. It returns a placeholder when it cannot parse, which is the point.
+    diag.error(
+      `Refusing to export: OTLP endpoint is not a valid URL (${redactEndpoint(endpoint)}).`
+    );
+    return;
+  }
+  if (usingGenericEndpoint) {
+    parsedUrl.pathname = `${parsedUrl.pathname.replace(/\/+$/, '')}/v1/traces`;
+  }
+  const tracesUrl = parsedUrl.toString();
 
   const headers = buildOtlpHeaders();
 
@@ -170,9 +189,31 @@ export function registerTelemetry(): void {
   // working on purpose — that is how a local collector is used, including the
   // ones these changes were verified against — but an authenticated http://
   // endpoint would put a Grafana token on the wire in the clear.
-  if (Object.keys(headers).length > 0 && tracesUrl.startsWith('http://')) {
+  // Credentials can arrive two ways, and the query string is the one that is
+  // easy to miss: `http://collector/v1/traces?api_key=secret` produces NO
+  // headers, so a headers-only check waves it straight through and the key
+  // goes out in cleartext. Protocol is compared on the PARSED url rather than
+  // with a prefix test, so `HTTP://` cannot dodge the check on scheme casing.
+  // The four places a credential hides are the same four redactEndpoint above
+  // already strips — userinfo, query, fragment — plus request headers. A
+  // headers-only check misses all of the URL ones: `http://id:tok@host/v1/traces`
+  // and `http://host/v1/traces?api_key=secret` both yield ZERO headers and
+  // would previously have gone out in cleartext. Fragments are never
+  // transmitted, so they are excluded here deliberately.
+  //
+  // Protocol is compared on the PARSED url rather than with a string prefix,
+  // so `HTTP://` cannot dodge the check on scheme casing.
+  const urlCarriesSecrets = Boolean(
+    parsedUrl.username || parsedUrl.password || parsedUrl.search
+  );
+  const hasCredentials = Object.keys(headers).length > 0 || urlCarriesSecrets;
+  if (hasCredentials && parsedUrl.protocol === 'http:') {
+    // Worded as "may carry" on purpose: any query string trips this, and a
+    // query string is not proof of a credential (`?tenant=dev` is innocuous).
+    // Failing closed is right for this guard, but the message should not
+    // assert something it has not established.
     diag.error(
-      'Refusing to export: OTLP credentials are configured but the endpoint is plaintext http://. Use https://, or remove the credentials for a local collector.'
+      'Refusing to export: the OTLP endpoint is plaintext http:// and credentials are configured, or the URL carries userinfo or a query string that may contain them. Use https://, or drop the credentials for a local collector.'
     );
     return;
   }
@@ -204,10 +245,14 @@ export function registerTelemetry(): void {
     //    caller passes, so every span would be exported twice.
     // 2. That env-derived exporter appends "/v1/traces" to the endpoint and
     //    reads auth only from OTEL_EXPORTER_OTLP_HEADERS /
-    //    OTEL_EXPORTER_OTLP_TRACES_HEADERS. Our endpoint is already a full
-    //    signal URL and our credentials arrive as the GRAFANA_CLOUD_* pair, so
+    //    OTEL_EXPORTER_OTLP_TRACES_HEADERS. `tracesUrl` above is ALREADY a
+    //    full signal URL by this point — production sets the generic
+    //    OTEL_EXPORTER_OTLP_ENDPOINT and this function appends the signal path
+    //    itself — and our credentials arrive as the GRAFANA_CLOUD_* pair, so
     //    those extra requests would go to ".../otlp/v1/traces/v1/traces" with
-    //    no Authorization header.
+    //    no Authorization header. (Setting a full traces URL on the GENERIC
+    //    variable produces that doubled path here too; use
+    //    OTEL_EXPORTER_OTLP_TRACES_ENDPOINT for a full signal URL.)
     //
     // Passing `spanProcessors` replaces the "auto" set outright, which is what
     // keeps this to exactly one authenticated exporter pointed at `endpoint`.

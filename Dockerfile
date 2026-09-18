@@ -116,6 +116,23 @@ ARG NEXT_PUBLIC_FIREBASE_VAPID_KEY
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# FAIL THE BUILD if NEXT_PUBLIC_API_URL was not passed. Docker happily omits an
+# ARG, and lib/axios.ts:27 falls back to `https://dev.api.storytimeapp.me` — so
+# without this the build SUCCEEDS and produces an image whose browser traffic
+# goes to the dev API. Nothing downstream catches it: the container starts,
+# pages render, and only the network tab shows the wrong origin.
+#
+# Read indirectly via printenv rather than interpolating ${NEXT_PUBLIC_API_URL}
+# into the RUN line: buildx expands a set ARG into the printed step name, which
+# would put the value into build logs. Not secret here, but this guard gets
+# copied to args that are.
+RUN if [ -z "$(printenv NEXT_PUBLIC_API_URL)" ]; then \
+      echo "ERROR: --build-arg NEXT_PUBLIC_API_URL=... is required." >&2; \
+      echo "It is inlined into the bundle at build time and cannot be set at runtime." >&2; \
+      echo "Omitting it silently falls back to the dev API (lib/axios.ts:27)." >&2; \
+      exit 1; \
+    fi
+
 # The build never needs to reach the STORYTIME API: there is no
 # generateStaticParams and the only fetch runs at request time. It does still
 # need general outbound network, because app/layout.tsx imports ABeeZee from

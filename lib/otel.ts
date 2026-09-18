@@ -33,9 +33,21 @@ function parseOtlpHeaderString(raw: string): Record<string, string> {
       continue;
     }
     const key = pair.slice(0, idx).trim();
-    const value = pair.slice(idx + 1).trim();
-    if (key) {
-      headers[key] = value;
+    const rawValue = pair.slice(idx + 1).trim();
+    if (!key) {
+      continue;
+    }
+    // Values are W3C Baggage encoded per the OTLP spec, so `Basic%20<b64>`
+    // means `Basic <b64>`. @vercel/otel merges these straight into fetch()
+    // without decoding, so an encoded space would be sent literally and a
+    // Basic-auth gateway would reject it. Malformed encoding is treated as an
+    // invalid pair rather than silently forwarded.
+    try {
+      headers[key] = decodeURIComponent(rawValue);
+    } catch {
+      diag.warn(
+        `OTEL_EXPORTER_OTLP_HEADERS entry "${key}" has malformed percent-encoding and was ignored`
+      );
     }
   }
   return headers;
@@ -87,12 +99,19 @@ function buildOtlpHeaders(): Record<string, string> {
 function redactEndpoint(endpoint: string): string {
   try {
     const url = new URL(endpoint);
-    if (url.username || url.password) {
-      url.username = '';
-      url.password = '';
-      return `${url.toString()} (credentials redacted)`;
-    }
-    return url.toString();
+    const hadSecrets = Boolean(
+      url.username || url.password || url.search || url.hash
+    );
+    // Userinfo is not the only place a credential hides: `?api_key=...` and
+    // `#token=...` are both real OTLP gateway patterns, and url.toString()
+    // preserves them. Drop all four.
+    url.username = '';
+    url.password = '';
+    url.search = '';
+    url.hash = '';
+    return hadSecrets
+      ? `${url.toString()} (credentials redacted)`
+      : url.toString();
   } catch {
     return '<unparseable OTLP endpoint>';
   }
@@ -103,11 +122,14 @@ export function registerTelemetry(): void {
   // signal URL and wins when present; `OTEL_EXPORTER_OTLP_ENDPOINT` is what
   // this estate's SSM parameters actually set, and is read the same way (see
   // the note on the exporter below).
-  const endpoint = (
-    process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT ||
-    process.env.OTEL_EXPORTER_OTLP_ENDPOINT ||
-    ''
+  const tracesEndpoint = (
+    process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT || ''
   ).trim();
+  const genericEndpoint = (
+    process.env.OTEL_EXPORTER_OTLP_ENDPOINT || ''
+  ).trim();
+  const usingGenericEndpoint = !tracesEndpoint && Boolean(genericEndpoint);
+  const endpoint = tracesEndpoint || genericEndpoint;
   if (!endpoint) {
     return;
   }
@@ -127,10 +149,33 @@ export function registerTelemetry(): void {
     process.env.NODE_ENV ||
     'development';
 
+  // A GENERIC endpoint is a base URL and needs the signal path appended;
+  // OTEL_EXPORTER_OTLP_TRACES_ENDPOINT is already a full signal URL and must
+  // be used as given. @vercel/otel appends /v1/traces only when it configures
+  // the exporter from the environment itself — an explicit `url` is passed
+  // through untouched, so a base URL would POST to the collector root and the
+  // spans would be dropped.
+  const tracesUrl = usingGenericEndpoint
+    ? `${endpoint.replace(/\/+$/, '')}/v1/traces`
+    : endpoint;
+
+  const headers = buildOtlpHeaders();
+
+  // Never send credentials in cleartext. Unauthenticated http:// is left
+  // working on purpose — that is how a local collector is used, including the
+  // ones these changes were verified against — but an authenticated http://
+  // endpoint would put a Grafana token on the wire in the clear.
+  if (Object.keys(headers).length > 0 && tracesUrl.startsWith('http://')) {
+    diag.error(
+      'Refusing to export: OTLP credentials are configured but the endpoint is plaintext http://. Use https://, or remove the credentials for a local collector.'
+    );
+    return;
+  }
+
   const spanProcessor = new BatchSpanProcessor(
     new OTLPHttpProtoTraceExporter({
-      url: endpoint,
-      headers: buildOtlpHeaders(),
+      url: tracesUrl,
+      headers,
     }),
     // Shorter than the 5000ms default, to narrow the window described in the
     // shutdown note below. Spans are exported on this timer or as soon as

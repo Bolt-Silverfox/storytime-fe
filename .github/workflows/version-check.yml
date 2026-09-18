@@ -13,4 +13,4 @@ permissions:
 
 jobs:
   version:
-    uses: Bolt-Silverfox/storytime-ci/.github/workflows/version-check.yml@58020cad60f20b24c238ee31a9a3bbe296dc0cf2
+    uses: Bolt-Silverfox/storytime-ci/.github/workflows/version-check.yml@107b55a468ef4d0b8f3c050bd361186818575bc2

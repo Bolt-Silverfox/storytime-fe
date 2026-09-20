@@ -203,9 +203,21 @@ export function registerTelemetry(): void {
   //
   // Protocol is compared on the PARSED url rather than with a string prefix,
   // so `HTTP://` cannot dodge the check on scheme casing.
-  const urlCarriesSecrets = Boolean(
-    parsedUrl.username || parsedUrl.password || parsedUrl.search
-  );
+  // Userinfo is rejected OUTRIGHT, not merely on plaintext. @vercel/otel's
+  // exporter goes through fetch, and the Fetch spec has the Request
+  // constructor throw on any URL containing credentials -- so
+  // `https://id:token@host/otlp` does not export over TLS either, it throws on
+  // every single batch. Failing loudly here beats a process that looks healthy
+  // and sends nothing, which is the exact failure mode this file exists to
+  // eliminate.
+  if (parsedUrl.username || parsedUrl.password) {
+    diag.error(
+      'Refusing to export: the OTLP endpoint URL carries userinfo (user:password@), which fetch rejects outright. Supply credentials as OTLP headers instead.'
+    );
+    return;
+  }
+
+  const urlCarriesSecrets = parsedUrl.search.length > 0;
   const hasCredentials = Object.keys(headers).length > 0 || urlCarriesSecrets;
   if (hasCredentials && parsedUrl.protocol === 'http:') {
     // Worded as "may carry" on purpose: any query string trips this, and a

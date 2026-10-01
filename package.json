@@ -1,6 +1,6 @@
 {
   "name": "storytime-fe",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "prepare": "command -v git >/dev/null 2>&1 && { cur=$(git config --local core.hooksPath 2>/dev/null || true); if [ -z \"$cur\" ] || [ \"$cur\" = .githooks ]; then git config core.hooksPath .githooks || echo '[prepare] warning: failed to set core.hooksPath for git hooks' >&2; else echo \"[prepare] warning: core.hooksPath already set to '$cur'; not overwriting (run: git config core.hooksPath .githooks to enable the CodeRabbit pre-push hook)\" >&2; fi; }; true",
@@ -12,6 +12,13 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/api-logs": "^0.208.0",
+    "@opentelemetry/instrumentation": "^0.208.0",
+    "@opentelemetry/resources": "^2.10.0",
+    "@opentelemetry/sdk-logs": "^0.208.0",
+    "@opentelemetry/sdk-metrics": "^2.11.0",
+    "@opentelemetry/sdk-trace-base": "^2.10.0",
     "@radix-ui/react-accordion": "^1.2.16",
     "@radix-ui/react-alert-dialog": "^1.1.19",
     "@radix-ui/react-aspect-ratio": "^1.1.11",
@@ -42,6 +49,7 @@
     "@studio-freight/lenis": "^1.0.42",
     "@tabler/icons-react": "^3.44.0",
     "@tanstack/react-query": "^5.101.2",
+    "@vercel/otel": "^2.1.3",
     "axios": "^1.18.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

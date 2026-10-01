@@ -1,0 +1,28 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# CodeRabbit configuration.
+#
+# Auto-review is OFF deliberately. Reviews are a limited quota shared across the
+# org, and auto-reviewing every push burned it on trivial commits — we hit the
+# cap mid-release on 2026-09-06. A rate-limited run still reports a green
+# "CodeRabbit" status check, so a review that never happened looks like a pass.
+#
+# Review locally first (`coderabbit --agent`, or just read and run the change),
+# then ask for a hosted review deliberately by commenting:
+#
+#     @coderabbitai review
+#
+# base_branches only gates AUTOMATIC reviews, so while auto_review is off it has
+# no effect: a manual `@coderabbitai review` is honoured on any base branch. It
+# is kept, and kept accurate, so that re-enabling auto-review later still covers
+# the non-default release lines instead of only the repo default branch.
+language: en-US
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  auto_review:
+    enabled: false
+    drafts: false
+    base_branches:
+      - main
+      - dev
+      - develop

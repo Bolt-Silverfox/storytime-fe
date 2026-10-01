@@ -40,6 +40,14 @@ jobs:
           egress-policy: audit
 
       - uses: actions/checkout@v7
+        # The default checkout leaves the job's token in .git/config for later
+        # git commands. Nothing here needs it: there are no git: or github:
+        # dependencies in package.json, so `pnpm install --frozen-lockfile
+        # --ignore-scripts` resolves entirely from the registry, and neither
+        # lint nor build touches the remote. Dropping it removes the token from
+        # reach of anything that runs after checkout.
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@v6
         with:
           version: 9
@@ -60,6 +68,14 @@ jobs:
           egress-policy: audit
 
       - uses: actions/checkout@v7
+        # The default checkout leaves the job's token in .git/config for later
+        # git commands. Nothing here needs it: there are no git: or github:
+        # dependencies in package.json, so `pnpm install --frozen-lockfile
+        # --ignore-scripts` resolves entirely from the registry, and neither
+        # lint nor build touches the remote. Dropping it removes the token from
+        # reach of anything that runs after checkout.
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@v6
         with:
           version: 9

@@ -1,0 +1,185 @@
+# ---------------------------------------------------------------------------
+# Production deploy caller for the `web` service.
+#
+# All this file does is invoke the reusable pipeline in storytime-devops:
+# build a linux/arm64 image from this repo's Dockerfile, push it to ECR as
+# :latest and :<full git SHA>, then reconcile the EC2 box over SSM and verify
+# that this service's containers are running on the digest just pushed.
+#
+# MANUAL ONLY, ON PURPOSE. There is no `push:` trigger here — deploying this
+# image is a deliberate act a human performs from the Actions tab. That is a
+# statement about THIS workflow, not about the repo:
+#
+#   `deploy-prod.yml` still runs on every push to `main`.
+#
+# That pipeline is NOT retired by this change, and its concurrency group is
+# unrelated to this one, so the two can run against the same box at the same
+# time. Retiring it is a separate, separately reviewed change.
+#
+# THIS FILE MUST ALSO REACH THE DEFAULT BRANCH BEFORE IT CAN BE RUN AT ALL.
+# GitHub registers `workflow_dispatch` from the repository's DEFAULT branch,
+# which here is `dev`, not `main`. While this file exists only on
+# `main` it appears in neither the Actions tab nor
+# `POST /actions/workflows/{id}/dispatches`. Merging it onto the default
+# branch as well is a required follow-up.
+#
+# And once it is runnable, the run MUST be started with the branch set to
+# `main`: the deploy role's trust policy pins the OIDC `sub` claim to
+# `repo:Bolt-Silverfox/storytime-fe:ref:refs/heads/main`,
+# so dispatching from the default branch fails the assume-role with
+# AccessDenied.
+#
+# THE RECONCILE IS BOX-WIDE, NOT PER-SERVICE. `storytime-reconcile.service`
+# runs /usr/local/bin/redeploy.sh with no arguments, which re-pulls and
+# re-creates EVERY container on the host, each onto whatever its configured tag
+# currently points at. So deploying web also restarts the other services
+# sharing the box, and a broken `latest` pushed by any repo goes live the next
+# time any repo deploys. (The digest assertion afterwards checks only this
+# service's containers.) Restarts are seconds on this single-box stack, but
+# time the run accordingly and do not run two deploys at once.
+#
+# WHY THESE ARE DISPATCH INPUTS RATHER THAN LITERALS.
+#   instance_id  the box is going to be replaced, and a replacement gets a new
+#                ID. Hard-coding it means editing this file under time
+#                pressure during the cutover.
+#   role_arn     comes from the gha_deploy_pipeline_role_arns Terraform output.
+#                Those roles DO NOT EXIST YET (manage_github_deploy_roles is
+#                still false), so there is no correct value to commit today.
+#   environment  an audit label only — it names the role session and the SSM
+#                command comment. It does not select the target box; the
+#                instance_id does.
+#
+# ARM64. The host is Graviton, so the image must be linux/arm64 or it dies with
+# `exec format error`. That is entirely the reusable workflow's concern —
+# a job that `uses:` a reusable workflow cannot also declare `steps:`, so
+# nothing can be added here that would get the architecture wrong.
+#
+# THE PINNED SHA IS LOAD-BEARING, and it pins a different claim than the one
+# above. Two trust-policy conditions are in play:
+#   job_workflow_ref  identifies the REUSABLE workflow that is executing — so
+#                     it is storytime-devops' ref, not this repo's. The claim
+#                     is whatever this `uses:` line says, verbatim, and
+#                     Terraform's `github_deploy_workflow_ref` must equal it
+#                     exactly. Both now carry the SHA below. Change one
+#                     without the other and every deploy fails AccessDenied.
+#   sub               identifies the CALLING repo and ref — that is the
+#                     condition the branch note above is about.
+#
+# This deliberately diverges from the caller snippet in
+# storytime-devops/docs/build-and-deploy.md, which installs the file under a
+# different name (`deploy-prod.yml`), adds a `push: branches: [main]` trigger
+# and hard-codes role_arn and instance_id. Deploys are staying manual for now,
+# the role ARNs do not exist yet, and the instance is about to be replaced.
+# ---------------------------------------------------------------------------
+name: Deploy to production (web)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Audit label for the role session and the SSM command comment. Does not choose the box.'
+        required: true
+        default: prod
+        type: choice
+        options:
+          - prod
+          - staging
+          - blue
+          - dev
+      instance_id:
+        description: 'EC2 instance to reconcile, e.g. i-07cce36e829161c03. Must match the instance the deploy role is pinned to.'
+        required: true
+        type: string
+      role_arn:
+        description: "This repo's entry in the gha_deploy_pipeline_role_arns Terraform output. Must be a role in account 772316781095."
+        required: true
+        type: string
+
+# One deploy of this service at a time. Not cancel-in-progress: a run that has
+# already pushed its image should be allowed to finish its reconcile —
+# cancelling mid-reconcile can leave the box with containers removed and not
+# yet recreated. Queueing costs minutes; a half-reconciled box costs an outage.
+#
+# The group deliberately excludes the environment input: environment is only a
+# label, so two runs with different labels can still target the same instance
+# and must not overlap. It cannot serialise against OTHER repos' deploys
+# either — GitHub concurrency groups are per repository — and every deploy
+# reconciles the whole box. Coordinate across repos by hand.
+concurrency:
+  group: deploy-web
+  cancel-in-progress: false
+
+# id-token: write is required to mint the OIDC token the deploy role is
+# assumed with, and it is NOT in the default token. A reusable workflow cannot
+# grant itself more than the caller gave it, so this has to be declared here.
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    # PINNED to an immutable commit, not `@main`. The trust policy on the
+    # deploy role matches `job_workflow_ref` exactly, so this SHA and the
+    # `github_deploy_workflow_ref` variable in storytime-devops
+    # (infra/github-oidc-deploy.tf) MUST MOVE TOGETHER -- changing one
+    # alone makes the assume-role fail with AccessDenied. Updating the
+    # pipeline therefore means: merge there, apply the tf change, then
+    # bump this line in all five caller repos.
+    uses: Bolt-Silverfox/storytime-devops/.github/workflows/build-and-deploy.yml@e8e832285ca78d3c49bd54142d9b5aa4fc1ad0b0 # main @ 2026-09-30
+    with:
+      service: web
+      environment: ${{ inputs.environment }}
+      instance_id: ${{ inputs.instance_id }}
+      role_arn: ${{ inputs.role_arn }}
+      # Values come from REPOSITORY variables, deliberately not from literals
+      # in this file: this repo is public, and NEXT_PUBLIC_API_KEY is on the
+      # rotation list, so a literal would be a third place it leaks. Rotating
+      # it then becomes a settings change rather than a PR.
+      #
+      # Repository-scoped, not environment-scoped: a job that calls a reusable
+      # workflow cannot declare `environment:`, so an environment variable
+      # would never resolve here and would silently render empty.
+      #
+      # Not secrets either -- `secrets` is not available in a `with:` block at
+      # all. That constraint happens to match the input's own PUBLIC VALUES
+      # ONLY rule: every value below is inlined into the client bundle and
+      # served to browsers, so none of it is confidential. It is still echoed
+      # in the build log and recorded in the image, which is why nothing
+      # genuinely secret may be added to this list.
+      #
+      # An unset variable renders EMPTY, and the pipeline's validation rejects
+      # a blank NEXT_PUBLIC_API_URL by name rather than shipping a bundle that
+      # silently falls back to a default origin and 404s. The optional values
+      # below fail quieter: an empty Sentry DSN just disables reporting, and an
+      # empty Firebase key breaks push at runtime, not at build. Set them all.
+      build_args: |
+        NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
+        NEXT_PUBLIC_API_KEY=${{ vars.NEXT_PUBLIC_API_KEY }}
+        NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID=${{ vars.NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID }}
+        NEXT_PUBLIC_APPLE_SERVICE_ID=${{ vars.NEXT_PUBLIC_APPLE_SERVICE_ID }}
+        NEXT_PUBLIC_APPLE_REDIRECT_URI=${{ vars.NEXT_PUBLIC_APPLE_REDIRECT_URI }}
+        NEXT_PUBLIC_SENTRY_DSN=${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
+        NEXT_PUBLIC_SENTRY_ENVIRONMENT=${{ vars.NEXT_PUBLIC_SENTRY_ENVIRONMENT }}
+        NEXT_PUBLIC_FIREBASE_API_KEY=${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID=${{ vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+        NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${{ vars.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+        NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ vars.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+        NEXT_PUBLIC_FIREBASE_APP_ID=${{ vars.NEXT_PUBLIC_FIREBASE_APP_ID }}
+        NEXT_PUBLIC_FIREBASE_VAPID_KEY=${{ vars.NEXT_PUBLIC_FIREBASE_VAPID_KEY }}
+
+# NEXT_PUBLIC_* ARE BUILD-TIME. Next.js inlines them into the client bundle
+# when the image is BUILT, so they are build args rather than runtime env, and an
+# image built without them is misconfigured rather than unconfigured. The
+# reusable workflow grew a `build_args` input for exactly this, and its
+# validation now REJECTS a dispatch of `web` that supplies no non-blank
+# NEXT_PUBLIC_API_URL -- `web` being the service that otherwise fails silently,
+# falling back to a default API origin and producing a bundle that looks healthy
+# and 404s every request.
+#
+# PREREQUISITE: a Dockerfile must exist on the ref this runs from. One exists on
+# `dev`; `main` gets it by promotion. The reusable workflow checks out the ref
+# the run was dispatched from and defaults to `Dockerfile` at the repo root --
+# its `dockerfile` input overrides the path, but not the ref. With the branch
+# note above, that means this can only succeed from `main`, and only once the
+# promotion has landed and the deploy roles exist.

@@ -9,8 +9,11 @@
 # both by picking an unlisted filename (eslint.config.mjs) and mutating its
 # marker. Instead it scans every git-TRACKED text file for structural hallmarks.
 #
-# Canonical source: Bolt-Silverfox/storytime_be:scripts/scan-injection.sh
-# Vendored copies in other repos are hash-verified against this one in CI.
+# LOCAL PRE-COMMIT COPY ONLY — not the gate, and not verified by anything.
+# Canonical source: Bolt-Silverfox/storytime-ci:scripts/scan-injection.sh, which
+# CI fetches at the reusable workflow's pinned SCANNER_REF and runs from there.
+# Since storytime-ci@5f4e23d there is no SCAN_SCRIPT_SHA256 and no drift gate, so
+# this file is allowed to drift and may be OLDER than the detector gating CI.
 #
 # Usage:
 #   scan-injection.sh            # scan all tracked files (CI)

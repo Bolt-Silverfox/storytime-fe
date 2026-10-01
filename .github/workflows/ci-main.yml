@@ -1,0 +1,87 @@
+# Lint and build gate for `main`.
+#
+# This file (as `deploy-prod.yml`) used to also deploy production: it built the
+# app on the runner and rsynced the bundle (`.next/standalone` + static +
+# public + ecosystem.config.js + .env) over SSH to `secrets.SERVER_HOST`, a
+# hand-built host that no longer serves production. The production hostnames
+# (apex, www, web, api, admin) now resolve to the container stack on a single
+# EC2 box. That job has been removed, along with the `rsync --delete-after`
+# that would mirror the bundle over a live deployment path if `SERVER_HOST`
+# were ever repointed at the current box.
+#
+# Production deploys are to be made by `deploy-production.yml`, a manual
+# (`workflow_dispatch`) caller of the shared storytime-devops pipeline. That
+# file is not merged yet — it is open as PR #167 — and it also needs a
+# Dockerfile on `main`, the deploy roles applied, and a copy on the default
+# branch (`dev`) before `workflow_dispatch` will even register it. So `main`
+# has no automated production deploy path in the interim; the running
+# containers are unaffected.
+#
+# The build job below is new: `pnpm build` previously ran only inside the
+# deleted deploy job, so without it `main` would have lint coverage only.
+name: CI - main
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  NODE_VERSION: '24'
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@v7
+        # The default checkout leaves the job's token in .git/config for later
+        # git commands. Nothing here needs it: there are no git: or github:
+        # dependencies in package.json, so `pnpm install --frozen-lockfile
+        # --ignore-scripts` resolves entirely from the registry, and neither
+        # lint nor build touches the remote. Dropping it removes the token from
+        # reach of anything that runs after checkout.
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm lint
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@v7
+        # The default checkout leaves the job's token in .git/config for later
+        # git commands. Nothing here needs it: there are no git: or github:
+        # dependencies in package.json, so `pnpm install --frozen-lockfile
+        # --ignore-scripts` resolves entirely from the registry, and neither
+        # lint nor build touches the remote. Dropping it removes the token from
+        # reach of anything that runs after checkout.
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm build

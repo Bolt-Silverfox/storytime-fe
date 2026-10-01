@@ -1,0 +1,61 @@
+# Build-context excludes for the production image.
+#
+# Deliberately an EXCLUDE list, not an allow list. An allow list silently drops
+# any newly added top-level asset directory, and the failure mode is a 404 in
+# production rather than a build error. Equally deliberately, there is NO broad
+# dotfile glob (`.*`, `**/.*`): `public/.well-known/` holds
+# apple-app-site-association and assetlinks.json, and dropping them silently
+# breaks iOS/Android universal links with no build-time signal.
+
+# VCS and agent scratch
+.git
+.gitattributes
+.githooks
+.github
+.storytime-ci/
+.claude/
+.idea/
+.vscode/
+
+# Installed/derived output. node_modules in particular MUST NOT be copied in:
+# pnpm resolves optional platform packages (sharp, @next/swc, @tailwindcss/oxide,
+# lightningcss) against the INSTALL HOST's arch/libc, so a host node_modules is
+# usually the wrong build for the linux/arm64 + musl runtime.
+node_modules
+**/node_modules
+.next
+**/.next
+out
+build
+coverage
+*.tsbuildinfo
+next-env.d.ts
+
+# Env files - never bake into a layer. The NEXT_PUBLIC_* values the build needs
+# are passed as explicit --build-arg instead (see Dockerfile).
+.env
+.env.*
+
+# Deployment/runtime artifacts not used by the container image
+.vercel
+vercel.json
+ecosystem.config.js
+deploy/
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Docs and editor noise
+README.md
+**/*.md
+!app/**/*.md
+.DS_Store
+*.pem
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Keep .well-known even if a future rule above starts matching dotted paths.
+!public/.well-known
+!public/.well-known/**

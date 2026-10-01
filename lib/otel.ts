@@ -20,10 +20,19 @@ import { OTLPHttpProtoTraceExporter, registerOTel } from '@vercel/otel';
  * Parse the standard `OTEL_EXPORTER_OTLP_HEADERS` format: comma-separated
  * `key=value` pairs, e.g. `Authorization=Basic xxx,X-Scope-OrgID=123`.
  *
- * Values are used verbatim. The OTLP specification defines them as W3C Baggage
- * (i.e. percent-encoded) and this does not decode them - a deliberate match for
- * storytime_be so both services read the variable identically, and lossless for
- * the `Basic <base64>` value we actually set.
+ * Values ARE percent-decoded. The OTLP specification defines them as W3C
+ * Baggage, and the reason is in the parser below: @vercel/otel merges these
+ * straight into fetch() without decoding, so `Basic%20<b64>` would be sent
+ * literally and a Basic-auth gateway would reject it.
+ *
+ * THIS DIVERGES FROM storytime_be, which uses values verbatim
+ * (`src/otel-setup.ts`, `headers[key] = value`). Two consequences: a value
+ * containing a literal `%` not followed by two hex digits is dropped here and
+ * forwarded there, and if that dropped pair was the only `Authorization` and no
+ * GRAFANA_CLOUD_* pair is set, this service exports with no auth. Decoding is
+ * lossless for the `Basic <base64>` value we actually set, so the divergence is
+ * theoretical for our own configuration -- but do not assume the two services
+ * read this variable identically.
  */
 function parseOtlpHeaderString(raw: string): Record<string, string> {
   const headers: Record<string, string> = {};
@@ -57,7 +66,8 @@ function parseOtlpHeaderString(raw: string): Record<string, string> {
 /**
  * Build OTLP request headers for the Grafana Cloud OTLP gateway.
  * Precedence:
- *   1. `OTEL_EXPORTER_OTLP_HEADERS` (OTel standard) - used verbatim.
+ *   1. `OTEL_EXPORTER_OTLP_HEADERS` (OTel standard) - percent-decoded; see
+ *      the parser note above on how this differs from storytime_be.
  *   2. `GRAFANA_CLOUD_INSTANCE_ID` + `GRAFANA_CLOUD_API_TOKEN` (or legacy
  *      `GRAFANA_CLOUD_API_KEY`) - encoded as HTTP Basic auth.
  * With neither set this returns `{}`: the exporter still runs (which is what

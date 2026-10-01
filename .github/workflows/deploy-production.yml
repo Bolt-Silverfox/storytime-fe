@@ -7,21 +7,17 @@
 # that this service's containers are running on the digest just pushed.
 #
 # MANUAL ONLY, ON PURPOSE. There is no `push:` trigger here — deploying this
-# image is a deliberate act a human performs from the Actions tab. That is a
-# statement about THIS workflow, not about the repo:
+# image is a deliberate act a human performs from the Actions tab. Nothing else
+# deploys production any more: the old `deploy-prod.yml` rsync-over-SSH job was
+# removed, so this is the only path and there is no second pipeline that could
+# race it against the same box.
 #
-#   `deploy-prod.yml` still runs on every push to `main`.
-#
-# That pipeline is NOT retired by this change, and its concurrency group is
-# unrelated to this one, so the two can run against the same box at the same
-# time. Retiring it is a separate, separately reviewed change.
-#
-# THIS FILE MUST ALSO REACH THE DEFAULT BRANCH BEFORE IT CAN BE RUN AT ALL.
-# GitHub registers `workflow_dispatch` from the repository's DEFAULT branch,
-# which here is `dev`, not `main`. While this file exists only on
-# `main` it appears in neither the Actions tab nor
-# `POST /actions/workflows/{id}/dispatches`. Merging it onto the default
-# branch as well is a required follow-up.
+# WORKFLOW_DISPATCH REGISTERS ONLY FROM THE DEFAULT BRANCH. While the default
+# branch is not `main`, this file appears in neither the Actions tab nor
+# `POST /actions/workflows/{id}/dispatches`, so it cannot be run at all. Moving
+# the default branch to `main` is the remaining prerequisite; it is deliberate
+# rather than pending, because `main` is now what the production pipeline
+# builds from.
 #
 # And once it is runnable, the run MUST be started with the branch set to
 # `main`: the deploy role's trust policy pins the OIDC `sub` claim to
@@ -177,9 +173,10 @@ jobs:
 # falling back to a default API origin and producing a bundle that looks healthy
 # and 404s every request.
 #
-# PREREQUISITE: a Dockerfile must exist on the ref this runs from. One exists on
-# `dev`; `main` gets it by promotion. The reusable workflow checks out the ref
-# the run was dispatched from and defaults to `Dockerfile` at the repo root --
-# its `dockerfile` input overrides the path, but not the ref. With the branch
-# note above, that means this can only succeed from `main`, and only once the
-# promotion has landed and the deploy roles exist.
+# The Dockerfile this builds is on `main`, put there by the promotion that also
+# brought this file. That ordering is not incidental: the reusable workflow
+# checks out the ref the run was dispatched from and defaults to `Dockerfile` at
+# the repo root -- its `dockerfile` input overrides the path, but not the ref --
+# so a dispatch from a ref without a Dockerfile fails at build. With the branch
+# note above, this can only succeed from `main`, and only once the deploy roles
+# exist in storytime-devops.

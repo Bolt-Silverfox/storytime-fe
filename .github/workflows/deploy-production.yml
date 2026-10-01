@@ -131,26 +131,55 @@ jobs:
       environment: ${{ inputs.environment }}
       instance_id: ${{ inputs.instance_id }}
       role_arn: ${{ inputs.role_arn }}
+      # Values come from REPOSITORY variables, deliberately not from literals
+      # in this file: this repo is public, and NEXT_PUBLIC_API_KEY is on the
+      # rotation list, so a literal would be a third place it leaks. Rotating
+      # it then becomes a settings change rather than a PR.
+      #
+      # Repository-scoped, not environment-scoped: a job that calls a reusable
+      # workflow cannot declare `environment:`, so an environment variable
+      # would never resolve here and would silently render empty.
+      #
+      # Not secrets either -- `secrets` is not available in a `with:` block at
+      # all. That constraint happens to match the input's own PUBLIC VALUES
+      # ONLY rule: every value below is inlined into the client bundle and
+      # served to browsers, so none of it is confidential. It is still echoed
+      # in the build log and recorded in the image, which is why nothing
+      # genuinely secret may be added to this list.
+      #
+      # An unset variable renders EMPTY, and the pipeline's validation rejects
+      # a blank NEXT_PUBLIC_API_URL by name rather than shipping a bundle that
+      # silently falls back to a default origin and 404s. The optional values
+      # below fail quieter: an empty Sentry DSN just disables reporting, and an
+      # empty Firebase key breaks push at runtime, not at build. Set them all.
+      build_args: |
+        NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
+        NEXT_PUBLIC_API_KEY=${{ vars.NEXT_PUBLIC_API_KEY }}
+        NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID=${{ vars.NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID }}
+        NEXT_PUBLIC_APPLE_SERVICE_ID=${{ vars.NEXT_PUBLIC_APPLE_SERVICE_ID }}
+        NEXT_PUBLIC_APPLE_REDIRECT_URI=${{ vars.NEXT_PUBLIC_APPLE_REDIRECT_URI }}
+        NEXT_PUBLIC_SENTRY_DSN=${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
+        NEXT_PUBLIC_SENTRY_ENVIRONMENT=${{ vars.NEXT_PUBLIC_SENTRY_ENVIRONMENT }}
+        NEXT_PUBLIC_FIREBASE_API_KEY=${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID=${{ vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+        NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${{ vars.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+        NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ vars.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+        NEXT_PUBLIC_FIREBASE_APP_ID=${{ vars.NEXT_PUBLIC_FIREBASE_APP_ID }}
+        NEXT_PUBLIC_FIREBASE_VAPID_KEY=${{ vars.NEXT_PUBLIC_FIREBASE_VAPID_KEY }}
 
-# NEXT_PUBLIC_* ARE BUILD-TIME, AND THIS PIPELINE CANNOT SUPPLY THEM. Next.js
-# inlines NEXT_PUBLIC_* into the client bundle when the image is BUILT, so they
-# are build args, not runtime env. The reusable workflow exposes no build-args
-# and no secrets input — its inputs are service, environment, role_arn,
-# instance_id, aws_region, dockerfile, build_context, ecr_repository_prefix,
-# runner and reconcile_timeout_seconds — and it passes nothing to
-# docker/build-push-action beyond context, file, platforms, tags and cache. So
-# every NEXT_PUBLIC_* value must be baked into the Dockerfile, or the reusable
-# workflow must grow a build_args input, before an image built by this pipeline
-# is correct for production.
+# NEXT_PUBLIC_* ARE BUILD-TIME. Next.js inlines them into the client bundle
+# when the image is BUILT, so they are build args rather than runtime env, and an
+# image built without them is misconfigured rather than unconfigured. The
+# reusable workflow grew a `build_args` input for exactly this, and its
+# validation now REJECTS a dispatch of `web` that supplies no non-blank
+# NEXT_PUBLIC_API_URL -- `web` being the service that otherwise fails silently,
+# falling back to a default API origin and producing a bundle that looks healthy
+# and 404s every request.
 #
-# PREREQUISITE, NOT SATISFIED TODAY: there is no Dockerfile on `main` in this
-# repo — one exists on `dev`. The reusable workflow checks out the ref the run
-# was dispatched from and defaults to `Dockerfile` at the repo root; its
-# `dockerfile` input can override the path, but not the ref.
-#
-# Combined with the branch note above, that means there is currently NO branch
-# from which this workflow can succeed: from `main` the OIDC check passes and
-# the build fails for want of a Dockerfile; from `dev` the Dockerfile is there
-# but the `sub` claim names that branch and the assume-role is rejected.
-# Landing a production Dockerfile on `main` is the unblocker, and the deploy
-# roles have to exist by then too.
+# PREREQUISITE: a Dockerfile must exist on the ref this runs from. One exists on
+# `dev`; `main` gets it by promotion. The reusable workflow checks out the ref
+# the run was dispatched from and defaults to `Dockerfile` at the repo root --
+# its `dockerfile` input overrides the path, but not the ref. With the branch
+# note above, that means this can only succeed from `main`, and only once the
+# promotion has landed and the deploy roles exist.

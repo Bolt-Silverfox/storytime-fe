@@ -134,14 +134,21 @@ jobs:
     name: Dispatch ref must be main
     runs-on: ubuntu-latest
     steps:
-      - name: Refuse a dispatch from any ref but main
-        if: github.ref_name != 'main'
-        # Via env, not inline interpolation: a branch name is attacker-supplied
+      - name: Refuse a dispatch from any ref but the main branch
+        # `github.ref`, NOT `github.ref_name`. workflow_dispatch accepts tags as
+        # well as branches, and `ref_name` is the SHORT name -- a tag called
+        # `main` yields `main` and would pass a short-name check. The full ref
+        # distinguishes `refs/heads/main` from `refs/tags/main`, which is the
+        # same distinction the trust policy makes: its sub claim is pinned to
+        # `refs/heads/main`, so a tag dispatch is rejected at assume-role with
+        # the bare AccessDenied this guard exists to pre-empt.
+        if: github.ref != 'refs/heads/main'
+        # Via env, not inline interpolation: a ref name is attacker-supplied
         # text and must not be pasted into a shell command.
         env:
-          DISPATCH_REF: ${{ github.ref_name }}
+          DISPATCH_REF: ${{ github.ref }}
         run: |
-          echo "::error::Dispatched from '$DISPATCH_REF'. Production deploys must be dispatched from 'main': the deploy role's trust policy pins the OIDC sub claim to refs/heads/main, and this repo's main is what the production image is built from. Re-run with Branch set to main."
+          echo "::error::Dispatched from '$DISPATCH_REF'. Production deploys must be dispatched from the main BRANCH (refs/heads/main): the deploy role's trust policy pins the OIDC sub claim to that exact ref, and main is what the production image is built from. A tag named main does not qualify. Re-run with Branch set to main."
           exit 1
 
   deploy:

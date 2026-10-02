@@ -117,7 +117,35 @@ permissions:
   id-token: write
 
 jobs:
+  # A DISPATCH FROM THE WRONG BRANCH FAILS EITHER WAY -- this makes it fail
+  # early, and say why. The deploy role's trust policy pins the OIDC `sub`
+  # claim to `refs/heads/main`, so any other ref is rejected at assume-role
+  # with a bare AccessDenied, which reads like a broken credential rather than
+  # a wrong branch. That rejection also happens AFTER checkout, so the runner
+  # has already pulled the wrong ref's code by then.
+  #
+  # This matters because the Run workflow dropdown defaults to the repository's
+  # DEFAULT branch, which in this repo is not `main`. Picking the default is
+  # the easy mistake, so it is the one worth naming.
+  #
+  # A separate job rather than an `if:` on `deploy`: a false `if:` SKIPS the
+  # job, which reports green. A wrong-branch dispatch should be red.
+  guard-ref:
+    name: Dispatch ref must be main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse a dispatch from any ref but main
+        if: github.ref_name != 'main'
+        # Via env, not inline interpolation: a branch name is attacker-supplied
+        # text and must not be pasted into a shell command.
+        env:
+          DISPATCH_REF: ${{ github.ref_name }}
+        run: |
+          echo "::error::Dispatched from '$DISPATCH_REF'. Production deploys must be dispatched from 'main': the deploy role's trust policy pins the OIDC sub claim to refs/heads/main, and this repo's main is what the production image is built from. Re-run with Branch set to main."
+          exit 1
+
   deploy:
+    needs: guard-ref
     # PINNED to an immutable commit, not `@main`. The trust policy on the
     # deploy role matches `job_workflow_ref` exactly, so this SHA and the
     # `github_deploy_workflow_ref` variable in storytime-devops

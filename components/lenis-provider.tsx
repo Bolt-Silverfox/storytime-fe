@@ -1,8 +1,8 @@
 'use client';
 
-import { cancelFrame, frame } from 'framer-motion';
 import { ReactLenis } from 'lenis/react';
 import type { LenisRef } from 'lenis/react';
+import { cancelFrame, frame } from 'motion/react';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 

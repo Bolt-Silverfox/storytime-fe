@@ -5,7 +5,7 @@ import kid1 from '@/public/kid-3.svg';
 import kid3 from '@/public/kid-3.svg';
 import kid2 from '@/public/kid-4.svg';
 import kid4 from '@/public/kid-4.svg';
-import { motion as m } from 'framer-motion';
+import { motion as m } from 'motion/react';
 import { useEffect, useState } from 'react';
 
 // Default avatar images to use when avatarUrl is null

@@ -189,7 +189,7 @@ export const KidsAvatarSheet = ({
                               key={file.id}
                               file={file}
                             >
-                              <FormItem key={Math.random()}>
+                              <FormItem>
                                 <FormLabel
                                   htmlFor={file.id}
                                   className='w-full cursor-pointer flex items-center justify-between gap-3 rounded-2xl border border-[#FAF4F2] bg-white p-6 shadow-[0_0_17px_0_#221D29]/5 [&:has(>button[data-state=checked])]:border-[#FB9583] [&:has(>button[data-state=checked])]:ring-2 [&:has(>button[data-state=checked])]:ring-[#FB9583]/50'

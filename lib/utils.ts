@@ -1,4 +1,3 @@
-import { faker } from '@faker-js/faker';
 import { type ClassValue, clsx } from 'clsx';
 import ISO6391 from 'iso-639-1';
 import { twMerge } from 'tailwind-merge';
@@ -70,7 +69,11 @@ export const ageRangesOptions = () => {
   return ranges;
 };
 
-export const avatarOptions = Array.from({ length: 6 }, () => ({
-  avatar: faker.image.avatar(),
-  name: faker.person.firstName(),
-}));
+export const avatarOptions = [
+  { avatar: '/danny.png', name: 'Danny' },
+  { avatar: '/ella.png', name: 'Ella' },
+  { avatar: '/henry.png', name: 'Henry' },
+  { avatar: '/noah.png', name: 'Noah' },
+  { avatar: '/oliva.png', name: 'Olivia' },
+  { avatar: '/stella.png', name: 'Stella' },
+];

@@ -1,6 +1,6 @@
 import close from '@/public/close.svg';
 import expandIcon from '@/public/expand.svg';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'motion/react';
 import Image from 'next/image';
 import type React from 'react';
 import { useEffect, useId, useRef } from 'react';
@@ -103,7 +103,7 @@ const Modal: React.FC<ModalProps> = ({
           aria-modal='true'
           aria-labelledby={title ? titleId : undefined}
           onKeyDown={handleTabKey}
-          // biome-ignore lint/a11y/useSemanticElements: motion.div is used for animation; native <dialog> is not compatible with framer-motion AnimatePresence
+          // biome-ignore lint/a11y/useSemanticElements: motion.div is used for animation; native <dialog> is not compatible with motion AnimatePresence
           role='dialog'
         >
           <motion.div

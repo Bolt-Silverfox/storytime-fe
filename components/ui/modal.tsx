@@ -103,6 +103,7 @@ const Modal: React.FC<ModalProps> = ({
           aria-modal='true'
           aria-labelledby={title ? titleId : undefined}
           onKeyDown={handleTabKey}
+          // biome-ignore lint/a11y/useSemanticElements: motion.div is used for animation; native <dialog> is not compatible with motion AnimatePresence
           role='dialog'
         >
           <motion.div

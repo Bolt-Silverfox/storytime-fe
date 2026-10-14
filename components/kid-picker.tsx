@@ -44,6 +44,7 @@ const KidPicker = ({
   const [formLoading, setFormLoading] = useState(false);
   const [_formError, setFormError] = useState<string | null>(null);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: mount-only fetch; fetchKids is redefined every render, so listing it would re-fetch in a loop
   useEffect(() => {
     fetchKids();
     // eslint-disable-next-line react-hooks/exhaustive-deps

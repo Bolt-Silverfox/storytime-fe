@@ -700,6 +700,7 @@ const PersonalSettingsPage = () => {
         <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/30'>
           <div
             className='bg-white rounded-2xl shadow-lg p-8 w-full max-w-md mx-4 relative'
+            // biome-ignore lint/a11y/useSemanticElements: native <dialog> is not used here; this is a hand-rolled overlay dialog
             role='dialog'
             aria-modal='true'
             aria-labelledby='remove-kid-title'
@@ -746,6 +747,7 @@ const PersonalSettingsPage = () => {
         <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/30'>
           <div
             className='bg-white rounded-2xl shadow-lg p-8 w-full max-w-md mx-4 relative'
+            // biome-ignore lint/a11y/useSemanticElements: native <dialog> is not used here; this is a hand-rolled overlay dialog
             role='dialog'
             aria-modal='true'
             aria-labelledby='delete-account-title'
@@ -849,6 +851,7 @@ const PersonalSettingsPage = () => {
         <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/30'>
           <div
             className='bg-white rounded-4xl shadow-lg p-8 w-full max-w-md mx-4 relative'
+            // biome-ignore lint/a11y/useSemanticElements: native <dialog> is not used here; this is a hand-rolled overlay dialog
             role='dialog'
             aria-modal='true'
             aria-labelledby='confirm-delete-title'

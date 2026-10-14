@@ -192,6 +192,7 @@ const StoryReader = ({
     fetchStory();
   }, [storyId, isGuest, queryClient]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: audioRetry is a deliberate trigger so the "Try again" button re-runs audio generation; it isn't read in the body.
   useEffect(() => {
     let cancelled = false;
 
@@ -385,6 +386,7 @@ const StoryReader = ({
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: audioUrl is a deliberate trigger so listeners attach when the <audio> element (re)mounts on a new clip; the body reads the element via ref, not audioUrl directly.
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) {
@@ -806,6 +808,7 @@ const StoryReader = ({
                   const paraReady =
                     !useAudioParagraphs || !!audioParagraphs[i]?.audioUrl;
                   return (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: paragraphs can repeat verbatim, so the index is what keeps the key unique
                     <div key={`para-${i}-${para.slice(0, 12)}`}>
                       <p
                         id={`reading-para-${i}`}

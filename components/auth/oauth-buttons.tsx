@@ -134,6 +134,7 @@ export const OAuthButtons = ({
   // ready. Runs on mount too (covers client-side nav where onLoad already
   // fired and won't fire again). googleReady is a re-trigger only — the body
   // reads window.google directly — hence the exhaustive-deps exception.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: googleReady re-triggers render after the script loads
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) {
       return;

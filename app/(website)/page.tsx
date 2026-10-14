@@ -407,6 +407,7 @@ export default function Home() {
         <div className='grid md:grid-cols-3 gap-x-[25px] gap-y-10 w-full'>
           {testimonials.slice(2).map((testimonial, index) => (
             <Card
+              // biome-ignore lint/suspicious/noArrayIndexKey: the index disambiguates testimonials that share a name; the key is not the bare index
               key={`bottom-testimonial-${testimonial.name}-${index}`}
               className='w-full col-span-1 bg-white shadow-none rounded-[21px] border-[0.5px] border-solid border-stone-100'
             >

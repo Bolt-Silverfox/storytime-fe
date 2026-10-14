@@ -30,7 +30,7 @@ import {
 
 const EmailSchema = z.object({
   email: z
-    .string({ required_error: 'Email address is required.' })
+    .string({ error: 'Email address is required.' })
     .min(1, 'Email address is required.')
     .email({ message: 'Enter a valid email address' }),
 });

@@ -41,7 +41,7 @@ import { avatarOptions, cn } from '@/lib/utils';
 
 const FormSchema = z.object({
   avatar: z.string({
-    required_error: 'You need to select a notification type.',
+    error: 'You need to select a notification type.',
   }),
 });
 

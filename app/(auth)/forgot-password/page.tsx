@@ -24,7 +24,7 @@ import { StepBackButton } from '../register/components/step-back';
 
 const FormSchema = z.object({
   email: z
-    .string({ required_error: 'Email address is required.' })
+    .string({ error: 'Email address is required.' })
     .email({ message: 'Invalid email address' }),
 });
 

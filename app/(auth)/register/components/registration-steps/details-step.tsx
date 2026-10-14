@@ -29,12 +29,12 @@ import { cn } from '@/lib/utils';
 
 const FormSchema = z.object({
   title: z
-    .string({ required_error: 'Your title is required.' })
+    .string({ error: 'Your title is required.' })
     .refine((val) => registrationTitles.includes(val), {
       message: 'Please select a valid title.',
     }),
   name: z
-    .string({ required_error: 'Your full name is required.' })
+    .string({ error: 'Your full name is required.' })
     .min(3, 'Your name is too short.')
     .regex(
       /^[A-Za-z\s'-]+$/,

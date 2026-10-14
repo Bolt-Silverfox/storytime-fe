@@ -30,9 +30,9 @@ import { cn } from '@/lib/utils';
 
 const FormSchema = z.object({
   email: z
-    .string({ required_error: 'Email address is required.' })
+    .string({ error: 'Email address is required.' })
     .email({ message: 'Invalid email address' }),
-  password: z.string({ required_error: 'Password is required' }),
+  password: z.string({ error: 'Password is required' }),
 });
 
 const Page = () => {

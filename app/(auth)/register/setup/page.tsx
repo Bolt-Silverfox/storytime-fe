@@ -38,19 +38,17 @@ import { KidsInformationContent } from './components/kids-information-content';
 import { KidsInformationLoader } from './components/kids-information-loader';
 
 const KidsFormSchema = z.object({
-  name: z
-    .string({ required_error: 'Name is required.' })
-    .min(1, 'Name is required.'),
+  name: z.string({ error: 'Name is required.' }).min(1, 'Name is required.'),
   ageRange: z
-    .string({ required_error: 'Age range is required' })
+    .string({ error: 'Age range is required' })
     .min(1, 'Age range is required.'),
-  avatar: z.string({ required_error: 'Avatar is required' }),
+  avatar: z.string({ error: 'Avatar is required' }),
 });
 
 const FormSchema = z.object({
-  language: z.string({ required_error: 'Language is required.' }),
-  country: z.string({ required_error: 'Country is required.' }),
-  kids: z.string({ required_error: 'Kids is required.' }),
+  language: z.string({ error: 'Language is required.' }),
+  country: z.string({ error: 'Country is required.' }),
+  kids: z.string({ error: 'Kids is required.' }),
   kidsInfo: z.array(KidsFormSchema).nonempty('At least one kid is required'),
 });
 

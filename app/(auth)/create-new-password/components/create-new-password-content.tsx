@@ -24,7 +24,7 @@ import { cn } from '@/lib/utils';
 const FormSchema = z
   .object({
     password: z
-      .string({ required_error: 'Password is required' })
+      .string({ error: 'Password is required' })
       .min(8, {
         message: 'Password has to be 8 characters long',
       })
@@ -49,7 +49,7 @@ const FormSchema = z
         (value) => /[^A-Za-z0-9\s]/.test(value),
         'Password must contain at least one special character'
       ),
-    confirm_password: z.string({ required_error: 'Please confirm password' }),
+    confirm_password: z.string({ error: 'Please confirm password' }),
   })
   .refine((data) => data.password === data.confirm_password, {
     message: "Passwords don't match",

@@ -1,5 +1,12 @@
 'use client';
 
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Trash2Icon } from 'lucide-react';
+import Image from 'next/image';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
+import { z } from 'zod';
 import { PageLoader } from '@/components/page-loader';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
@@ -31,13 +38,6 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { avatarOptions, cn } from '@/lib/utils';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Trash2Icon } from 'lucide-react';
-import Image from 'next/image';
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { toast } from 'sonner';
-import { z } from 'zod';
 
 const FormSchema = z.object({
   avatar: z.string({

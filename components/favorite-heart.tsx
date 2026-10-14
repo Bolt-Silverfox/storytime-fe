@@ -1,7 +1,7 @@
 'use client';
 
-import { useFavorite } from '@/lib/favorites-store';
 import type { MouseEvent } from 'react';
+import { useFavorite } from '@/lib/favorites-store';
 
 const FavoriteHeart = ({
   storyId,

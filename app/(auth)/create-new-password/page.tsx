@@ -1,5 +1,5 @@
-import { PageLoader } from '@/components/page-loader';
 import { Suspense } from 'react';
+import { PageLoader } from '@/components/page-loader';
 import { CreateNewPasswordContent } from './components/create-new-password-content';
 
 const Page = () => {

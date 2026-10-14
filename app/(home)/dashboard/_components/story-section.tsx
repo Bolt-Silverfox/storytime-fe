@@ -1,9 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import FavoriteHeart from '@/components/favorite-heart';
 import StoryStatusBadge from '@/components/story-status-badge';
 import type { StoryListItem } from '@/lib/services';
-import Link from 'next/link';
 
 const ageLabel = (story: StoryListItem): string | null => {
   const { ageMin, ageMax } = story;

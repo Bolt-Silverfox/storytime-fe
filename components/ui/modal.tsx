@@ -1,9 +1,9 @@
-import close from '@/public/close.svg';
-import expandIcon from '@/public/expand.svg';
 import { AnimatePresence, motion } from 'motion/react';
 import Image from 'next/image';
 import type React from 'react';
 import { useEffect, useId, useRef } from 'react';
+import close from '@/public/close.svg';
+import expandIcon from '@/public/expand.svg';
 
 interface ModalProps {
   open: boolean;

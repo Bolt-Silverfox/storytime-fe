@@ -1,6 +1,6 @@
+import Link from 'next/link';
 import { Logo } from '@/components/logo';
 import { Icons } from '@/components/ui/icons';
-import Link from 'next/link';
 
 export const AuthNav = () => {
   return (

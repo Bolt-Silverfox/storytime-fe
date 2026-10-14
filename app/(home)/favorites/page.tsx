@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+import { useCallback, useEffect, useState } from 'react';
 import BackButton from '@/components/back-button';
 import Header from '@/components/header';
 import StoryStatusBadge from '@/components/story-status-badge';
@@ -9,8 +11,6 @@ import {
   listFavoritesService,
   removeFavoriteService,
 } from '@/lib/services';
-import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
 
 const FavoritesPage = () => {
   const [favorites, setFavorites] = useState<FavoriteStory[]>([]);

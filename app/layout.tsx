@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
 import { ABeeZee } from 'next/font/google';
 import './globals.css';
+import localFont from 'next/font/local';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { cn } from '@/lib/utils';
-import localFont from 'next/font/local';
 import { Providers } from './providers';
 
 const abeezee = ABeeZee({

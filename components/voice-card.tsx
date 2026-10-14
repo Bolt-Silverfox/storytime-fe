@@ -1,6 +1,6 @@
-import volumeActive from '@/public/volume-light.svg';
-import volume from '@/public/volume.svg';
 import Image from 'next/image';
+import volume from '@/public/volume.svg';
+import volumeActive from '@/public/volume-light.svg';
 
 const VoiceCard = ({
   name,

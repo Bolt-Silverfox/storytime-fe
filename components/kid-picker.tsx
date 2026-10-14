@@ -1,15 +1,15 @@
+import Image from 'next/image';
+import { useEffect, useState } from 'react';
 import {
-  type SystemAvatar,
   addKidsService,
   getKidsService,
   getSystemAvatarsService,
+  type SystemAvatar,
 } from '@/lib/services';
 import kid1 from '@/public/kid-3.svg';
 import kid3 from '@/public/kid-3.svg';
 import kid2 from '@/public/kid-4.svg';
 import kid4 from '@/public/kid-4.svg';
-import Image from 'next/image';
-import { useEffect, useState } from 'react';
 import { Input } from './ui/input';
 import Modal from './ui/modal'; // Import Modal
 import {
@@ -44,6 +44,7 @@ const KidPicker = ({
   const [formLoading, setFormLoading] = useState(false);
   const [_formError, setFormError] = useState<string | null>(null);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: mount-only fetch; fetchKids is redefined every render, so listing it would re-fetch in a loop
   useEffect(() => {
     fetchKids();
     // eslint-disable-next-line react-hooks/exhaustive-deps

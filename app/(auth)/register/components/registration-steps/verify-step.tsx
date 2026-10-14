@@ -1,5 +1,11 @@
 'use client';
 
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
+import { z } from 'zod';
 import { PageLoader } from '@/components/page-loader';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,12 +26,6 @@ import {
   verifyEmailService,
 } from '@/lib/services';
 import { maskEmail } from '@/lib/utils';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { toast } from 'sonner';
-import { z } from 'zod';
 
 const FormSchema = z.object({
   pin: z.string().min(6, {
@@ -58,7 +58,7 @@ export const VerifyStep = () => {
         registrationData?.email ?? ''
       );
       toast.success(response.message);
-      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      // biome-ignore lint/suspicious/noExplicitAny: the caught value is untyped; only .message is read below
     } catch (error: any) {
       toast.error(error.message || 'Could not send verification email');
     } finally {
@@ -72,7 +72,7 @@ export const VerifyStep = () => {
       await verifyEmailService(data.pin);
       toast.success('Email verified successfully!');
       router.push('/register/setup');
-      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      // biome-ignore lint/suspicious/noExplicitAny: the caught value is untyped; only .message is read below
     } catch (error: any) {
       toast.error(error?.message || 'Verification failed');
     } finally {

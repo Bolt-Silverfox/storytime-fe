@@ -1,12 +1,12 @@
-import BackButton from '@/components/back-button';
 import type { Metadata } from 'next';
+import BackButton from '@/components/back-button';
 import { ageLabel, coverOf, extractStoryId, getStory } from './get-story';
 import OpenInAppButton from './open-in-app-button';
 import {
   APP_STORE_URL,
+  ogImageUrl,
   PLAY_STORE_URL,
   SITE_URL,
-  ogImageUrl,
 } from './story-links';
 import StoryView from './story-view';
 

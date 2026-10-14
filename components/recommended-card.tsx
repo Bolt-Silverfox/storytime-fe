@@ -1,9 +1,9 @@
 'use client';
 
-import heartFilled from '@/public/heart-filled.svg';
-import heart from '@/public/heart-plain.svg';
 import Image, { type StaticImageData } from 'next/image';
 import { useState } from 'react';
+import heartFilled from '@/public/heart-filled.svg';
+import heart from '@/public/heart-plain.svg';
 
 interface RecommendedCardProps {
   title: string;

@@ -1,6 +1,6 @@
-import api from '@/lib/axios';
 import { AxiosError } from 'axios';
 import Cookies from 'js-cookie';
+import api from '@/lib/axios';
 
 interface RegisterPayload {
   email: string;

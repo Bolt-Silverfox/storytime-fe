@@ -1,5 +1,8 @@
 'use client';
 
+import Image from 'next/image';
+import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import BackButton from '@/components/back-button';
 import Header from '@/components/header';
 import KidsCard from '@/components/kids-card';
@@ -15,13 +18,13 @@ import {
 } from '@/components/ui/select';
 import { countries } from '@/data/countries';
 import {
-  type SystemAvatar,
   clearUserFromStorage,
   deleteAccountService,
   deleteKidService,
   getKidsService,
   getSystemAvatarsService,
   getUserFromStorage,
+  type SystemAvatar,
   updateKidService,
   updateParentAvatarService,
   updateParentProfileService,
@@ -31,9 +34,6 @@ import { cn } from '@/lib/utils';
 import avatar from '@/public/avatar-big.png';
 import kidAvatar1 from '@/public/kid-3.svg';
 import kidAvatar2 from '@/public/kid-4.svg';
-import Image from 'next/image';
-import { useCallback, useEffect, useState } from 'react';
-import { toast } from 'sonner';
 
 interface MappedKid {
   id: string;

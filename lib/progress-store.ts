@@ -1,12 +1,12 @@
 'use client';
 
+import { useSyncExternalStore } from 'react';
 import {
   getCompletedStoriesService,
   getInProgressStoriesService,
   isUserLoggedIn,
   recordUserProgressService,
 } from '@/lib/services';
-import { useSyncExternalStore } from 'react';
 
 // Module-singleton store of per-story reading status. Works for guests
 // (persisted to localStorage) and logged-in users (hydrated from the library).

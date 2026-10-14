@@ -1,7 +1,7 @@
 'use client';
 
-import { cn } from '@/lib/utils';
 import { EyeIcon, EyeOff } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface PasswordInputToggleProps {
   /** Whether the password is currently visible (input type is `text`). */

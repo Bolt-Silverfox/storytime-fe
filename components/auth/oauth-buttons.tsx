@@ -1,10 +1,10 @@
 'use client';
 
-import { appleLoginService, googleLoginService } from '@/lib/services';
 import { useRouter } from 'next/navigation';
 import Script from 'next/script';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { appleLoginService, googleLoginService } from '@/lib/services';
 
 // Public web OAuth config, inlined at build time. Google uses the same web
 // client id the mobile app registers (backend verifies the id_token audience

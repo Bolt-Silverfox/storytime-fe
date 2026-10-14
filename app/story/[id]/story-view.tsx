@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import ModeSelector from '@/components/mode-selector';
 import QuotaIndicator from '@/components/quota-indicator';
 import StoryReader from '@/components/story-reader';
@@ -15,7 +16,6 @@ import {
   listFavoritesService,
   removeFavoriteService,
 } from '@/lib/services';
-import { useEffect, useState } from 'react';
 
 interface StoryDetail {
   id: string;

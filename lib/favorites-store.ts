@@ -1,12 +1,12 @@
 'use client';
 
+import { useSyncExternalStore } from 'react';
 import {
   addFavoriteService,
   isUserLoggedIn,
   listFavoritesService,
   removeFavoriteService,
 } from '@/lib/services';
-import { useSyncExternalStore } from 'react';
 
 // Module-singleton store of the current user's favorited story ids. Shared by
 // every FavoriteHeart on the page so a toggle on one card reflects everywhere.

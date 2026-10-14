@@ -6,12 +6,12 @@
 // null / false instead of throwing so the UI can render a disabled state.
 import { type FirebaseApp, getApps, initializeApp } from 'firebase/app';
 import {
-  type MessagePayload,
-  type Messaging,
   deleteToken,
   getMessaging,
   getToken,
   isSupported,
+  type MessagePayload,
+  type Messaging,
   onMessage,
 } from 'firebase/messaging';
 

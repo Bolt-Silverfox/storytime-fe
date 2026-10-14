@@ -1,12 +1,12 @@
 'use client';
 
+import Image, { type StaticImageData } from 'next/image';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import CategoryImage from '@/components/category-image';
 import { cn } from '@/lib/utils';
 import heartFilled from '@/public/hearted.svg';
 import heart from '@/public/not-hearted.svg';
-import Image, { type StaticImageData } from 'next/image';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
 
 interface StoryCardProps {
   img: string | StaticImageData;

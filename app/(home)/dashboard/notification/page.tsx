@@ -1,22 +1,22 @@
 'use client';
 
+import Link from 'next/link';
+import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import BackButton from '@/components/back-button';
 import Header from '@/components/header';
 import { Switch } from '@/components/ui/switch';
 import { useWebPush } from '@/lib/hooks/use-web-push';
 import {
-  type NotificationItem,
-  type NotificationPreference,
   getNotificationPreferencesService,
   getUserFromStorage,
   isUserLoggedIn,
   listNotificationsService,
   markAllNotificationsReadService,
+  type NotificationItem,
+  type NotificationPreference,
   updateNotificationPreferenceService,
 } from '@/lib/services';
-import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
-import { toast } from 'sonner';
 
 type TabKey = 'inbox' | 'settings';
 

@@ -1,5 +1,7 @@
 'use client';
 
+import Image from 'next/image';
+import { useEffect, useState } from 'react';
 import { getDailyChallengesService } from '@/lib/services';
 import arrowRight from '@/public/arrow-right.svg';
 import slice1 from '@/public/slice-1.svg';
@@ -7,8 +9,6 @@ import slice2 from '@/public/slice-2.svg';
 import slice3 from '@/public/slice-3.svg';
 import slice4 from '@/public/slice-4.svg';
 import timer from '@/public/timer.svg';
-import Image from 'next/image';
-import { useEffect, useState } from 'react';
 
 const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 

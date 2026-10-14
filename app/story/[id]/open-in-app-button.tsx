@@ -2,8 +2,8 @@
 
 import {
   APP_STORE_URL,
-  PLAY_STORE_URL,
   makeStoryDeepLink,
+  PLAY_STORE_URL,
 } from './story-links';
 
 // Tries to open the story in the installed app via the custom scheme, and if

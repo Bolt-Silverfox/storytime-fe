@@ -1,10 +1,10 @@
 'use client';
 
-import { appleLoginService, googleLoginService } from '@/lib/services';
 import { useRouter } from 'next/navigation';
 import Script from 'next/script';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { appleLoginService, googleLoginService } from '@/lib/services';
 
 // Public web OAuth config, inlined at build time. Google uses the same web
 // client id the mobile app registers (backend verifies the id_token audience
@@ -134,7 +134,6 @@ export const OAuthButtons = ({
   // ready. Runs on mount too (covers client-side nav where onLoad already
   // fired and won't fire again). googleReady is a re-trigger only — the body
   // reads window.google directly — hence the exhaustive-deps exception.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: googleReady re-triggers render after the script loads
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) {
       return;

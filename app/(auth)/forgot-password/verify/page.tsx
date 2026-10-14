@@ -1,5 +1,12 @@
 'use client';
 
+import { zodResolver } from '@hookform/resolvers/zod';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
+import { z } from 'zod';
 import { PageLoader } from '@/components/page-loader';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,13 +27,6 @@ import {
   validateResetTokenService,
 } from '@/lib/services';
 import { maskEmail } from '@/lib/utils';
-import { zodResolver } from '@hookform/resolvers/zod';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { toast } from 'sonner';
-import { z } from 'zod';
 import { StepBackButton } from '../../register/components/step-back';
 
 const FormSchema = z.object({
@@ -60,7 +60,7 @@ const Page = () => {
         registrationData?.email ?? ''
       );
       toast.success(response.message);
-      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      // biome-ignore lint/suspicious/noExplicitAny: the caught value is untyped; only .message is read below
     } catch (error: any) {
       toast.error(error.message || 'Could not send verification email');
     } finally {
@@ -88,7 +88,7 @@ const Page = () => {
           data.pin
         )}&email=${encodeURIComponent(email)}`
       );
-      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      // biome-ignore lint/suspicious/noExplicitAny: the caught value is untyped; only .message is read below
     } catch (error: any) {
       toast.error('OTP verification failed', {
         description: error?.message || 'An unexpected error occurred.',

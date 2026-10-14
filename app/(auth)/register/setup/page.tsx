@@ -1,5 +1,12 @@
 'use client';
 
+import { zodResolver } from '@hookform/resolvers/zod';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
+import { z } from 'zod';
 import { PageLoader } from '@/components/page-loader';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
@@ -26,13 +33,6 @@ import {
   kidsOptions,
   languageOptions,
 } from '@/lib/utils';
-import { zodResolver } from '@hookform/resolvers/zod';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { toast } from 'sonner';
-import { z } from 'zod';
 import { StepProgress } from '../components/step-progress';
 import { KidsInformationContent } from './components/kids-information-content';
 import { KidsInformationLoader } from './components/kids-information-loader';
@@ -95,7 +95,7 @@ const Page = () => {
       // Next: let the parent explicitly choose a story voice (changeable later
       // in Settings), then finish onboarding.
       router.push('/register/setup/voice');
-      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      // biome-ignore lint/suspicious/noExplicitAny: the caught value is untyped; only .message is read below
     } catch (err: any) {
       toast.error(err.message || 'Something went wrong while adding kids');
     } finally {

@@ -1,12 +1,12 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import {
   getAvailableVoicesService,
   getPreferredVoiceService,
   getVoiceAccessService,
   setPreferredVoiceService,
 } from '@/lib/services';
-import { useEffect, useRef, useState } from 'react';
 import VoiceCard from './voice-card';
 
 export interface SelectedVoice {

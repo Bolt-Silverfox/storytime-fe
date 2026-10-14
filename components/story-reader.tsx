@@ -1,24 +1,24 @@
-import { ensureGuestSession } from '@/lib/guest';
-import { STORY_QUOTA_QUERY_KEY } from '@/lib/hooks/use-story-quota';
-import { markDone, markReading } from '@/lib/progress-store';
-import {
-  type StoryAudioBatch,
-  type StoryAudioParagraph,
-  getGuestStoryService,
-  getStoryAudioBatchStatusService,
-  getStoryByIdService,
-  recordUserProgressService,
-  startStoryAudioBatchService,
-} from '@/lib/services';
-import edit from '@/public/edit.svg';
-import movementSmall from '@/public/movement-small.png';
-import movement from '@/public/movement.png';
-import pause from '@/public/pause.svg';
-import play from '@/public/play.svg';
 import { useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+import { ensureGuestSession } from '@/lib/guest';
+import { STORY_QUOTA_QUERY_KEY } from '@/lib/hooks/use-story-quota';
+import { markDone, markReading } from '@/lib/progress-store';
+import {
+  getGuestStoryService,
+  getStoryAudioBatchStatusService,
+  getStoryByIdService,
+  recordUserProgressService,
+  type StoryAudioBatch,
+  type StoryAudioParagraph,
+  startStoryAudioBatchService,
+} from '@/lib/services';
+import edit from '@/public/edit.svg';
+import movement from '@/public/movement.png';
+import movementSmall from '@/public/movement-small.png';
+import pause from '@/public/pause.svg';
+import play from '@/public/play.svg';
 import { Switch } from './ui/switch';
 
 // Turn the story text into readable paragraphs for read-along. Prefer explicit
@@ -192,7 +192,6 @@ const StoryReader = ({
     fetchStory();
   }, [storyId, isGuest, queryClient]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: audioRetry is a deliberate trigger so the "Try again" button re-runs audio generation; it isn't read in the body.
   useEffect(() => {
     let cancelled = false;
 
@@ -386,7 +385,6 @@ const StoryReader = ({
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: audioUrl is a deliberate trigger so listeners attach when the <audio> element (re)mounts on a new clip; the body reads the element via ref, not audioUrl directly.
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) {

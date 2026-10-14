@@ -1,16 +1,16 @@
 'use client';
 
-import { PageLoader } from '@/components/page-loader';
-import { Button } from '@/components/ui/button';
-import {
-  type Voice,
-  getAvailableVoicesService,
-  setPreferredVoiceService,
-} from '@/lib/services';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { PageLoader } from '@/components/page-loader';
+import { Button } from '@/components/ui/button';
+import {
+  getAvailableVoicesService,
+  setPreferredVoiceService,
+  type Voice,
+} from '@/lib/services';
 
 const VoiceSetupPage = () => {
   const router = useRouter();

@@ -1,15 +1,15 @@
 'use client';
 
+import Script from 'next/script';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import {
-  type LinkedAccount,
   getLinkedAccountsService,
+  type LinkedAccount,
   linkAppleService,
   linkGoogleService,
   unlinkProviderService,
 } from '@/lib/services';
-import Script from 'next/script';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
 
 // window.google / window.AppleID and their types are declared globally in
 // components/auth/oauth-buttons.tsx — reused here for account linking.
@@ -139,7 +139,6 @@ export const LinkedAccounts = () => {
   // onGoogleCredential is stable (depends only on the stable `refresh`), so
   // passing it directly keeps the effect pure — no ref-mutation-in-render.
   // googleReady is a re-trigger only (body reads window.google directly).
-  // biome-ignore lint/correctness/useExhaustiveDependencies: googleReady re-triggers render after the GSI script loads
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID || googleLinked) {
       return;

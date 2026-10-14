@@ -1,5 +1,7 @@
 'use client';
 
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import {
   deletePushToken,
   isPushConfigured,
@@ -10,8 +12,6 @@ import {
   registerWebPushTokenService,
   unregisterWebPushTokenService,
 } from '@/lib/services';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
 
 const STORAGE_KEY = 'webPushToken';
 

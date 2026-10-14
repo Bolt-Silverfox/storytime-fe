@@ -1,3 +1,6 @@
+import { Volume2Icon } from 'lucide-react';
+import Image from 'next/image';
+import Link from 'next/link';
 import CategoryImage from '@/components/category-image';
 import {
   Accordion,
@@ -23,9 +26,6 @@ import {
   yellowFeatures,
 } from '@/lib/data';
 import { cn } from '@/lib/utils';
-import { Volume2Icon } from 'lucide-react';
-import Image from 'next/image';
-import Link from 'next/link';
 
 export default function Home() {
   return (

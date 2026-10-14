@@ -1,18 +1,18 @@
 'use client';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import {
   MobileNav,
   MobileNavHeader,
   MobileNavMenu,
   MobileNavToggle,
   NavBody,
-  NavItems,
   Navbar,
+  NavItems,
 } from '@/components/ui/resizable-navbar';
 import { isUserLoggedIn } from '@/lib/services';
 import { cn } from '@/lib/utils';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
 import { Logo } from './logo';
 import { buttonVariants } from './ui/button';
 import { ScrollProgress } from './ui/scroll-progress';

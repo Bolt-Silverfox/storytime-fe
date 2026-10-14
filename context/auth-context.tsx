@@ -1,6 +1,5 @@
 'use client';
 
-import type { RegistrationData } from '@/types/auth';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type React from 'react';
 import {
@@ -11,6 +10,7 @@ import {
   useMemo,
   useState,
 } from 'react';
+import type { RegistrationData } from '@/types/auth';
 
 type RegistrationStep = 'details' | 'credentials' | 'verify';
 

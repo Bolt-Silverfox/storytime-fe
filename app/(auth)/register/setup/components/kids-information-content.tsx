@@ -52,7 +52,6 @@ export const KidsInformationContent = () => {
       </p>
       <div className='space-y-6 '>
         {fields.map((_, index) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
           <KidsInformationCard key={index} index={index} />
         ))}
       </div>

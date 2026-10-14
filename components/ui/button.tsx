@@ -1,5 +1,5 @@
 import { Slot } from '@radix-ui/react-slot';
-import { type VariantProps, cva } from 'class-variance-authority';
+import { cva, type VariantProps } from 'class-variance-authority';
 import Link from 'next/link'; // Add this import
 import * as React from 'react';
 
@@ -89,4 +89,5 @@ const Button = React.forwardRef<
   );
 });
 Button.displayName = 'Button';
+
 export { Button, buttonVariants };

@@ -1,4 +1,3 @@
-import { cn } from '@/lib/utils';
 import {
   createContext,
   forwardRef,
@@ -14,6 +13,7 @@ import {
   type FileRejection,
   useDropzone as rootUseDropzone,
 } from 'react-dropzone';
+import { cn } from '@/lib/utils';
 import { Button, type ButtonProps } from './button';
 
 type DropzoneResult<TUploadRes, TUploadError> =
@@ -152,6 +152,11 @@ const getRootError = (
       }
       case 'too-many-files':
         return `max ${limits.maxFiles} files`;
+      default:
+        // react-dropzone can surface codes beyond the four above (including
+        // ones from a custom validator). Without this the callback returned
+        // undefined and "undefined" leaked into the joined message below.
+        return error;
     }
   });
   const joinedErrors = errors.join(', ');
@@ -833,8 +838,8 @@ const InfiniteProgress = forwardRef<HTMLDivElement, InfiniteProgressProps>(
 InfiniteProgress.displayName = 'InfiniteProgress';
 
 export {
-  Dropzone,
   DropZoneArea,
+  Dropzone,
   DropzoneDescription,
   DropzoneFileList,
   DropzoneFileListItem,

@@ -1,14 +1,14 @@
 'use client';
 
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { LinkedAccounts } from '@/components/auth/linked-accounts';
 import BackButton from '@/components/back-button';
 import Header from '@/components/header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { changePasswordService, isUserLoggedIn } from '@/lib/services';
-import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
 
 const isStrongPassword = (password: string) => {
   return (

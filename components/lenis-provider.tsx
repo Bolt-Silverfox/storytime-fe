@@ -1,7 +1,7 @@
 'use client';
 
-import { ReactLenis } from 'lenis/react';
 import type { LenisRef } from 'lenis/react';
+import { ReactLenis } from 'lenis/react';
 import { cancelFrame, frame } from 'motion/react';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -35,7 +35,6 @@ export function LenisProvider({ children }: { children: React.ReactNode }) {
   }, [mounted, reducedMotion]);
 
   // 경로 변경 시 스크롤 최상단으로 리셋
-  // biome-ignore lint/correctness/useExhaustiveDependencies: pathname is intentionally used as a trigger to scroll to top on route change
   useEffect(() => {
     if (!mounted || reducedMotion) {
       return;

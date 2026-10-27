@@ -246,6 +246,10 @@ const StoryReader = ({
       // ready audio URLs (the status endpoint reports these cumulatively).
       const textByIndex = new Map<number, string>();
       const readyByIndex = new Map<number, string>();
+      // Latest paragraph list built by applyBatch, so a failed poll can mark
+      // the still-pending paragraphs as failed (retryable) without discarding
+      // the ones that already have playable audio.
+      let latestParagraphs: StoryAudioParagraph[] = [];
 
       // Fold a batch snapshot into playable state. Enables playback as soon as
       // the first paragraph is ready and, if auto-advance is waiting, resumes.
@@ -297,6 +301,7 @@ const StoryReader = ({
             text: textByIndex.get(i),
           });
         }
+        latestParagraphs = paras;
         setAudioParagraphs(paras);
         setFailedIndices(failed);
 
@@ -380,6 +385,11 @@ const StoryReader = ({
         // A failed start/poll (e.g. a guest 429) must not leave the calm
         // "Preparing audio…" indicator spinning forever next to the error.
         setAudioGenerating(false);
+        setFailedIndices(
+          new Set(
+            latestParagraphs.filter((p) => !p.audioUrl).map((p) => p.index)
+          )
+        );
         setAudioError(
           isGuest && (error as { status?: number | null })?.status === 429
             ? 'Audio is busy right now. Please try again in a minute.'

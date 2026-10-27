@@ -223,6 +223,7 @@ export default function StoryView({ storyId }: { storyId: string }) {
         )}
         {step === 3 && (
           <StoryReader
+            key={storyId}
             img={storyDetail?.coverImageUrl ?? ''}
             title={storyDetail?.title ?? ''}
             description={storyDetail?.description ?? ''}

@@ -377,6 +377,9 @@ const StoryReader = ({
           return;
         }
         console.error('Failed to fetch audio:', error);
+        // A failed start/poll (e.g. a guest 429) must not leave the calm
+        // "Preparing audio…" indicator spinning forever next to the error.
+        setAudioGenerating(false);
         setAudioError(
           isGuest && (error as { status?: number | null })?.status === 429
             ? 'Audio is busy right now. Please try again in a minute.'

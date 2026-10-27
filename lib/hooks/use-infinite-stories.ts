@@ -1,7 +1,7 @@
 'use client';
 
-import { type StoryQuery, listStoriesPageService } from '@/lib/services';
 import { useInfiniteQuery } from '@tanstack/react-query';
+import { listStoriesPageService, type StoryQuery } from '@/lib/services';
 
 export function useInfiniteStories(params: StoryQuery) {
   const query = useInfiniteQuery({

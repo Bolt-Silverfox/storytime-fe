@@ -1,11 +1,11 @@
+import Image from 'next/image';
+import Link from 'next/link';
 import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Icons } from '@/components/ui/icons';
 import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern';
 import { featureCard2 } from '@/lib/data';
 import { cn } from '@/lib/utils';
-import Image from 'next/image';
-import Link from 'next/link';
 
 const Page = () => {
   return (

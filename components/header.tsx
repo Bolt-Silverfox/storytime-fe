@@ -1,13 +1,13 @@
 'use client';
 
+import Image from 'next/image';
+import Link from 'next/link';
+import { useState } from 'react';
 import { getUserFromStorage } from '@/lib/services';
 import { cn } from '@/lib/utils';
 import arrow_down from '@/public/arrow-down.svg';
 import avatar from '@/public/avatar.svg';
 import heart from '@/public/heart.svg';
-import Image from 'next/image';
-import Link from 'next/link';
-import { useState } from 'react';
 import ProfileDropdown from './ui/profile-dropdown';
 
 const Header = ({ white = false }: { white?: boolean }) => {

@@ -1,6 +1,5 @@
 'use client';
 
-import type { RegistrationData } from '@/types/auth';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type React from 'react';
 import {
@@ -11,6 +10,7 @@ import {
   useMemo,
   useState,
 } from 'react';
+import type { RegistrationData } from '@/types/auth';
 
 type RegistrationStep = 'details' | 'credentials' | 'verify';
 
@@ -31,6 +31,15 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 const storageKey = 'root:auth';
+
+// Module scope: a constant list, so it keeps a stable identity across renders.
+// Declared inside the provider it was a fresh array each render, which made the
+// useCallback that reads it memoize against a changing dependency.
+const registrationSteps: RegistrationStep[] = [
+  'details',
+  'credentials',
+  'verify',
+];
 
 const getInitialState = (searchParams: URLSearchParams) => {
   if (typeof window !== 'undefined') {
@@ -53,11 +62,6 @@ const AuthContextProvider = ({ children }: { children: React.ReactNode }) => {
 
   const [registrationData, setRegistrationData] =
     useState<RegistrationData | null>(null);
-  const registrationSteps: RegistrationStep[] = [
-    'details',
-    'credentials',
-    'verify',
-  ];
 
   const [registrationStep, setRegistrationStep] = useState<RegistrationStep>(
     () => getInitialState(searchParams).registrationStep
@@ -86,6 +90,7 @@ const AuthContextProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [searchParams, registrationStep]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: this guard should fire on data/step changes only; handleRegistrationStepForward is memoized on searchParams, so listing it would re-run the redirect on every query-string change
   useEffect(() => {
     if (!registrationData) {
       handleRegistrationStepForward('details');

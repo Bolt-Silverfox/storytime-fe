@@ -1,18 +1,18 @@
 'use client';
 
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import BackButton from '@/components/back-button';
 import FavoriteHeart from '@/components/favorite-heart';
 import Header from '@/components/header';
 import QuotaIndicator from '@/components/quota-indicator';
 import StoryStatusBadge from '@/components/story-status-badge';
 import {
-  type StoryListItem,
   getCompletedStoriesService,
   getInProgressStoriesService,
   isUserLoggedIn,
+  type StoryListItem,
 } from '@/lib/services';
-import Link from 'next/link';
-import { useEffect, useState } from 'react';
 
 const StoryCard = ({ story }: { story: StoryListItem }) => {
   return (

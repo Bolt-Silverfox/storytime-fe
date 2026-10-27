@@ -1,5 +1,12 @@
 'use client';
 
+import { zodResolver } from '@hookform/resolvers/zod';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
+import { z } from 'zod';
 import { PageLoader } from '@/components/page-loader';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
@@ -26,31 +33,22 @@ import {
   kidsOptions,
   languageOptions,
 } from '@/lib/utils';
-import { zodResolver } from '@hookform/resolvers/zod';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { toast } from 'sonner';
-import { z } from 'zod';
 import { StepProgress } from '../components/step-progress';
 import { KidsInformationContent } from './components/kids-information-content';
 import { KidsInformationLoader } from './components/kids-information-loader';
 
 const KidsFormSchema = z.object({
-  name: z
-    .string({ required_error: 'Name is required.' })
-    .min(1, 'Name is required.'),
+  name: z.string({ error: 'Name is required.' }).min(1, 'Name is required.'),
   ageRange: z
-    .string({ required_error: 'Age range is required' })
+    .string({ error: 'Age range is required' })
     .min(1, 'Age range is required.'),
-  avatar: z.string({ required_error: 'Avatar is required' }),
+  avatar: z.string({ error: 'Avatar is required' }),
 });
 
 const FormSchema = z.object({
-  language: z.string({ required_error: 'Language is required.' }),
-  country: z.string({ required_error: 'Country is required.' }),
-  kids: z.string({ required_error: 'Kids is required.' }),
+  language: z.string({ error: 'Language is required.' }),
+  country: z.string({ error: 'Country is required.' }),
+  kids: z.string({ error: 'Kids is required.' }),
   kidsInfo: z.array(KidsFormSchema).nonempty('At least one kid is required'),
 });
 
@@ -95,7 +93,7 @@ const Page = () => {
       // Next: let the parent explicitly choose a story voice (changeable later
       // in Settings), then finish onboarding.
       router.push('/register/setup/voice');
-      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      // biome-ignore lint/suspicious/noExplicitAny: the caught value is untyped; only .message is read below
     } catch (err: any) {
       toast.error(err.message || 'Something went wrong while adding kids');
     } finally {

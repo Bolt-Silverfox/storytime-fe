@@ -1,8 +1,8 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import StoryCard from '@/components/story-card';
 import { getStoryCategoriesService } from '@/lib/services';
-import { useEffect, useState } from 'react';
 
 // Import category images
 import adventureAndAction from '@/public/category/Adventure-and-action.jpg';

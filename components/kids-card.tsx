@@ -1,9 +1,9 @@
 'use client';
 
-import { cn } from '@/lib/utils';
-import editIcon from '@/public/edit-icon.svg';
 import Image from 'next/image';
 import { useState } from 'react';
+import { cn } from '@/lib/utils';
+import editIcon from '@/public/edit-icon.svg';
 
 interface KidsCardProps {
   img: string;

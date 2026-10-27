@@ -1,8 +1,8 @@
 'use client';
 
-import { cn } from '@/lib/utils';
 import Image, { type StaticImageData } from 'next/image';
 import { useState } from 'react';
+import { cn } from '@/lib/utils';
 
 interface CategoryImageProps {
   src?: string | StaticImageData | null;

@@ -1,19 +1,20 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
   "vcs": {
     "enabled": false,
     "clientKind": "git",
     "useIgnoreFile": false
   },
   "files": {
-    "ignore": [
-      "dist",
-      "node_modules",
-      "bun.lock",
-      ".next",
-      "output",
-      "next-env.d.ts",
-      "public/firebase-messaging-sw.js"
+    "includes": [
+      "**",
+      "!**/dist",
+      "!**/node_modules",
+      "!**/bun.lock",
+      "!**/.next",
+      "!**/output",
+      "!**/next-env.d.ts",
+      "!**/public/firebase-messaging-sw.js"
     ]
   },
   "formatter": {
@@ -25,13 +26,21 @@
     "lineWidth": 80,
     "attributePosition": "auto"
   },
-  "organizeImports": {
-    "enabled": true
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
   },
   "linter": {
     "enabled": true,
+    "domains": {
+      "react": "recommended",
+      "next": "recommended"
+    },
     "rules": {
-      "recommended": true,
+      "preset": "recommended",
       "complexity": {
         "useArrowFunction": "error",
         "noForEach": "error",
@@ -45,9 +54,10 @@
         "noUnusedVariables": "error",
         "noUnusedImports": "error"
       },
-      "security": { "noGlobalEval": "error" },
+      "security": {
+        "noGlobalEval": "error"
+      },
       "style": {
-        "noVar": "error",
         "useBlockStatements": "error",
         "useConst": "error",
         "useFilenamingConvention": {
@@ -62,7 +72,39 @@
         "noDoubleEquals": "error",
         "noExplicitAny": "error",
         "useNamespaceKeyword": "error",
-        "noConsoleLog": "error"
+        "noVar": "error",
+        "noConsole": {
+          "level": "error",
+          "options": {
+            "allow": [
+              "assert",
+              "clear",
+              "count",
+              "countReset",
+              "debug",
+              "dir",
+              "dirxml",
+              "error",
+              "group",
+              "groupCollapsed",
+              "groupEnd",
+              "info",
+              "table",
+              "time",
+              "timeEnd",
+              "timeLog",
+              "trace",
+              "warn"
+            ]
+          }
+        }
+      },
+      "a11y": {
+        "noSvgWithoutTitle": "off",
+        "noStaticElementInteractions": "off",
+        "useSemanticElements": "off",
+        "useAriaPropsSupportedByRole": "off",
+        "noNoninteractiveTabindex": "off"
       }
     }
   },
@@ -77,6 +119,11 @@
       "bracketSameLine": false,
       "quoteStyle": "single",
       "attributePosition": "auto"
+    }
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
     }
   }
 }

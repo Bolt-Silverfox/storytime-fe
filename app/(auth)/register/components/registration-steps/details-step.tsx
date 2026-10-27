@@ -1,5 +1,10 @@
 'use client';
 
+import { zodResolver } from '@hookform/resolvers/zod';
+import Link from 'next/link';
+import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
+import { z } from 'zod';
 import { OAuthButtons } from '@/components/auth/oauth-buttons';
 import { Button } from '@/components/ui/button';
 import {
@@ -21,20 +26,15 @@ import {
 import { useAuth } from '@/context/auth-context';
 import { registrationTitles } from '@/lib/data';
 import { cn } from '@/lib/utils';
-import { zodResolver } from '@hookform/resolvers/zod';
-import Link from 'next/link';
-import { useForm } from 'react-hook-form';
-import { toast } from 'sonner';
-import { z } from 'zod';
 
 const FormSchema = z.object({
   title: z
-    .string({ required_error: 'Your title is required.' })
+    .string({ error: 'Your title is required.' })
     .refine((val) => registrationTitles.includes(val), {
       message: 'Please select a valid title.',
     }),
   name: z
-    .string({ required_error: 'Your full name is required.' })
+    .string({ error: 'Your full name is required.' })
     .min(3, 'Your name is too short.')
     .regex(
       /^[A-Za-z\s'-]+$/,

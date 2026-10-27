@@ -1,5 +1,11 @@
 'use client';
 
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
+import { z } from 'zod';
 import { PageLoader } from '@/components/page-loader';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,17 +20,11 @@ import { Input } from '@/components/ui/input';
 import { PasswordInputToggle } from '@/components/ui/password-input-toggle';
 import { resetPasswordService } from '@/lib/services';
 import { cn } from '@/lib/utils';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { toast } from 'sonner';
-import { z } from 'zod';
 
 const FormSchema = z
   .object({
     password: z
-      .string({ required_error: 'Password is required' })
+      .string({ error: 'Password is required' })
       .min(8, {
         message: 'Password has to be 8 characters long',
       })
@@ -49,7 +49,7 @@ const FormSchema = z
         (value) => /[^A-Za-z0-9\s]/.test(value),
         'Password must contain at least one special character'
       ),
-    confirm_password: z.string({ required_error: 'Please confirm password' }),
+    confirm_password: z.string({ error: 'Please confirm password' }),
   })
   .refine((data) => data.password === data.confirm_password, {
     message: "Passwords don't match",
@@ -87,7 +87,7 @@ export const CreateNewPasswordContent = () => {
 
       toast.success(response.message);
       router.push('/create-new-password/success');
-      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      // biome-ignore lint/suspicious/noExplicitAny: the caught value is untyped; only .message is read below
     } catch (err: any) {
       toast.error(err.message || 'Something went wrong');
     } finally {

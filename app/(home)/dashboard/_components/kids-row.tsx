@@ -1,12 +1,12 @@
 'use client';
+import { motion as m } from 'motion/react';
+import { useEffect, useState } from 'react';
 import KidsCard from '@/components/kids-card';
 import { getKidsService } from '@/lib/services';
 import kid1 from '@/public/kid-3.svg';
 import kid3 from '@/public/kid-3.svg';
 import kid2 from '@/public/kid-4.svg';
 import kid4 from '@/public/kid-4.svg';
-import { motion as m } from 'framer-motion';
-import { useEffect, useState } from 'react';
 
 // Default avatar images to use when avatarUrl is null
 const defaultAvatars = [kid1, kid2, kid3, kid4];

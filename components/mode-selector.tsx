@@ -1,7 +1,7 @@
+import { useState } from 'react';
 import { setSelectedModeToStorage } from '@/lib/services';
 import interactive from '@/public/interactive.png';
 import plain from '@/public/plain.png';
-import { useState } from 'react';
 import ModeCard from './mode-card';
 
 interface ModeSelectorProps {

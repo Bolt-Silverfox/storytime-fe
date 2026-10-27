@@ -1,5 +1,13 @@
 'use client';
 
+import { zodResolver } from '@hookform/resolvers/zod';
+import { REGEXP_ONLY_DIGITS } from 'input-otp';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
+import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -19,18 +27,10 @@ import {
   sendVerificationEmailService,
   verifyEmailService,
 } from '@/lib/services';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { REGEXP_ONLY_DIGITS } from 'input-otp';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { toast } from 'sonner';
-import { z } from 'zod';
 
 const EmailSchema = z.object({
   email: z
-    .string({ required_error: 'Email address is required.' })
+    .string({ error: 'Email address is required.' })
     .min(1, 'Email address is required.')
     .email({ message: 'Enter a valid email address' }),
 });

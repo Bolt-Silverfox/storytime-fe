@@ -1,5 +1,12 @@
 'use client';
 
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Mail, Users } from 'lucide-react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
+import { z } from 'zod';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -15,22 +22,15 @@ import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern
 import { Textarea } from '@/components/ui/textarea';
 import { submitFeedbackService } from '@/lib/services';
 import { cn } from '@/lib/utils';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Mail, Users } from 'lucide-react';
-import Image from 'next/image';
-import Link from 'next/link';
-import { useForm } from 'react-hook-form';
-import { toast } from 'sonner';
-import { z } from 'zod';
 
 const contactSchema = z.object({
-  fullname: z.string({ required_error: 'Full name is required' }).min(2, ''),
+  fullname: z.string({ error: 'Full name is required' }).min(2, ''),
   email: z
-    .string({ required_error: 'email address is required' })
+    .string({ error: 'email address is required' })
     .email('Invalid email address'),
-  subject: z.string({ required_error: 'Subject is required' }),
+  subject: z.string({ error: 'Subject is required' }),
   message: z.string({
-    required_error: 'Message must be at least 5 characters',
+    error: 'Message must be at least 5 characters',
   }),
 });
 

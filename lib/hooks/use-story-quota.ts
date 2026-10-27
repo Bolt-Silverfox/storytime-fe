@@ -1,7 +1,7 @@
 'use client';
 
-import { getStoryQuotaService } from '@/lib/services';
 import { useQuery } from '@tanstack/react-query';
+import { getStoryQuotaService } from '@/lib/services';
 
 // Shared query key so a story read can invalidate the quota everywhere it's shown.
 export const STORY_QUOTA_QUERY_KEY = ['story-quota'] as const;

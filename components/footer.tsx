@@ -1,5 +1,5 @@
-import { footerLinks } from '@/lib/data';
 import Link from 'next/link';
+import { footerLinks } from '@/lib/data';
 import { Logo } from './logo';
 
 export const Footer = () => {

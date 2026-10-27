@@ -1,5 +1,12 @@
 'use client';
 
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Trash2Icon } from 'lucide-react';
+import Image from 'next/image';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
+import { z } from 'zod';
 import { PageLoader } from '@/components/page-loader';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
@@ -31,17 +38,10 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { avatarOptions, cn } from '@/lib/utils';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Trash2Icon } from 'lucide-react';
-import Image from 'next/image';
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { toast } from 'sonner';
-import { z } from 'zod';
 
 const FormSchema = z.object({
   avatar: z.string({
-    required_error: 'You need to select a notification type.',
+    error: 'You need to select a notification type.',
   }),
 });
 
@@ -157,7 +157,7 @@ export const KidsAvatarSheet = ({
                       className='grid grid-cols-2 gap-4 mt-4'
                     >
                       {avatarOptions.map((option) => (
-                        <FormItem key={Math.random()}>
+                        <FormItem key={option.avatar}>
                           <FormLabel className='w-full cursor-pointer flex items-center justify-between gap-3 rounded-2xl border border-[#FAF4F2] bg-white p-6 shadow-[0_0_17px_0_#221D29]/5 [&:has(>button[data-state=checked])]:border-[#FB9583] [&:has(>button[data-state=checked])]:ring-2 [&:has(>button[data-state=checked])]:ring-[#FB9583]/50'>
                             <div className='flex items-center gap-2.5'>
                               <Image
@@ -189,7 +189,7 @@ export const KidsAvatarSheet = ({
                               key={file.id}
                               file={file}
                             >
-                              <FormItem key={Math.random()}>
+                              <FormItem>
                                 <FormLabel
                                   htmlFor={file.id}
                                   className='w-full cursor-pointer flex items-center justify-between gap-3 rounded-2xl border border-[#FAF4F2] bg-white p-6 shadow-[0_0_17px_0_#221D29]/5 [&:has(>button[data-state=checked])]:border-[#FB9583] [&:has(>button[data-state=checked])]:ring-2 [&:has(>button[data-state=checked])]:ring-[#FB9583]/50'

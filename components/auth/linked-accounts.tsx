@@ -1,15 +1,15 @@
 'use client';
 
+import Script from 'next/script';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import {
-  type LinkedAccount,
   getLinkedAccountsService,
+  type LinkedAccount,
   linkAppleService,
   linkGoogleService,
   unlinkProviderService,
 } from '@/lib/services';
-import Script from 'next/script';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
 
 // window.google / window.AppleID and their types are declared globally in
 // components/auth/oauth-buttons.tsx — reused here for account linking.

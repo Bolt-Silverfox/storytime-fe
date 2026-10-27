@@ -1,10 +1,10 @@
 'use client';
 
-import { clearUserFromStorage } from '@/lib/services';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'motion/react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef } from 'react';
+import { clearUserFromStorage } from '@/lib/services';
 
 interface ProfileDropdownProps {
   open: boolean;

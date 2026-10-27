@@ -1,24 +1,24 @@
-import { ensureGuestSession } from '@/lib/guest';
-import { STORY_QUOTA_QUERY_KEY } from '@/lib/hooks/use-story-quota';
-import { markDone, markReading } from '@/lib/progress-store';
-import {
-  type StoryAudioBatch,
-  type StoryAudioParagraph,
-  getGuestStoryService,
-  getStoryAudioBatchStatusService,
-  getStoryByIdService,
-  recordUserProgressService,
-  startStoryAudioBatchService,
-} from '@/lib/services';
-import edit from '@/public/edit.svg';
-import movementSmall from '@/public/movement-small.png';
-import movement from '@/public/movement.png';
-import pause from '@/public/pause.svg';
-import play from '@/public/play.svg';
 import { useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+import { ensureGuestSession } from '@/lib/guest';
+import { STORY_QUOTA_QUERY_KEY } from '@/lib/hooks/use-story-quota';
+import { markDone, markReading } from '@/lib/progress-store';
+import {
+  getGuestStoryService,
+  getStoryAudioBatchStatusService,
+  getStoryByIdService,
+  recordUserProgressService,
+  type StoryAudioBatch,
+  type StoryAudioParagraph,
+  startStoryAudioBatchService,
+} from '@/lib/services';
+import edit from '@/public/edit.svg';
+import movement from '@/public/movement.png';
+import movementSmall from '@/public/movement-small.png';
+import pause from '@/public/pause.svg';
+import play from '@/public/play.svg';
 import { Switch } from './ui/switch';
 
 // Turn the story text into readable paragraphs for read-along. Prefer explicit
@@ -808,6 +808,7 @@ const StoryReader = ({
                   const paraReady =
                     !useAudioParagraphs || !!audioParagraphs[i]?.audioUrl;
                   return (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: paragraphs can repeat verbatim, so the index is what keeps the key unique
                     <div key={`para-${i}-${para.slice(0, 12)}`}>
                       <p
                         id={`reading-para-${i}`}

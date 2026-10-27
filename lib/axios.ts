@@ -4,13 +4,13 @@ import Cookies from 'js-cookie';
 
 let isRefreshing = false;
 let failedQueue: {
-  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+  // biome-ignore lint/suspicious/noExplicitAny: queued callers resolve with an arbitrary axios response
   resolve: (value?: any) => void;
-  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+  // biome-ignore lint/suspicious/noExplicitAny: queued callers reject with an arbitrary axios error
   reject: (error: any) => void;
 }[] = [];
 
-// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+// biome-ignore lint/suspicious/noExplicitAny: forwards an arbitrary axios error to queued callers
 const processQueue = (error: any, token: string | null = null) => {
   for (const prom of failedQueue) {
     if (token) {

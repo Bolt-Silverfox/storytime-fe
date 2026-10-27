@@ -1,5 +1,10 @@
 'use client';
 
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
+import { z } from 'zod';
 import { PageLoader } from '@/components/page-loader';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,20 +20,15 @@ import { PasswordInputToggle } from '@/components/ui/password-input-toggle';
 import { useAuth } from '@/context/auth-context';
 import { registerService } from '@/lib/services';
 import { cn } from '@/lib/utils';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { toast } from 'sonner';
-import { z } from 'zod';
 
 const FormSchema = z
   .object({
     email: z
-      .string({ required_error: 'Email address is required.' })
+      .string({ error: 'Email address is required.' })
       .email({ message: 'Invalid email address' })
       .max(100, { message: 'Email address is too long' }),
     password: z
-      .string({ required_error: 'Password is required' })
+      .string({ error: 'Password is required' })
       .min(8, {
         message: 'Password has to be 8 characters long',
       })
@@ -53,11 +53,9 @@ const FormSchema = z
         (value) => /[^A-Za-z0-9\s]/.test(value),
         'Password must contain at least one special character'
       ),
-    confirm_password: z
-      .string({ required_error: 'Please confirm password' })
-      .min(8, {
-        message: 'Password has to be 8 characters long',
-      }),
+    confirm_password: z.string({ error: 'Please confirm password' }).min(8, {
+      message: 'Password has to be 8 characters long',
+    }),
   })
   .refine((data) => data.password === data.confirm_password, {
     message: "Passwords don't match",
@@ -104,7 +102,7 @@ export const CredentialsStep = () => {
 
       toast.success('Registration successful. Check your email to verify.');
       handleRegistrationStepForward('verify');
-      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      // biome-ignore lint/suspicious/noExplicitAny: the caught value is untyped; only .message is read below
     } catch (error: any) {
       toast.error(error?.message || 'Registration failed');
     } finally {

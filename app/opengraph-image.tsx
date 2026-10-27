@@ -31,6 +31,7 @@ export default async function OpengraphImage() {
         textAlign: 'center',
       }}
     >
+      {/* biome-ignore lint/performance/noImgElement: next/og renders plain img */}
       <img src={logoSrc} alt='Storytime' width={560} height={200} />
       <div
         style={{

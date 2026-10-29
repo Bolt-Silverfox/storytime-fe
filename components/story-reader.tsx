@@ -375,9 +375,10 @@ const StoryReader = ({
         if (snap.playlist.length === 0 && snap.failedSize > 0) {
           setAudioError('We couldn’t prepare the audio for this story.');
           setAudioGenerating(false);
-        } else if (terminal && snap.accounted < snap.total) {
-          // Terminal status but some paragraphs were never delivered: nothing
-          // more will arrive, so mark them failed (ref first — handleEnded
+        } else if (snap.accounted < snap.total) {
+          // The poll loop has exited (terminal status, poll limit reached or no
+          // batch to poll) with paragraphs never delivered: nothing more will
+          // arrive, so mark them failed (ref first — handleEnded
           // reads it), release any waiting auto-advance and offer a retry.
           const missing = new Set(
             latestParagraphs.filter((p) => !p.audioUrl).map((p) => p.index)

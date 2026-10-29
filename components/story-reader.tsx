@@ -251,6 +251,15 @@ const StoryReader = ({
       // the ones that already have playable audio.
       let latestParagraphs: StoryAudioParagraph[] = [];
 
+      // Release an auto-advance that was waiting for a clip that will never
+      // arrive, so playback doesn't sit "playing" with nothing to play.
+      const releaseWaiting = () => {
+        if (waitingForNextRef.current) {
+          waitingForNextRef.current = false;
+          setIsPlaying(false);
+        }
+      };
+
       // Fold a batch snapshot into playable state. Enables playback as soon as
       // the first paragraph is ready and, if auto-advance is waiting, resumes.
       const applyBatch = (batch: StoryAudioBatch) => {
@@ -326,6 +335,16 @@ const StoryReader = ({
           setAudioUrl(playlist[next]);
         }
 
+        // Still waiting, but the paragraph we're waiting on has failed: it will
+        // never arrive, so surface the retry instead of stalling.
+        if (
+          waitingForNextRef.current &&
+          failed.has(clipIndexRef.current + 1)
+        ) {
+          releaseWaiting();
+          setAudioError('Some of the audio couldn’t be prepared.');
+        }
+
         const stillGenerating = accounted < total;
         setAudioGenerating(stillGenerating);
         return { playlist, accounted, total, failedSize: failed.size };
@@ -374,6 +393,7 @@ const StoryReader = ({
         // Real failure ONLY when nothing at all is playable AND something failed.
         if (snap.playlist.length === 0 && snap.failedSize > 0) {
           setAudioError('We couldn’t prepare the audio for this story.');
+          releaseWaiting();
           setAudioGenerating(false);
         } else if (snap.accounted < snap.total) {
           // The poll loop has exited (terminal status, poll limit reached or no
@@ -385,10 +405,7 @@ const StoryReader = ({
           );
           failedIndicesRef.current = missing;
           setFailedIndices(missing);
-          if (waitingForNextRef.current) {
-            waitingForNextRef.current = false;
-            setIsPlaying(false);
-          }
+          releaseWaiting();
           setAudioError('Some of the audio couldn’t be prepared.');
           setAudioGenerating(false);
         } else if (snap.accounted >= snap.total) {
@@ -409,6 +426,7 @@ const StoryReader = ({
         // Keep the ref in sync: handleEnded reads it, not the state.
         failedIndicesRef.current = failedOnError;
         setFailedIndices(failedOnError);
+        releaseWaiting();
         setAudioError(
           isGuest && (error as { status?: number | null })?.status === 429
             ? 'Audio is busy right now. Please try again in a minute.'

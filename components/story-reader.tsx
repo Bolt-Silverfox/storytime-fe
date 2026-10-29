@@ -343,8 +343,10 @@ const StoryReader = ({
         // Keep polling in the background for the remaining paragraphs. Playback
         // is already possible off the eager clips while this runs.
         let attempts = 0;
+        let terminal =
+          initial.status === 'failed' || initial.status === 'completed';
         while (
-          !cancelled &&
+          !(cancelled || terminal) &&
           initial.batchJobId &&
           snap.accounted < snap.total &&
           attempts < 60
@@ -362,7 +364,7 @@ const StoryReader = ({
           }
           snap = applyBatch(batch);
           if (batch.status === 'failed' || batch.status === 'completed') {
-            break;
+            terminal = true;
           }
         }
         if (cancelled) {
@@ -373,8 +375,9 @@ const StoryReader = ({
         if (snap.playlist.length === 0 && snap.failedSize > 0) {
           setAudioError('We couldn’t prepare the audio for this story.');
           setAudioGenerating(false);
-        } else if (snap.accounted >= snap.total) {
-          // Everything accounted for (ready and/or failed) — stop the spinner.
+        } else if (terminal || snap.accounted >= snap.total) {
+          // Everything accounted for, or the backend reports a terminal status
+          // (even if accounted < total) — stop the spinner.
           setAudioGenerating(false);
         }
       } catch (error) {
@@ -385,11 +388,12 @@ const StoryReader = ({
         // A failed start/poll (e.g. a guest 429) must not leave the calm
         // "Preparing audio…" indicator spinning forever next to the error.
         setAudioGenerating(false);
-        setFailedIndices(
-          new Set(
-            latestParagraphs.filter((p) => !p.audioUrl).map((p) => p.index)
-          )
+        const failedOnError = new Set(
+          latestParagraphs.filter((p) => !p.audioUrl).map((p) => p.index)
         );
+        // Keep the ref in sync: handleEnded reads it, not the state.
+        failedIndicesRef.current = failedOnError;
+        setFailedIndices(failedOnError);
         setAudioError(
           isGuest && (error as { status?: number | null })?.status === 429
             ? 'Audio is busy right now. Please try again in a minute.'

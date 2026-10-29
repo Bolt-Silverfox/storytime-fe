@@ -375,9 +375,23 @@ const StoryReader = ({
         if (snap.playlist.length === 0 && snap.failedSize > 0) {
           setAudioError('We couldn’t prepare the audio for this story.');
           setAudioGenerating(false);
-        } else if (terminal || snap.accounted >= snap.total) {
-          // Everything accounted for, or the backend reports a terminal status
-          // (even if accounted < total) — stop the spinner.
+        } else if (terminal && snap.accounted < snap.total) {
+          // Terminal status but some paragraphs were never delivered: nothing
+          // more will arrive, so mark them failed (ref first — handleEnded
+          // reads it), release any waiting auto-advance and offer a retry.
+          const missing = new Set(
+            latestParagraphs.filter((p) => !p.audioUrl).map((p) => p.index)
+          );
+          failedIndicesRef.current = missing;
+          setFailedIndices(missing);
+          if (waitingForNextRef.current) {
+            waitingForNextRef.current = false;
+            setIsPlaying(false);
+          }
+          setAudioError('Some of the audio couldn’t be prepared.');
+          setAudioGenerating(false);
+        } else if (snap.accounted >= snap.total) {
+          // Everything accounted for (ready and/or failed) — stop the spinner.
           setAudioGenerating(false);
         }
       } catch (error) {

@@ -337,10 +337,7 @@ const StoryReader = ({
 
         // Still waiting, but the paragraph we're waiting on has failed: it will
         // never arrive, so surface the retry instead of stalling.
-        if (
-          waitingForNextRef.current &&
-          failed.has(clipIndexRef.current + 1)
-        ) {
+        if (waitingForNextRef.current && failed.has(clipIndexRef.current + 1)) {
           releaseWaiting();
           setAudioError('Some of the audio couldn’t be prepared.');
         }

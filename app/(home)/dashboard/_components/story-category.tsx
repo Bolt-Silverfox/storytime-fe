@@ -84,7 +84,9 @@ const StoryCategory = () => {
         STORIES BY CATEGORIES
       </h2>
       {loading ? (
-        <div className='text-center text-subtle'>Loading...</div>
+        <div className='text-center text-gray-400 dark:text-subtle'>
+          Loading...
+        </div>
       ) : error ? (
         <div className='text-center text-red-500'>{error}</div>
       ) : (

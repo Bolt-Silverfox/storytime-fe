@@ -115,7 +115,7 @@ export function AppNavbar() {
                   key={`mobile-link-${item.name}`}
                   href={item.link}
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className='relative text-body'
+                  className='relative text-neutral-600 dark:text-body'
                   aria-current={pathname === item.link ? 'page' : undefined}
                 >
                   <span className='block'>{item.name}</span>

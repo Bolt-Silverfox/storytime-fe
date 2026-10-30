@@ -706,7 +706,7 @@ const PersonalSettingsPage = () => {
         )}
       </Modal>
       {showRemoveKidModal && (
-        <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/30'>
+        <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/30 dark:bg-black/70'>
           <div
             className='bg-surface rounded-2xl shadow-lg p-8 w-full max-w-md mx-4 relative'
             // biome-ignore lint/a11y/useSemanticElements: native <dialog> is not used here; this is a hand-rolled overlay dialog
@@ -716,7 +716,7 @@ const PersonalSettingsPage = () => {
           >
             <button
               type='button'
-              className='absolute top-4 right-4 text-xl text-body hover:text-strong'
+              className='absolute top-4 right-4 text-xl text-body hover:text-gray-600 dark:hover:text-strong'
               onClick={cancelRemoveKid}
               aria-label='Close'
             >
@@ -753,7 +753,7 @@ const PersonalSettingsPage = () => {
         </div>
       )}
       {showDeleteAccountModal && (
-        <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/30'>
+        <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/30 dark:bg-black/70'>
           <div
             className='bg-surface rounded-2xl shadow-lg p-8 w-full max-w-md mx-4 relative'
             // biome-ignore lint/a11y/useSemanticElements: native <dialog> is not used here; this is a hand-rolled overlay dialog
@@ -763,7 +763,7 @@ const PersonalSettingsPage = () => {
           >
             <button
               type='button'
-              className='absolute top-4 right-4 text-xl text-body hover:text-strong'
+              className='absolute top-4 right-4 text-xl text-body hover:text-gray-600 dark:hover:text-strong'
               onClick={handleDeleteAccountCancel}
               aria-label='Close'
             >
@@ -857,7 +857,7 @@ const PersonalSettingsPage = () => {
         </div>
       </Modal>
       {showConfirmDeleteModal && (
-        <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/30'>
+        <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/30 dark:bg-black/70'>
           <div
             className='bg-surface rounded-4xl shadow-lg p-8 w-full max-w-md mx-4 relative'
             // biome-ignore lint/a11y/useSemanticElements: native <dialog> is not used here; this is a hand-rolled overlay dialog
@@ -874,7 +874,7 @@ const PersonalSettingsPage = () => {
               </h2>
               <button
                 type='button'
-                className='text-xl text-body hover:text-strong'
+                className='text-xl text-body hover:text-gray-600 dark:hover:text-strong'
                 onClick={handleDeleteConfirmCancel}
                 aria-label='Close'
               >

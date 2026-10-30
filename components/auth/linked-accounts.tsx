@@ -66,7 +66,7 @@ const Row = ({
 }) => (
   <div className='flex items-center justify-between gap-4 py-4'>
     <div className='flex min-w-0 items-center gap-3'>
-      <span className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sunken text-strong'>
+      <span className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-stone-50 dark:bg-sunken text-strong'>
         {icon}
       </span>
       <div className='min-w-0'>
@@ -232,7 +232,7 @@ export const LinkedAccounts = () => {
       title={
         isLastMethod ? 'You must keep at least one sign-in method' : undefined
       }
-      className='rounded-full border border-line-mid px-5 py-2 font-abeezee text-sm text-strong transition hover:bg-sunken disabled:cursor-not-allowed disabled:opacity-50'
+      className='rounded-full border border-line-mid px-5 py-2 font-abeezee text-sm text-strong transition hover:bg-stone-50 dark:hover:bg-sunken disabled:cursor-not-allowed disabled:opacity-50'
     >
       {busy === provider ? 'Removing…' : 'Unlink'}
     </button>

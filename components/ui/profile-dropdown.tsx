@@ -116,7 +116,7 @@ export default function ProfileDropdown({
             <Link
               key={item.label}
               role='menuitem'
-              className='flex items-center gap-3 py-6 px-4 hover:bg-sunken  rounded-[1.6875rem] cursor-pointer transition-colors border-b-[0.5px] border-solid border-hairline'
+              className='flex items-center gap-3 py-6 px-4 hover:bg-gray-50 dark:hover:bg-sunken  rounded-[1.6875rem] cursor-pointer transition-colors border-b-[0.5px] border-solid border-hairline'
               href={item.link}
             >
               <Image
@@ -133,7 +133,7 @@ export default function ProfileDropdown({
           ))}
           <button
             role='menuitem'
-            className='flex items-center gap-3 py-6 px-4 hover:bg-sunken  rounded-[1.6875rem] cursor-pointer transition-colors border-b-[0.5px] border-solid border-hairline w-full text-left'
+            className='flex items-center gap-3 py-6 px-4 hover:bg-gray-50 dark:hover:bg-sunken  rounded-[1.6875rem] cursor-pointer transition-colors border-b-[0.5px] border-solid border-hairline w-full text-left'
             onClick={handleLogout}
             type='button'
           >

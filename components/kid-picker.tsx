@@ -148,7 +148,7 @@ const KidPicker = ({
               }
             }}
           >
-            <div className='w-full h-48 bg-sunken flex items-center justify-center'>
+            <div className='w-full h-48 bg-gray-100 dark:bg-sunken flex items-center justify-center'>
               <Image
                 src={kid.img}
                 alt={kid.name}

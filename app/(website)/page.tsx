@@ -381,7 +381,7 @@ export default function Home() {
                 className='w-full col-span-1 bg-surface shadow-none rounded-[21px] border-[0.5px] border-solid border-hairline'
               >
                 <CardContent className='flex flex-col items-start gap-6 p-8'>
-                  <p className='text-xl text-body font-abeezee'>
+                  <p className='text-xl text-foreground font-abeezee'>
                     &quot;{testimonial.quote}&quot;
                   </p>
                   <div className='flex items-center gap-2 self-stretch w-full'>
@@ -412,7 +412,7 @@ export default function Home() {
               className='w-full col-span-1 bg-surface shadow-none rounded-[21px] border-[0.5px] border-solid border-hairline'
             >
               <CardContent className='flex flex-col items-start gap-6 p-8'>
-                <p className='text-xl text-body font-abeezee'>
+                <p className='text-xl text-foreground font-abeezee'>
                   &quot;{testimonial.quote}&quot;
                 </p>
                 <div className='flex items-center gap-2 self-stretch w-full'>

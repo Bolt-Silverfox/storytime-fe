@@ -184,7 +184,7 @@ const VoiceSelector = ({
         >
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <div key={i} className='animate-pulse'>
-              <div className='border-hairline bg-line-mid px-4 py-3 rounded-3xl border-[0.5px] border-solid h-24' />
+              <div className='border-hairline bg-gray-200 dark:bg-line-mid px-4 py-3 rounded-3xl border-[0.5px] border-solid h-24' />
             </div>
           ))}
         </div>

@@ -121,7 +121,7 @@ export const NavItems = ({ items, className, onItemClick }: NavItemsProps) => {
       aria-label='Main'
       onMouseLeave={() => setHovered(null)}
       className={cn(
-        'hidden min-w-0 flex-1 flex-row items-center justify-center space-x-2 px-4 text-sm font-medium text-body transition duration-200 hover:text-strong lg:flex lg:space-x-2',
+        'hidden min-w-0 flex-1 flex-row items-center justify-center space-x-2 px-4 text-sm font-medium text-zinc-600 transition duration-200 hover:text-zinc-800 dark:text-body dark:hover:text-strong lg:flex lg:space-x-2',
         className
       )}
     >
@@ -129,7 +129,7 @@ export const NavItems = ({ items, className, onItemClick }: NavItemsProps) => {
         <a
           onMouseEnter={() => setHovered(idx)}
           onClick={onItemClick}
-          className='relative px-4 py-2 text-body'
+          className='relative px-4 py-2 text-neutral-600 dark:text-body'
           key={item.link}
           href={item.link}
           aria-current={pathname === item.link ? 'page' : undefined}
@@ -137,7 +137,7 @@ export const NavItems = ({ items, className, onItemClick }: NavItemsProps) => {
           {hovered === idx && (
             <motion.div
               layoutId='hovered'
-              className='absolute inset-0 h-full w-full rounded-full bg-sunken'
+              className='absolute inset-0 h-full w-full rounded-full bg-gray-100 dark:bg-sunken'
             />
           )}
           <span className='relative z-20'>{item.name}</span>
@@ -233,9 +233,9 @@ export const MobileNavToggle = ({
       className='flex items-center justify-center'
     >
       {isOpen ? (
-        <IconX className='text-strong' aria-hidden='true' />
+        <IconX className='text-black dark:text-strong' aria-hidden='true' />
       ) : (
-        <IconMenu2 className='text-strong' aria-hidden='true' />
+        <IconMenu2 className='text-black dark:text-strong' aria-hidden='true' />
       )}
     </button>
   );
@@ -245,7 +245,7 @@ export const NavbarLogo = () => {
   return (
     <a
       href='/'
-      className='relative z-20 mr-4 flex items-center space-x-2 px-2 py-1 text-sm font-normal text-strong'
+      className='relative z-20 mr-4 flex items-center space-x-2 px-2 py-1 text-sm font-normal text-black dark:text-strong'
     >
       <img
         src='https://assets.aceternity.com/logo-dark.png'
@@ -253,7 +253,7 @@ export const NavbarLogo = () => {
         width={30}
         height={30}
       />
-      <span className='font-medium text-strong'>Startup</span>
+      <span className='font-medium text-black dark:text-strong'>Startup</span>
     </a>
   );
 };
@@ -276,7 +276,7 @@ export const NavbarButton = ({
   | React.ComponentPropsWithoutRef<'button'>
 )) => {
   const baseStyles =
-    'px-4 py-2 rounded-md bg-surface button text-strong text-sm font-bold relative cursor-pointer hover:-translate-y-0.5 transition duration-200 inline-block text-center';
+    'px-4 py-2 rounded-md bg-surface button text-black dark:text-strong text-sm font-bold relative cursor-pointer hover:-translate-y-0.5 transition duration-200 inline-block text-center';
 
   const variantStyles = {
     primary:

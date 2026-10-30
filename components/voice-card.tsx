@@ -116,7 +116,7 @@ const VoiceCard = ({
         <Image
           src={highlight ? volumeActive : volume}
           alt='volume'
-          className='shrink-0'
+          className={`shrink-0 ${highlight ? '' : 'dark:brightness-0 dark:invert'}`}
         />
         <p
           className={`text-xs not-italic font-normal leading-4 font-abeezee whitespace-nowrap ${

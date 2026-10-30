@@ -721,7 +721,7 @@ const StoryReader = ({
               alt=''
               className='h-[9rem] max-w-full rounded-[3xl] mb-4 object-cover'
             />
-            <div className='bg-surface flex justify-center items-center gap-3 shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] px-6 py-2.5 rounded-[3.125rem] border-[0.5px] border-solid border-[#FAF4F2]'>
+            <div className='bg-surface flex justify-center items-center gap-3 shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] px-6 py-2.5 rounded-[3.125rem] border-[0.5px] border-solid border-hairline-warm'>
               <h5 className='text-strong text-right text-xl not-italic font-bold leading-6'>
                 {voice}
               </h5>
@@ -731,7 +731,11 @@ const StoryReader = ({
                 onClick={() => setStep(1)}
                 className='cursor-pointer rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2'
               >
-                <Image src={edit} alt='' />
+                <Image
+                  src={edit}
+                  alt=''
+                  className='dark:brightness-0 dark:invert'
+                />
               </button>
             </div>
             <small className='text-body text-base not-italic font-normal leading-5 font-abeezee mt-2'>
@@ -760,7 +764,11 @@ const StoryReader = ({
                 onClick={() => setStep(1)}
                 className='cursor-pointer rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2'
               >
-                <Image src={edit} alt='' />
+                <Image
+                  src={edit}
+                  alt=''
+                  className='dark:brightness-0 dark:invert'
+                />
               </button>
             </div>
           </div>
@@ -805,7 +813,7 @@ const StoryReader = ({
                               ? 'border-green-500 bg-green-50 dark:bg-green-950/50'
                               : 'border-red-500 bg-red-50 dark:bg-red-950/50'
                             : 'border-reader-panel-border bg-reader-panel'
-                          : 'border-line-mid hover:border-line-light'
+                          : 'border-gray-200 dark:border-line-mid hover:border-gray-300 dark:hover:border-line-hover'
                       } ${showAnswer ? 'cursor-default' : 'cursor-pointer'}`}
                     >
                       <span className='text-strong font-abeezee'>{option}</span>

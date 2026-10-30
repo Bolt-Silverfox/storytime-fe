@@ -25,6 +25,7 @@
   --color-hairline: var(--hairline);
   --color-hairline-warm: var(--hairline-warm);
   --color-line-mid: var(--line-mid);
+  --color-line-hover: var(--line-hover);
   --color-brand: var(--brand);
   --color-brand-edge: var(--brand-edge);
   --color-brand-text: var(--brand-text);
@@ -125,6 +126,7 @@
   --hairline: #f5f5f4;
   --hairline-warm: #faf4f2;
   --line-mid: #e7e5e4;
+  --line-hover: #d1d5dc;
   --brand: #ec4007;
   --brand-edge: #f84020;
   --brand-text: #ec4007;
@@ -190,6 +192,7 @@
   --hairline: #3a302d;
   --hairline-warm: #3a302d;
   --line-mid: #3a302d;
+  --line-hover: #6e625d;
   --brand: #ec4007;
   --brand-edge: #f84020;
   --brand-text: #ff6b3d;

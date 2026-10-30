@@ -108,7 +108,7 @@ const Modal: React.FC<ModalProps> = ({
         >
           <motion.div
             ref={dialogRef}
-            className={`relative border-stone-100 bg-white ${
+            className={`relative border-hairline bg-surface ${
               expand
                 ? 'w-[95vw] max-w-[56rem] sm:w-[70vw]'
                 : 'w-[95vw] max-w-[32rem] sm:w-[32vw]'
@@ -128,7 +128,7 @@ const Modal: React.FC<ModalProps> = ({
               {title && (
                 <h2
                   id={titleId}
-                  className='text-[#221D1D] text-base not-italic font-normal leading-5 min-w-0'
+                  className='text-strong text-base not-italic font-normal leading-5 min-w-0'
                 >
                   {title}
                 </h2>
@@ -138,10 +138,10 @@ const Modal: React.FC<ModalProps> = ({
                   <button
                     type='button'
                     onClick={() => setExpand?.(!expand)}
-                    className='border-stone-100 cursor-pointer hover:scale-105 transition-all duration-300 bg-white shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] p-2 px-3 rounded-[3.125rem] border-[0.5px] border-solid flex items-center gap-2'
+                    className='border-hairline cursor-pointer hover:scale-105 transition-all duration-300 bg-surface shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] p-2 px-3 rounded-[3.125rem] border-[0.5px] border-solid flex items-center gap-2'
                   >
                     <Image src={expandIcon} alt='' />
-                    <p className='text-[#221D1D] text-base not-italic font-normal leading-5'>
+                    <p className='text-strong text-base not-italic font-normal leading-5'>
                       {expand ? 'Collapse' : 'Expand'}
                     </p>
                   </button>

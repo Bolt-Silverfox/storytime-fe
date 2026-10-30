@@ -103,10 +103,10 @@ export const CreateNewPasswordContent = () => {
     <div className='md:space-y-[103px]'>
       <div className='space-y-[26px] flex flex-col items-center'>
         <div className='space-y-1.5 text-center w-full'>
-          <p className='text-[#221D1D] dark:text-white text-[34px] font-bold font-qilka'>
+          <p className='text-strong text-[34px] font-bold font-qilka'>
             Create new password
           </p>
-          <p className='text-[#4A413F] max-w-[539px] mx-auto dark:text-white font-abeezee'>
+          <p className='text-body max-w-[539px] mx-auto font-abeezee'>
             Create a new password
           </p>
         </div>
@@ -117,7 +117,7 @@ export const CreateNewPasswordContent = () => {
           className='max-w-[539px] mx-auto space-y-10'
         >
           <div className='space-y-6'>
-            <h1 className='text-center font-qilka font-bold text-[26px] text-[#221D1D] dark:text-white'>
+            <h1 className='text-center font-qilka font-bold text-[26px] text-strong'>
               Provide your details
             </h1>
 
@@ -167,7 +167,7 @@ export const CreateNewPasswordContent = () => {
                   </FormControl>
                   <FormMessage
                     className={cn(
-                      'text-[#4A413F]',
+                      'text-body',
                       form.formState.errors.confirm_password &&
                         'text-destructive'
                     )}

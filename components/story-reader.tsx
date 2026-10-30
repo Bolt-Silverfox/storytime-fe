@@ -721,7 +721,7 @@ const StoryReader = ({
               alt=''
               className='h-[9rem] max-w-full rounded-[3xl] mb-4 object-cover'
             />
-            <div className='bg-white flex justify-center items-center gap-3 shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] px-6 py-2.5 rounded-[3.125rem] border-[0.5px] border-solid border-[#FAF4F2]'>
+            <div className='bg-surface flex justify-center items-center gap-3 shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] px-6 py-2.5 rounded-[3.125rem] border-[0.5px] border-solid border-[#FAF4F2]'>
               <h5 className='text-[#221D1D] text-right text-xl not-italic font-bold leading-6'>
                 {voice}
               </h5>
@@ -750,7 +750,7 @@ const StoryReader = ({
                   : `${formatTime(currentTime)} / ${formatTime(duration)}`}
               </small>
             </div>
-            <div className='bg-white flex justify-center items-center gap-3 shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] px-6 py-2.5 rounded-[3.125rem] border-[0.5px] border-solid border-[#FAF4F2] font-qilka'>
+            <div className='bg-surface flex justify-center items-center gap-3 shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] px-6 py-2.5 rounded-[3.125rem] border-[0.5px] border-solid border-[#FAF4F2] font-qilka'>
               <h5 className='text-[#221D1D] text-right text-xl not-italic font-bold leading-6'>
                 {voice}
               </h5>
@@ -805,7 +805,7 @@ const StoryReader = ({
                               ? 'border-green-500 bg-green-50'
                               : 'border-red-500 bg-red-50'
                             : 'border-[#83E9FB] bg-[#E6FBFE]'
-                          : 'border-gray-200 hover:border-gray-300'
+                          : 'border-line-mid hover:border-line-light'
                       } ${showAnswer ? 'cursor-default' : 'cursor-pointer'}`}
                     >
                       <span className='text-[#221D1D] font-abeezee'>

@@ -66,16 +66,12 @@ const Row = ({
 }) => (
   <div className='flex items-center justify-between gap-4 py-4'>
     <div className='flex min-w-0 items-center gap-3'>
-      <span className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-stone-50 text-[#221D1D]'>
+      <span className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sunken text-strong'>
         {icon}
       </span>
       <div className='min-w-0'>
-        <p className='truncate font-abeezee text-base text-[#221D1D]'>
-          {title}
-        </p>
-        <p className='truncate font-abeezee text-sm text-[#4A413F]'>
-          {subtitle}
-        </p>
+        <p className='truncate font-abeezee text-base text-strong'>{title}</p>
+        <p className='truncate font-abeezee text-sm text-body'>{subtitle}</p>
       </div>
     </div>
     <div className='shrink-0'>{action}</div>
@@ -236,7 +232,7 @@ export const LinkedAccounts = () => {
       title={
         isLastMethod ? 'You must keep at least one sign-in method' : undefined
       }
-      className='rounded-full border border-stone-200 px-5 py-2 font-abeezee text-sm text-[#221D1D] transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50'
+      className='rounded-full border border-line-mid px-5 py-2 font-abeezee text-sm text-strong transition hover:bg-sunken disabled:cursor-not-allowed disabled:opacity-50'
     >
       {busy === provider ? 'Removing…' : 'Unlink'}
     </button>
@@ -259,30 +255,28 @@ export const LinkedAccounts = () => {
         />
       )}
 
-      <h2 className='mb-1 font-qilka text-2xl font-bold leading-7 text-[#221D1D]'>
+      <h2 className='mb-1 font-qilka text-2xl font-bold leading-7 text-strong'>
         Linked accounts
       </h2>
-      <p className='mb-2 font-abeezee text-sm text-[#4A413F]'>
+      <p className='mb-2 font-abeezee text-sm text-body'>
         Connect Google or Apple to sign in faster. You must keep at least one
         sign-in method.
       </p>
 
       {loading ? (
         <div className='space-y-3 py-4'>
-          <div className='h-12 animate-pulse rounded-2xl bg-stone-100' />
-          <div className='h-12 animate-pulse rounded-2xl bg-stone-100' />
+          <div className='h-12 animate-pulse rounded-2xl bg-sunken' />
+          <div className='h-12 animate-pulse rounded-2xl bg-sunken' />
         </div>
       ) : (
-        <div className='divide-y divide-stone-100'>
+        <div className='divide-y divide-hairline'>
           {emailAccount && (
             <Row
               icon={<span className='text-lg'>✉️</span>}
               title='Email & password'
               subtitle={emailAccount.email ?? 'Connected'}
               action={
-                <span className='font-abeezee text-sm text-[#4A413F]'>
-                  Primary
-                </span>
+                <span className='font-abeezee text-sm text-body'>Primary</span>
               }
             />
           )}
@@ -326,7 +320,7 @@ export const LinkedAccounts = () => {
                     disabled={
                       busy !== null || !appleReady || !APPLE_REDIRECT_URI
                     }
-                    className='flex items-center gap-2 rounded-full bg-black px-5 py-2 font-abeezee text-sm text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60'
+                    className='flex items-center gap-2 rounded-full border border-transparent bg-black px-5 dark:border-line py-2 font-abeezee text-sm text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60'
                   >
                     {busy === 'apple' ? 'Linking…' : 'Continue with Apple'}
                   </button>

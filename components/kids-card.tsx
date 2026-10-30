@@ -42,9 +42,9 @@ const KidsCard = ({
         }
       }}
       className={cn(
-        'border-stone-100 bg-white shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] px-4 py-3 rounded-3xl border-[0.5px] border-solid flex items-center justify-between gap-3 cursor-pointer transition-all duration-200 w-full',
+        'border-hairline bg-surface shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] px-4 py-3 rounded-3xl border-[0.5px] border-solid flex items-center justify-between gap-3 cursor-pointer transition-all duration-200 w-full',
         isActive &&
-          'bg-[#EC4007] shadow-[0px_0px_0px_4px_rgba(236,64,7,0.15)] rounded-3xl border-[0.5px] border-solid border-[#F84020]'
+          'bg-brand shadow-[0px_0px_0px_4px_rgba(236,64,7,0.15)] rounded-3xl border-[0.5px] border-solid border-brand-edge'
       )}
     >
       <div className='flex items-center gap-3'>
@@ -53,8 +53,8 @@ const KidsCard = ({
           {stories && (
             <p
               className={cn(
-                'text-[#EC4007] text-xs not-italic font-normal leading-4 mb-2',
-                isActive && 'text-[#FEEAE6]'
+                'text-brand-text text-xs not-italic font-normal leading-4 mb-2',
+                isActive && 'text-on-brand-soft'
               )}
             >
               {cstories}
@@ -62,7 +62,7 @@ const KidsCard = ({
           )}
           <h3
             className={cn(
-              'text-[#221D1D] text-base not-italic font-normal leading-5',
+              'text-strong text-base not-italic font-normal leading-5',
               isActive && 'text-white'
             )}
           >
@@ -70,8 +70,8 @@ const KidsCard = ({
           </h3>
           <p
             className={cn(
-              'text-[#4A413F] text-xs not-italic font-normal leading-4',
-              isActive && 'text-[#FB9583]'
+              'text-body text-xs not-italic font-normal leading-4',
+              isActive && 'text-brand-soft'
             )}
           >
             {age}

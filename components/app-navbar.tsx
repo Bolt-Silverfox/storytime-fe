@@ -72,7 +72,7 @@ export function AppNavbar() {
                   href='/login'
                   className={cn(
                     buttonVariants({ variant: 'outline' }),
-                    'rounded-full bg-transparent border-[#EC4007] border px-9 h-auto py-4'
+                    'rounded-full bg-transparent border-brand border px-9 h-auto py-4'
                   )}
                 >
                   Login
@@ -110,7 +110,7 @@ export function AppNavbar() {
                   key={`mobile-link-${item.name}`}
                   href={item.link}
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className='relative text-neutral-600 dark:text-neutral-300'
+                  className='relative text-body'
                   aria-current={pathname === item.link ? 'page' : undefined}
                 >
                   <span className='block'>{item.name}</span>
@@ -136,7 +136,7 @@ export function AppNavbar() {
                     onClick={() => setIsMobileMenuOpen(false)}
                     className={cn(
                       buttonVariants({ variant: 'outline' }),
-                      'rounded-full bg-transparent border-[#EC4007] border px-9 h-auto py-4'
+                      'rounded-full bg-transparent border-brand border px-9 h-auto py-4'
                     )}
                   >
                     Login

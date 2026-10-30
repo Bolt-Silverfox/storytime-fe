@@ -135,30 +135,30 @@ const AiVoicePage = () => {
     : null;
 
   return (
-    <div className='bg-white rounded-[2.5625rem] border-[0.5px] border-solid border-[#FAF4F2] px-4 sm:px-6 md:px-10 py-6 md:py-[2.125rem] w-full max-w-6xl mx-auto my-6 md:my-12'>
+    <div className='bg-surface rounded-[2.5625rem] border-[0.5px] border-solid border-hairline-warm px-4 sm:px-6 md:px-10 py-6 md:py-[2.125rem] w-full max-w-6xl mx-auto my-6 md:my-12'>
       <Header white={false} />
 
       <section className='mt-12'>
         <div className='mb-4 flex items-center gap-3'>
           <BackButton />
-          <span className='font-abeezee text-sm text-[#4A413F]'>Back</span>
+          <span className='font-abeezee text-sm text-body'>Back</span>
         </div>
-        <h2 className='mb-1 text-[#221D1D] text-2xl not-italic font-bold leading-7 font-qilka'>
+        <h2 className='mb-1 text-strong text-2xl not-italic font-bold leading-7 font-qilka'>
           AI voice
         </h2>
-        <p className='mb-6 text-[#4A413F] text-sm not-italic font-normal leading-5 font-abeezee'>
+        <p className='mb-6 text-body text-sm not-italic font-normal leading-5 font-abeezee'>
           This is the default voice used for all your stories. Change it here
           any time — every new story reads with your latest choice.
         </p>
 
         {!loggedIn ? (
-          <div className='rounded-3xl border border-stone-100 bg-[#FFF8ED] px-6 py-10 text-center'>
-            <p className='text-[#4A413F] font-abeezee'>
+          <div className='rounded-3xl border border-hairline bg-cream px-6 py-10 text-center'>
+            <p className='text-body font-abeezee'>
               Log in to choose a narration voice.
             </p>
             <Link
               href='/login'
-              className='mt-4 inline-block rounded-2xl bg-[#EC4007] px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90'
+              className='mt-4 inline-block rounded-2xl bg-brand px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90'
             >
               Log in
             </Link>
@@ -168,13 +168,13 @@ const AiVoicePage = () => {
             {[1, 2, 3, 4].map((i) => (
               <div
                 key={i}
-                className='h-[12rem] animate-pulse rounded-3xl bg-stone-100'
+                className='h-[12rem] animate-pulse rounded-3xl bg-sunken'
               />
             ))}
           </div>
         ) : voices.length === 0 ? (
-          <div className='rounded-3xl border border-stone-100 bg-[#FFF8ED] px-6 py-10 text-center'>
-            <p className='text-[#4A413F] font-abeezee'>
+          <div className='rounded-3xl border border-hairline bg-cream px-6 py-10 text-center'>
+            <p className='text-body font-abeezee'>
               No voices are available right now.
             </p>
           </div>
@@ -208,8 +208,8 @@ const AiVoicePage = () => {
                 </Button>
               </div>
             ) : (
-              <div className='mt-8 rounded-3xl border border-stone-100 bg-[#FFF8ED] px-6 py-6 text-center'>
-                <p className='text-[#4A413F] font-abeezee'>
+              <div className='mt-8 rounded-3xl border border-hairline bg-cream px-6 py-6 text-center'>
+                <p className='text-body font-abeezee'>
                   {currentVoiceName ? (
                     <>
                       <span className='font-semibold'>{currentVoiceName}</span>{' '}

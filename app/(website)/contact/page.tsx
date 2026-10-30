@@ -70,10 +70,10 @@ const Page = () => {
         <InteractiveGridPattern width={150} height={150} />
         <section className='relative px-2'>
           <div className='flex flex-col items-center gap-5 w-full'>
-            <h1 className='font-qilka font-bold text-[#221D1D] md:text-[60px] text-[44px] max-w-[926px] mx-auto text-center md:leading-[68px] leading-[50px]'>
+            <h1 className='font-qilka font-bold text-strong md:text-[60px] text-[44px] max-w-[926px] mx-auto text-center md:leading-[68px] leading-[50px]'>
               We’d love to hear from you
             </h1>
-            <p className='w-full max-w-[556px] text-lg text-[#4A413F] font-abeezee text-center'>
+            <p className='w-full max-w-[556px] text-lg text-body font-abeezee text-center'>
               Have a question, a suggestion, or just want to say hello? The
               Storytime team is here to help. Whether you're a parent, teacher,
               storyteller, or a fan we're listening
@@ -81,13 +81,11 @@ const Page = () => {
           </div>
         </section>
       </section>{' '}
-      <section className='md:p-[42px] p-6 mx-5 relative bg-white rounded-[51px] max-w-[1056px] md:mx-auto grid md:grid-cols-2 gap-10'>
+      <section className='md:p-[42px] p-6 mx-5 relative bg-surface rounded-[51px] max-w-[1056px] md:mx-auto grid md:grid-cols-2 gap-10'>
         <div className='space-y-12'>
           <div>
-            <h3 className='text-xl font-semibold text-[#4a413f] mb-2'>
-              Email us
-            </h3>
-            <p className='text-[#808080] mb-6'>
+            <h3 className='text-xl font-semibold text-body mb-2'>Email us</h3>
+            <p className='text-subtle mb-6'>
               We will get back to you within 24-48 hours.
             </p>
             <div className='flex items-center space-x-3'>
@@ -96,7 +94,7 @@ const Page = () => {
               </div>
               <a
                 href='mailto:support@storytimeapp.me'
-                className='text-[#4a413f] font-medium hover:underline'
+                className='text-body font-medium hover:underline'
               >
                 support@storytimeapp.me
               </a>
@@ -104,10 +102,10 @@ const Page = () => {
           </div>
 
           <div>
-            <h3 className='text-xl font-semibold text-[#4a413f] mb-2'>
+            <h3 className='text-xl font-semibold text-body mb-2'>
               Partnership opportunities
             </h3>
-            <p className='text-[#808080] mb-6'>
+            <p className='text-subtle mb-6'>
               Interested in collaborating, contributing stories, or educational
               content? We'd love to connect.
             </p>
@@ -117,7 +115,7 @@ const Page = () => {
               </div>
               <a
                 href='mailto:partners@storytimeapp.me'
-                className='text-[#4a413f] font-medium hover:underline'
+                className='text-body font-medium hover:underline'
               >
                 partners@storytimeapp.me
               </a>
@@ -132,14 +130,14 @@ const Page = () => {
               name='fullname'
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className='text-[#4a413f] font-medium'>
+                  <FormLabel className='text-body font-medium'>
                     Full name
                   </FormLabel>
                   <FormControl>
                     <Input
                       {...field}
                       placeholder='Enter your full name'
-                      className='mt-2 bg-white border-[#f5f5f4] focus:border-[#f84020] focus:ring-[#f84020]'
+                      className='mt-2 bg-surface border-hairline focus:border-brand-edge focus:ring-brand-edge'
                     />
                   </FormControl>
                   <FormMessage />
@@ -152,15 +150,13 @@ const Page = () => {
               name='email'
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className='text-[#4a413f] font-medium'>
-                    Email
-                  </FormLabel>
+                  <FormLabel className='text-body font-medium'>Email</FormLabel>
                   <FormControl>
                     <Input
                       {...field}
                       type='email'
                       placeholder='Enter your email'
-                      className='mt-2 bg-white border-[#f5f5f4] focus:border-[#f84020] focus:ring-[#f84020]'
+                      className='mt-2 bg-surface border-hairline focus:border-brand-edge focus:ring-brand-edge'
                     />
                   </FormControl>
                   <FormMessage />
@@ -173,14 +169,14 @@ const Page = () => {
               name='subject'
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className='text-[#4a413f] font-medium'>
+                  <FormLabel className='text-body font-medium'>
                     Subject
                   </FormLabel>
                   <FormControl>
                     <Input
                       {...field}
                       placeholder='Enter message subject'
-                      className='mt-2 bg-white border-[#f5f5f4] focus:border-[#f84020] focus:ring-[#f84020]'
+                      className='mt-2 bg-surface border-hairline focus:border-brand-edge focus:ring-brand-edge'
                     />
                   </FormControl>
                   <FormMessage />
@@ -197,7 +193,7 @@ const Page = () => {
                     <Textarea
                       {...field}
                       placeholder='Type your message'
-                      className='bg-white border-[#f5f5f4] focus:border-[#f84020] focus:ring-[#f84020] min-h-[120px]'
+                      className='bg-surface border-hairline focus:border-brand-edge focus:ring-brand-edge min-h-[120px]'
                     />
                   </FormControl>
                   <FormMessage />
@@ -217,7 +213,7 @@ const Page = () => {
         </Form>
       </section>
       <section className='md:pb-[160px] pb-[60px] px-5'>
-        <Card className='w-full max-w-[1140px] mx-auto bg-[#EC4007] rounded-[51px] border-[0.5px] border-solid border-[#f84020] md:p-[62px] p-6'>
+        <Card className='w-full max-w-[1140px] mx-auto bg-brand rounded-[51px] border-[0.5px] border-solid border-brand-edge md:p-[62px] p-6'>
           <CardContent className='p-0'>
             <div className='flex md:flex-row flex-col items-center gap-[70px] w-full'>
               <div className='flex flex-col items-start gap-8 flex-1 max-w-[473px]'>
@@ -226,7 +222,7 @@ const Page = () => {
                     Want to join the movement
                   </h2>
 
-                  <p className='text-[#FEEAE6] font-abeezee text-xl max-w-[500px]'>
+                  <p className='text-on-brand-soft font-abeezee text-xl max-w-[500px]'>
                     Let’s build a world where stories still matter.
                   </p>
                 </div>

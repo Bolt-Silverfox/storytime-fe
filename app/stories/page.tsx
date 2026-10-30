@@ -89,17 +89,17 @@ function StoriesBrowse() {
   // Nothing selected -> the shared mobile-style home for guests.
   if (!isBrowse) {
     return (
-      <main className='min-h-dvh bg-[#FFF8ED] text-[#1B1300]'>
+      <main className='min-h-dvh bg-cream text-ink'>
         <header className='mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 sm:px-6 pt-8 pb-5'>
           <Link
             href='/'
-            className='font-[family-name:var(--font-qilka)] text-2xl font-bold text-[#EC4007]'
+            className='font-[family-name:var(--font-qilka)] text-2xl font-bold text-brand-text'
           >
             Storytime
           </Link>
           <Link
             href='/register'
-            className='rounded-full bg-[#EC4007] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90'
+            className='rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90'
           >
             Sign up
           </Link>
@@ -126,13 +126,13 @@ function StoriesBrowse() {
             : 'All stories';
 
   return (
-    <main className='min-h-dvh bg-[#FFF8ED] text-[#1B1300]'>
+    <main className='min-h-dvh bg-cream text-ink'>
       <header className='mx-auto flex max-w-5xl items-center justify-between px-4 sm:px-6 pt-8 pb-5'>
         <div className='flex items-center gap-3'>
           <BackButton className='shrink-0' />
           <Link
             href='/'
-            className='font-[family-name:var(--font-qilka)] text-2xl font-bold text-[#EC4007]'
+            className='font-[family-name:var(--font-qilka)] text-2xl font-bold text-brand-text'
           >
             Storytime
           </Link>
@@ -143,7 +143,7 @@ function StoriesBrowse() {
         <h1 className='font-[family-name:var(--font-qilka)] text-3xl font-bold sm:text-4xl'>
           {browseTitle}
         </h1>
-        <p className='mt-2 text-[#5B4B33]'>
+        <p className='mt-2 text-sepia'>
           Pick a story and start reading — no account needed.
         </p>
 
@@ -167,8 +167,8 @@ function StoriesBrowse() {
                 }}
                 className={`shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition ${
                   active
-                    ? 'bg-[#EC4007] text-white'
-                    : 'bg-white text-[#5B4B33] hover:bg-[#FCE9CE]'
+                    ? 'bg-brand text-white'
+                    : 'bg-surface text-sepia hover:bg-sand'
                 }`}
               >
                 {cat.name}
@@ -178,11 +178,9 @@ function StoriesBrowse() {
         </div>
 
         {isLoading ? (
-          <p className='mt-10 text-[#5B4B33]'>Loading stories…</p>
+          <p className='mt-10 text-sepia'>Loading stories…</p>
         ) : stories.length === 0 ? (
-          <p className='mt-10 text-[#5B4B33]'>
-            No stories in this category yet.
-          </p>
+          <p className='mt-10 text-sepia'>No stories in this category yet.</p>
         ) : (
           <div className='mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3'>
             {stories.map((story) => (
@@ -197,9 +195,9 @@ function StoriesBrowse() {
                 />
                 <Link
                   href={`/story/${story.id}`}
-                  className='group block overflow-hidden rounded-3xl bg-white shadow-sm transition hover:shadow-md'
+                  className='group block overflow-hidden rounded-3xl bg-surface shadow-sm transition hover:shadow-md'
                 >
-                  <div className='aspect-[4/3] w-full overflow-hidden bg-[#FCE9CE]'>
+                  <div className='aspect-[4/3] w-full overflow-hidden bg-sand'>
                     {story.coverImageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element -- remote Cloudinary host
                       <img
@@ -218,7 +216,7 @@ function StoriesBrowse() {
                       {story.title}
                     </h2>
                     {typeof story.ageMin === 'number' && (
-                      <span className='mt-1 inline-block text-sm font-semibold text-[#4807EC]'>
+                      <span className='mt-1 inline-block text-sm font-semibold text-blue'>
                         Ages {story.ageMin}
                         {typeof story.ageMax === 'number'
                           ? `–${story.ageMax}`
@@ -235,7 +233,7 @@ function StoriesBrowse() {
         {/* Infinite-scroll sentinel + loading indicator */}
         <div ref={sentinelRef} className='h-px w-full' />
         {isFetchingNextPage && (
-          <p className='mt-6 text-center text-[#5B4B33]'>Loading more…</p>
+          <p className='mt-6 text-center text-sepia'>Loading more…</p>
         )}
       </section>
     </main>

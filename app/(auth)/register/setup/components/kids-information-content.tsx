@@ -47,9 +47,7 @@ export const KidsInformationContent = () => {
 
   return (
     <div className='space-y-6 overflow-auto max-h-[500px]'>
-      <p className='font-abeezee text-[#221D1D]'>
-        Complete your kids information
-      </p>
+      <p className='font-abeezee text-strong'>Complete your kids information</p>
       <div className='space-y-6 '>
         {fields.map((_, index) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: these cards are positional and have no id until saved

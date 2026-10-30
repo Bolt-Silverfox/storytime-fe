@@ -107,10 +107,10 @@ const Page = () => {
       <div className='space-y-[26px] flex flex-col items-center'>
         <div className='space-y-1.5 text-center w-full'>
           <StepBackButton onClick={() => router.push('/forgot-password')} />
-          <p className='text-[#221D1D] dark:text-white text-[34px] font-bold font-qilka'>
+          <p className='text-strong text-[34px] font-bold font-qilka'>
             Verify your email
           </p>
-          <p className='text-[#4A413F] max-w-[539px] mx-auto dark:text-white font-abeezee'>
+          <p className='text-body max-w-[539px] mx-auto font-abeezee'>
             We have sent a special code to your registered email address{' '}
             {maskEmail(registrationData?.email || '')}.
           </p>
@@ -137,7 +137,7 @@ const Page = () => {
                 </FormControl>
                 <div className=''>
                   <FormMessage />
-                  <p className='text-[#0731EC] font-abeezee text-end'>
+                  <p className='text-link font-abeezee text-end'>
                     {`0:${timeLeft < 10 ? `0${timeLeft}` : timeLeft}`}
                   </p>
                 </div>
@@ -150,7 +150,7 @@ const Page = () => {
             type='button'
             onClick={handleResend}
             disabled={timeLeft > 0}
-            className='py-2.5 px-6 rounded-[50px] !mx-auto max-w-max bg-white border-[#FAF4F2] shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] border dark:bg-neutral-950 text-[#221D1D] dark:text-white'
+            className='py-2.5 px-6 rounded-[50px] !mx-auto max-w-max bg-surface border-hairline-warm shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] border text-strong'
           >
             Resend OTP
           </Button>
@@ -162,9 +162,9 @@ const Page = () => {
           >
             {!form.formState.isValid ? 'Proceed' : 'Verify email'}
           </Button>
-          <p className='font-abeezee text-[#221D1D] dark:text-white text-center space-x-3'>
+          <p className='font-abeezee text-strong text-center space-x-3'>
             If you already have an account{' '}
-            <Link href='/login' className='text-[#0731EC] hover:underline'>
+            <Link href='/login' className='text-link hover:underline'>
               Login
             </Link>
           </p>

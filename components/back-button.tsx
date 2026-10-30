@@ -20,7 +20,7 @@ const BackButton = ({ className }: { className?: string }) => {
       type='button'
       onClick={handleBack}
       aria-label='Go back'
-      className={`flex h-10 w-10 items-center justify-center rounded-full border border-stone-200 bg-white text-[#221D1D] transition hover:bg-[#FFF8ED] ${
+      className={`flex h-10 w-10 items-center justify-center rounded-full border border-line-mid bg-surface text-strong transition hover:bg-cream ${
         className ?? ''
       }`}
     >

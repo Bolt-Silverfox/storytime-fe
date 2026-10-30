@@ -37,9 +37,7 @@ export default function QuotaIndicator({
     return (
       <span
         className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold ${
-          noneLeft
-            ? 'bg-[#EC4007]/10 text-[#EC4007]'
-            : 'bg-[#4807EC]/10 text-[#4807EC]'
+          noneLeft ? 'bg-brand/10 text-brand-text' : 'bg-blue/10 text-blue'
         } ${className}`}
       >
         {noneLeft
@@ -62,9 +60,7 @@ export default function QuotaIndicator({
   return (
     <div
       className={`flex flex-col items-start gap-3 rounded-2xl border px-5 py-4 sm:flex-row sm:items-center sm:justify-between ${
-        noneLeft
-          ? 'border-[#EC4007]/30 bg-[#EC4007]/5'
-          : 'border-[#4807EC]/20 bg-[#4807EC]/5'
+        noneLeft ? 'border-brand/30 bg-brand/5' : 'border-blue/20 bg-blue/5'
       } ${className}`}
     >
       <div className='flex items-center gap-3'>
@@ -72,14 +68,14 @@ export default function QuotaIndicator({
           {noneLeft ? '🔒' : '📖'}
         </span>
         <div>
-          <p className='font-qilka text-base font-bold text-[#221D1D]'>
+          <p className='font-qilka text-base font-bold text-strong'>
             {noneLeft
               ? "You've used all your free stories"
               : `${remaining} of ${totalAllowed} free ${
                   totalAllowed === 1 ? 'story' : 'stories'
                 } left`}
           </p>
-          <p className='font-abeezee text-sm text-[#4A413F]'>{message}</p>
+          <p className='font-abeezee text-sm text-body'>{message}</p>
         </div>
       </div>
       {cta.external ? (
@@ -87,14 +83,14 @@ export default function QuotaIndicator({
           href={cta.href}
           target='_blank'
           rel='noopener noreferrer'
-          className='shrink-0 rounded-full bg-[#EC4007] px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90'
+          className='shrink-0 rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90'
         >
           {cta.label}
         </a>
       ) : (
         <Link
           href={cta.href}
-          className='shrink-0 rounded-full bg-[#EC4007] px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90'
+          className='shrink-0 rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90'
         >
           {cta.label}
         </Link>

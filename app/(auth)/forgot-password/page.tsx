@@ -75,12 +75,10 @@ const Page = () => {
       <div className='space-y-[26px] flex flex-col items-center'>
         <div className='space-y-1.5 text-center w-full'>
           <StepBackButton onClick={() => router.push('/login')} />
-          <p className='text-[#221D1D] dark:text-white text-[34px] font-bold font-qilka'>
+          <p className='text-strong text-[34px] font-bold font-qilka'>
             Reset password
           </p>
-          <p className='text-[#4A413F] dark:text-white font-abeezee'>
-            Change your password
-          </p>
+          <p className='text-body font-abeezee'>Change your password</p>
         </div>
       </div>
       <Form {...form}>
@@ -115,9 +113,9 @@ const Page = () => {
           >
             Proceed
           </Button>
-          <p className='font-abeezee text-[#221D1D] dark:text-white text-center space-x-3'>
+          <p className='font-abeezee text-strong text-center space-x-3'>
             If you already have an account{' '}
-            <Link href='/login' className='text-[#0731EC] hover:underline'>
+            <Link href='/login' className='text-link hover:underline'>
               Login
             </Link>
           </p>

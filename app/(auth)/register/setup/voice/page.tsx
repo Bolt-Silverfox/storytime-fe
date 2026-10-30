@@ -77,10 +77,10 @@ const VoiceSetupPage = () => {
   return (
     <div className='max-w-[440px] mx-auto space-y-8'>
       <div className='space-y-1.5 text-center'>
-        <p className='text-[#221D1D] dark:text-white text-[28px] font-bold font-qilka'>
+        <p className='text-strong text-[28px] font-bold font-qilka'>
           Choose your story voice
         </p>
-        <p className='text-[#4A413F] dark:text-white font-abeezee text-sm'>
+        <p className='text-body font-abeezee text-sm'>
           Pick the voice that reads stories to your kids. You can change it any
           time in Settings.
         </p>
@@ -97,10 +97,10 @@ const VoiceSetupPage = () => {
                 type='button'
                 aria-pressed={active}
                 onClick={() => setSelectedId(voice.id)}
-                className={`flex flex-1 items-center gap-3 rounded-2xl border bg-white p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EC4007] ${
+                className={`flex flex-1 items-center gap-3 rounded-2xl border bg-surface p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
                   active
-                    ? 'border-[#EC4007] ring-2 ring-[#EC4007]/40'
-                    : 'border-[#FAF4F2]'
+                    ? 'border-brand ring-2 ring-brand/40'
+                    : 'border-hairline-warm'
                 }`}
               >
                 {voice.voiceAvatar ? (
@@ -114,18 +114,14 @@ const VoiceSetupPage = () => {
                 ) : (
                   <span
                     aria-hidden='true'
-                    className='h-11 w-11 shrink-0 rounded-full bg-[#FEEAE6]'
+                    className='h-11 w-11 shrink-0 rounded-full bg-tint'
                   />
                 )}
-                <span className='flex-1 font-abeezee text-[#221D1D]'>
-                  {label}
-                </span>
+                <span className='flex-1 font-abeezee text-strong'>{label}</span>
                 <span
                   aria-hidden='true'
                   className={`h-4 w-4 shrink-0 rounded-full border-2 ${
-                    active
-                      ? 'border-[#EC4007] bg-[#EC4007]'
-                      : 'border-[#D9D9D9]'
+                    active ? 'border-brand bg-brand' : 'border-line-light'
                   }`}
                 />
               </button>
@@ -134,7 +130,7 @@ const VoiceSetupPage = () => {
                   type='button'
                   aria-label={`Preview ${label}`}
                   onClick={() => handlePreview(voice)}
-                  className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#FAF4F2] text-[#EC4007] transition-colors hover:bg-[#FEEAE6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EC4007]'
+                  className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-hairline-warm text-brand-text transition-colors hover:bg-tint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand'
                 >
                   <svg
                     width='16'
@@ -167,7 +163,7 @@ const VoiceSetupPage = () => {
         <button
           type='button'
           onClick={() => router.push('/register/setup/success')}
-          className='block mx-auto text-sm font-abeezee text-[#4A413F] underline'
+          className='block mx-auto text-sm font-abeezee text-body underline'
         >
           Skip for now
         </button>

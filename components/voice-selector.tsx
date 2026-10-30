@@ -171,10 +171,10 @@ const VoiceSelector = ({
   if (loading) {
     return (
       <div className={`${expand ? 'h-[90%]' : ''}`}>
-        <h3 className='text-[#221D1D] text-xl not-italic font-normal leading-5 font-qilka'>
+        <h3 className='text-strong text-xl not-italic font-normal leading-5 font-qilka'>
           Select AI voice to read stories
         </h3>
-        <p className='text-[#4A413F] text-xs not-italic font-normal leading-4'>
+        <p className='text-body text-xs not-italic font-normal leading-4'>
           Customize how you want this AI voice to sound
         </p>
         <div
@@ -184,13 +184,13 @@ const VoiceSelector = ({
         >
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <div key={i} className='animate-pulse'>
-              <div className='border-stone-100 bg-gray-200 px-4 py-3 rounded-3xl border-[0.5px] border-solid h-24' />
+              <div className='border-hairline bg-line-mid px-4 py-3 rounded-3xl border-[0.5px] border-solid h-24' />
             </div>
           ))}
         </div>
         <button
           type='button'
-          className='w-full py-4 cursor-not-allowed bg-[#FEEAE6] text-[#FB9583] rounded-[3.125rem] font-semibold'
+          className='w-full py-4 cursor-not-allowed bg-tint text-brand-soft rounded-[3.125rem] font-semibold'
           disabled
         >
           Set-up AI voice
@@ -201,10 +201,10 @@ const VoiceSelector = ({
 
   return (
     <div className={`${expand ? 'h-[90%]' : ''}`}>
-      <h3 className='text-[#221D1D] text-xl not-italic font-normal leading-5 font-qilka'>
+      <h3 className='text-strong text-xl not-italic font-normal leading-5 font-qilka'>
         Select AI voice to read stories
       </h3>
-      <p className='text-[#4A413F] text-xs not-italic font-normal leading-4'>
+      <p className='text-body text-xs not-italic font-normal leading-4'>
         Customize how you want this AI voice to sound
       </p>
       <div
@@ -227,7 +227,7 @@ const VoiceSelector = ({
         ))}
       </div>
       {!canSwitchVoice && (
-        <p className='mb-4 text-sm text-[#4A413F] font-abeezee'>
+        <p className='mb-4 text-sm text-body font-abeezee'>
           {currentVoiceName ? (
             <>
               <span className='font-semibold'>{currentVoiceName}</span> reads
@@ -245,7 +245,7 @@ const VoiceSelector = ({
         </p>
       )}
       {lockedMessage && (
-        <p className='mb-4 text-sm text-[#EC4007] font-abeezee'>
+        <p className='mb-4 text-sm text-brand-text font-abeezee'>
           {lockedMessage}
         </p>
       )}
@@ -256,8 +256,8 @@ const VoiceSelector = ({
         type='button'
         className={`w-full py-4 cursor-pointer hover:scale-105 transition-all duration-300 rounded-[3.125rem] font-semibold ${
           !canSwitchVoice || selectedVoiceId
-            ? 'bg-[#EC4007] text-white'
-            : 'bg-[#FEEAE6] text-[#FB9583]'
+            ? 'bg-brand text-white'
+            : 'bg-tint text-brand-soft'
         }`}
         disabled={settingVoice || !(!canSwitchVoice || selectedVoiceId)}
         onClick={handleSetVoice}

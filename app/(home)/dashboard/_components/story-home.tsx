@@ -112,7 +112,7 @@ const StoryHome = () => {
       {/* Section 1 — Stories by age */}
       <section className='mt-12'>
         <div className='mb-4 flex flex-wrap items-center justify-between gap-3'>
-          <h2 className='text-[#221D1D] text-xl not-italic font-bold leading-6 font-qilka'>
+          <h2 className='text-strong text-xl not-italic font-bold leading-6 font-qilka'>
             Stories by age
           </h2>
           <Link
@@ -121,7 +121,7 @@ const StoryHome = () => {
                 ? '/stories?filter=all'
                 : `/stories?filter=age&minAge=${AGE_GROUPS.find((g) => g.label === ageGroup)?.minAge}&maxAge=${AGE_GROUPS.find((g) => g.label === ageGroup)?.maxAge}`
             }
-            className='text-sm font-semibold text-[#EC4007] font-abeezee hover:underline'
+            className='text-sm font-semibold text-brand-text font-abeezee hover:underline'
           >
             View all
           </Link>
@@ -136,8 +136,8 @@ const StoryHome = () => {
                 onClick={() => setAgeGroup(group.label)}
                 className={`rounded-full px-4 py-2 text-sm font-semibold font-abeezee transition ${
                   active
-                    ? 'bg-[#EC4007] text-white'
-                    : 'bg-white text-[#4A413F] border border-stone-100 hover:bg-[#FCE9CE]'
+                    ? 'bg-brand text-white'
+                    : 'bg-surface text-body border border-hairline hover:bg-sand'
                 }`}
               >
                 {group.label}
@@ -150,12 +150,12 @@ const StoryHome = () => {
             {[1, 2, 3, 4].map((i) => (
               <div
                 key={i}
-                className='h-[16rem] w-[15rem] shrink-0 animate-pulse rounded-3xl bg-stone-100'
+                className='h-[16rem] w-[15rem] shrink-0 animate-pulse rounded-3xl bg-sunken'
               />
             ))}
           </div>
         ) : ageStories.length === 0 ? (
-          <p className='text-[#4A413F] text-sm not-italic font-normal leading-5 font-abeezee'>
+          <p className='text-body text-sm not-italic font-normal leading-5 font-abeezee'>
             No stories for this age group yet.
           </p>
         ) : (
@@ -203,7 +203,7 @@ const StoryHome = () => {
 
       {/* Section 6 — Story categories grid */}
       <section className='mt-12'>
-        <h2 className='mb-4 text-[#221D1D] text-xl not-italic font-bold leading-6 font-qilka'>
+        <h2 className='mb-4 text-strong text-xl not-italic font-bold leading-6 font-qilka'>
           Story categories
         </h2>
         {loading ? (
@@ -211,12 +211,12 @@ const StoryHome = () => {
             {[1, 2, 3, 4].map((i) => (
               <div
                 key={i}
-                className='h-[9rem] animate-pulse rounded-3xl bg-stone-100'
+                className='h-[9rem] animate-pulse rounded-3xl bg-sunken'
               />
             ))}
           </div>
         ) : categories.length === 0 ? (
-          <p className='text-[#4A413F] text-sm not-italic font-normal leading-5 font-abeezee'>
+          <p className='text-body text-sm not-italic font-normal leading-5 font-abeezee'>
             No categories yet.
           </p>
         ) : (
@@ -225,7 +225,7 @@ const StoryHome = () => {
               <Link
                 key={category.id}
                 href={`/stories?category=${category.id}`}
-                className='group relative flex h-[9rem] items-end overflow-hidden rounded-3xl border border-stone-100 bg-[#FCE9CE] shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] transition-all duration-300 hover:scale-[1.03]'
+                className='group relative flex h-[9rem] items-end overflow-hidden rounded-3xl border border-hairline bg-sand shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] transition-all duration-300 hover:scale-[1.03]'
               >
                 <CategoryImage
                   src={category.image}
@@ -266,9 +266,9 @@ const StorySectionCardLink = ({ story }: { story: StoryListItem }) => {
       />
       <Link
         href={`/story/${story.id}`}
-        className='group block overflow-hidden rounded-3xl border border-stone-100 bg-white shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] transition-all duration-300 hover:scale-[1.03]'
+        className='group block overflow-hidden rounded-3xl border border-hairline bg-surface shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] transition-all duration-300 hover:scale-[1.03]'
       >
-        <div className='aspect-[4/3] w-full overflow-hidden bg-[#FCE9CE]'>
+        <div className='aspect-[4/3] w-full overflow-hidden bg-sand'>
           {story.coverImageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- remote Cloudinary host, avoids next.config image allowlist
             <img
@@ -283,11 +283,11 @@ const StorySectionCardLink = ({ story }: { story: StoryListItem }) => {
           )}
         </div>
         <div className='p-4'>
-          <h3 className='truncate text-[#221D1D] text-lg not-italic font-bold leading-6 font-qilka'>
+          <h3 className='truncate text-strong text-lg not-italic font-bold leading-6 font-qilka'>
             {story.title}
           </h3>
           {age && (
-            <span className='mt-1 inline-block text-sm font-semibold text-[#4807EC] font-abeezee'>
+            <span className='mt-1 inline-block text-sm font-semibold text-blue font-abeezee'>
               {age}
             </span>
           )}

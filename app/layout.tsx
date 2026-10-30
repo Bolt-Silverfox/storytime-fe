@@ -54,7 +54,7 @@ export default function RootLayout({
       <body className={cn(abeezee.variable, qilka.variable, 'antialiased')}>
         <a
           href='#main'
-          className='sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:font-abeezee focus:text-[#221D1D] focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#EC4007]'
+          className='sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-surface focus:px-4 focus:py-2 focus:font-abeezee focus:text-strong focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-brand'
         >
           Skip to content
         </a>

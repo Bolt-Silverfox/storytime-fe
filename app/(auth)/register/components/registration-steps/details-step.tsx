@@ -85,7 +85,7 @@ export const DetailsStep = () => {
         className='max-w-[539px] mx-auto space-y-10'
       >
         <div className='space-y-6'>
-          <h1 className='text-center font-qilka font-bold text-[26px] text-[#221D1D] dark:text-white'>
+          <h1 className='text-center font-qilka font-bold text-[26px] text-strong'>
             Provide your details
           </h1>
 
@@ -114,7 +114,7 @@ export const DetailsStep = () => {
                 </Select>
                 <FormMessage
                   className={cn(
-                    'text-[#4A413F] ',
+                    'text-body ',
                     form.formState.errors.title && 'text-destructive'
                   )}
                 >
@@ -153,9 +153,9 @@ export const DetailsStep = () => {
 
         <OAuthButtons mode='register' />
 
-        <p className='font-abeezee text-[#221D1D] dark:text-white text-center space-x-3'>
+        <p className='font-abeezee text-strong text-center space-x-3'>
           If you already have an account{' '}
-          <Link href='/login' className='text-[#0731EC] hover:underline'>
+          <Link href='/login' className='text-link hover:underline'>
             Login
           </Link>
         </p>

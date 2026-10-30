@@ -64,6 +64,7 @@ const RecommendedCard = ({
               alt='heart'
               width={20}
               height={20}
+              className={isFavorite ? '' : 'dark:brightness-0 dark:invert'}
               onClick={(e) => {
                 e.stopPropagation();
                 setIsFavorite(!isFavorite);

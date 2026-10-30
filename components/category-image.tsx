@@ -26,7 +26,7 @@ const CategoryImageFallback = ({
   return (
     <div
       className={cn(
-        'flex items-center justify-center bg-gradient-to-br from-sand to-[#FDEEE9]',
+        'flex items-center justify-center bg-gradient-to-br from-sand to-[#FDEEE9] dark:to-tint',
         className
       )}
     >

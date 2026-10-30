@@ -140,7 +140,11 @@ const Modal: React.FC<ModalProps> = ({
                     onClick={() => setExpand?.(!expand)}
                     className='border-hairline cursor-pointer hover:scale-105 transition-all duration-300 bg-surface shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] p-2 px-3 rounded-[3.125rem] border-[0.5px] border-solid flex items-center gap-2'
                   >
-                    <Image src={expandIcon} alt='' />
+                    <Image
+                      src={expandIcon}
+                      alt=''
+                      className='dark:brightness-0 dark:invert'
+                    />
                     <p className='text-strong text-base not-italic font-normal leading-5'>
                       {expand ? 'Collapse' : 'Expand'}
                     </p>
@@ -153,7 +157,11 @@ const Modal: React.FC<ModalProps> = ({
                   aria-label='Close'
                   className='cursor-pointer hover:scale-105 transition-all duration-300'
                 >
-                  <Image src={close} alt='' />
+                  <Image
+                    src={close}
+                    alt=''
+                    className='dark:brightness-0 dark:invert'
+                  />
                 </button>
               </div>
             </div>

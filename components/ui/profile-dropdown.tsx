@@ -119,7 +119,13 @@ export default function ProfileDropdown({
               className='flex items-center gap-3 py-6 px-4 hover:bg-sunken  rounded-[1.6875rem] cursor-pointer transition-colors border-b-[0.5px] border-solid border-hairline'
               href={item.link}
             >
-              <Image src={item.icon} alt='' width={24} height={24} />
+              <Image
+                src={item.icon}
+                alt=''
+                width={24}
+                height={24}
+                className='dark:brightness-0 dark:invert'
+              />
               <span className='text-body not-italic leading-6 font-abeezee text-base'>
                 {item.label}
               </span>
@@ -131,7 +137,13 @@ export default function ProfileDropdown({
             onClick={handleLogout}
             type='button'
           >
-            <Image src='/logout.svg' alt='' width={24} height={24} />
+            <Image
+              src='/logout.svg'
+              alt=''
+              width={24}
+              height={24}
+              className='dark:brightness-0 dark:invert'
+            />
             <span className='text-body not-italic leading-6 font-abeezee text-base'>
               Logout
             </span>

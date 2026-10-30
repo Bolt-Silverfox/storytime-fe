@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import arrow_down from '@/public/arrow-down.svg';
 import avatar from '@/public/avatar.svg';
 import heart from '@/public/heart.svg';
+import { Logo } from './logo';
 import ProfileDropdown from './ui/profile-dropdown';
 
 const Header = ({ white = false }: { white?: boolean }) => {
@@ -16,16 +17,7 @@ const Header = ({ white = false }: { white?: boolean }) => {
   return (
     <header>
       <div className='flex items-center justify-between relative'>
-        <Link href='/dashboard' aria-label='Go to stories home'>
-          <Image
-            src='/logo-light.svg'
-            alt='Logo'
-            width={140}
-            height={24}
-            priority
-            draggable={false}
-          />
-        </Link>
+        <Logo href='/dashboard' />
         <h1
           className={cn(
             'hidden md:block text-center text-base md:text-xl not-italic font-bold leading-6 font-qilka truncate max-w-[40%] px-2',
@@ -75,7 +67,7 @@ const Header = ({ white = false }: { white?: boolean }) => {
                 alt='arrow-down'
                 className={`${
                   dropdownOpen ? 'rotate-180' : ''
-                } transition-all duration-300`}
+                } transition-all duration-300 dark:brightness-0 dark:invert`}
               />
             </button>
             <ProfileDropdown

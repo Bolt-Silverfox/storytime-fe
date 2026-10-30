@@ -4,9 +4,9 @@ import { Logo } from './logo';
 
 export const Footer = () => {
   return (
-    <footer className='flex md:flex-row flex-col justify-between gap-2.5 px-4 md:px-[150px] py-20 w-full bg-[#221D1D]'>
+    <footer className='flex md:flex-row flex-col justify-between gap-2.5 px-4 md:px-[150px] py-20 w-full bg-[#221D1D] dark:border-t dark:border-hairline'>
       <div className='flex flex-col w-full md:w-[196px] items-start gap-3'>
-        <Logo />
+        <Logo onDark />
         <p className='text-[#F5F5F4] font-abeezee'>
           Magical stories.
           <br />

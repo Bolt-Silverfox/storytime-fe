@@ -195,7 +195,9 @@ export default function StoryView({ storyId }: { storyId: string }) {
           {isFavorite ? 'Saved to favorites' : 'Save to favorites'}
         </button>
       )}
-      {startError && <p className='text-sm text-red-600'>{startError}</p>}
+      {startError && (
+        <p className='text-sm text-red-600 dark:text-red-400'>{startError}</p>
+      )}
 
       <Modal
         open={modalOpen}

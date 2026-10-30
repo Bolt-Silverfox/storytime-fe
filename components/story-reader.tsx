@@ -642,7 +642,7 @@ const StoryReader = ({
   if (loading) {
     return (
       <div className='flex items-center justify-center h-64'>
-        <output className='text-[#4A413F]'>Loading story...</output>
+        <output className='text-body'>Loading story...</output>
       </div>
     );
   }
@@ -650,15 +650,15 @@ const StoryReader = ({
   if (quotaReached) {
     return (
       <div className='flex flex-col items-center justify-center h-64 text-center px-4'>
-        <h3 className='text-[#221D1D] text-2xl not-italic font-bold leading-7 font-qilka mb-2'>
+        <h3 className='text-strong text-2xl not-italic font-bold leading-7 font-qilka mb-2'>
           You've enjoyed your free stories!
         </h3>
-        <p className='text-[#4A413F] text-base not-italic font-normal leading-5 font-abeezee mb-6 max-w-md'>
+        <p className='text-body text-base not-italic font-normal leading-5 font-abeezee mb-6 max-w-md'>
           Sign up to keep reading unlimited stories with audio narration.
         </p>
         <Link
           href='/register'
-          className='rounded-[3.125rem] bg-[#EC4007] px-8 py-4 text-base font-semibold text-white transition hover:opacity-90'
+          className='rounded-[3.125rem] bg-brand px-8 py-4 text-base font-semibold text-white transition hover:opacity-90'
         >
           Sign up to read more
         </Link>
@@ -699,15 +699,15 @@ const StoryReader = ({
             className='w-full max-w-full rounded-2xl object-cover'
           />
         ) : null}
-        <h3 className='text-[#221D1D] text-[1.625rem] not-italic font-bold leading-[1.875rem] font-qilka mt-4 mb-0.5'>
+        <h3 className='text-strong text-[1.625rem] not-italic font-bold leading-[1.875rem] font-qilka mt-4 mb-0.5'>
           {displayTitle}
         </h3>
-        <p className='text-[#4A413F] not-italic font-normal leading-4'>
+        <p className='text-body not-italic font-normal leading-4'>
           {displayDescription}
         </p>
         {mode && (
-          <div className='mt-4 p-3 bg-[#FAF4F2] rounded-lg'>
-            <p className='text-[#4A413F] text-sm not-italic font-normal leading-4 font-abeezee'>
+          <div className='mt-4 p-3 bg-page rounded-lg'>
+            <p className='text-body text-sm not-italic font-normal leading-4 font-abeezee'>
               <strong>Mode:</strong> {getModeDescription()}
             </p>
           </div>
@@ -722,19 +722,19 @@ const StoryReader = ({
               className='h-[9rem] max-w-full rounded-[3xl] mb-4 object-cover'
             />
             <div className='bg-surface flex justify-center items-center gap-3 shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] px-6 py-2.5 rounded-[3.125rem] border-[0.5px] border-solid border-[#FAF4F2]'>
-              <h5 className='text-[#221D1D] text-right text-xl not-italic font-bold leading-6'>
+              <h5 className='text-strong text-right text-xl not-italic font-bold leading-6'>
                 {voice}
               </h5>
               <button
                 type='button'
                 aria-label='Change voice'
                 onClick={() => setStep(1)}
-                className='cursor-pointer rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EC4007] focus-visible:ring-offset-2'
+                className='cursor-pointer rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2'
               >
                 <Image src={edit} alt='' />
               </button>
             </div>
-            <small className='text-[#4A413F] text-base not-italic font-normal leading-5 font-abeezee mt-2'>
+            <small className='text-body text-base not-italic font-normal leading-5 font-abeezee mt-2'>
               {audioLoading || audioGenerating
                 ? 'Preparing audio…'
                 : `${formatTime(currentTime)} / ${formatTime(duration)}`}
@@ -744,35 +744,35 @@ const StoryReader = ({
           <div className='flex flex-wrap items-center gap-4 justify-between w-full'>
             <div className='flex items-center gap-4'>
               <Image src={movementSmall} alt='' className='' />
-              <small className='text-[#4A413F] text-base not-italic font-normal leading-5 font-abeezee mt-2'>
+              <small className='text-body text-base not-italic font-normal leading-5 font-abeezee mt-2'>
                 {audioLoading || audioGenerating
                   ? 'Preparing audio…'
                   : `${formatTime(currentTime)} / ${formatTime(duration)}`}
               </small>
             </div>
             <div className='bg-surface flex justify-center items-center gap-3 shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] px-6 py-2.5 rounded-[3.125rem] border-[0.5px] border-solid border-[#FAF4F2] font-qilka'>
-              <h5 className='text-[#221D1D] text-right text-xl not-italic font-bold leading-6'>
+              <h5 className='text-strong text-right text-xl not-italic font-bold leading-6'>
                 {voice}
               </h5>
               <button
                 type='button'
                 aria-label='Change voice'
                 onClick={() => setStep(1)}
-                className='cursor-pointer rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EC4007] focus-visible:ring-offset-2'
+                className='cursor-pointer rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2'
               >
                 <Image src={edit} alt='' />
               </button>
             </div>
           </div>
         )}
-        <div className='bg-[#E6FBFE] rounded-2xl border-[0.5px] border-solid border-[#83E9FB] px-6 py-4 flex justify-between items-center w-full my-12'>
-          <p className='text-[#221D1D] text-base not-italic font-normal leading-5 font-abeezee'>
+        <div className='bg-reader-panel rounded-2xl border-[0.5px] border-solid border-reader-panel-border px-6 py-4 flex justify-between items-center w-full my-12'>
+          <p className='text-strong text-base not-italic font-normal leading-5 font-abeezee'>
             Read story along with {voice}
           </p>
           <Switch
             checked={isChecked}
             onCheckedChange={() => setIsChecked(!isChecked)}
-            className='data-[state=checked]:bg-[#83E9FB] data-[state=unchecked]:bg-[#000] cursor-pointer'
+            className='data-[state=checked]:bg-[#83E9FB] data-[state=unchecked]:bg-black dark:data-[state=unchecked]:bg-line cursor-pointer'
           />
         </div>
         {isChecked && (
@@ -783,11 +783,11 @@ const StoryReader = ({
             storyFinished ? (
               <div className='space-y-6'>
                 <div className='text-center mb-6'>
-                  <h4 className='text-[#221D1D] text-lg font-bold mb-2'>
+                  <h4 className='text-strong text-lg font-bold mb-2'>
                     Question {currentQuestionIndex + 1} of{' '}
                     {story.questions.length}
                   </h4>
-                  <p className='text-[#4A413F] text-base font-abeezee'>
+                  <p className='text-body text-base font-abeezee'>
                     {currentQuestion?.question}
                   </p>
                 </div>
@@ -802,15 +802,13 @@ const StoryReader = ({
                         selectedAnswer === index
                           ? showAnswer
                             ? index === currentQuestion.correctOption
-                              ? 'border-green-500 bg-green-50'
-                              : 'border-red-500 bg-red-50'
-                            : 'border-[#83E9FB] bg-[#E6FBFE]'
+                              ? 'border-green-500 bg-green-50 dark:bg-green-950/50'
+                              : 'border-red-500 bg-red-50 dark:bg-red-950/50'
+                            : 'border-reader-panel-border bg-reader-panel'
                           : 'border-line-mid hover:border-line-light'
                       } ${showAnswer ? 'cursor-default' : 'cursor-pointer'}`}
                     >
-                      <span className='text-[#221D1D] font-abeezee'>
-                        {option}
-                      </span>
+                      <span className='text-strong font-abeezee'>{option}</span>
                       {showAnswer && selectedAnswer === index && (
                         <span className='ml-2 text-sm font-bold'>
                           {index === currentQuestion.correctOption
@@ -823,7 +821,7 @@ const StoryReader = ({
                 </div>
                 {showAnswer && (
                   <div className='text-center mt-6'>
-                    <p className='text-[#4A413F] font-abeezee mb-4'>
+                    <p className='text-body font-abeezee mb-4'>
                       {selectedAnswer === currentQuestion?.correctOption
                         ? 'Great job! You got it right!'
                         : `The correct answer is: ${
@@ -852,7 +850,7 @@ const StoryReader = ({
                           Next Question
                         </button>
                       ) : (
-                        <div className='text-[#4A413F] font-abeezee'>
+                        <div className='text-body font-abeezee'>
                           🎉 You've completed all questions!
                         </div>
                       )}
@@ -876,8 +874,8 @@ const StoryReader = ({
                         id={`reading-para-${i}`}
                         className={`text-lg not-italic font-normal leading-8 font-abeezee -mx-2 rounded-md px-2 transition-colors duration-300 ${
                           active
-                            ? 'bg-[#FFEFB8] font-medium text-[#221D1D]'
-                            : 'text-[#221D1D]'
+                            ? 'bg-reader-hl font-medium text-reader-hl-fg'
+                            : 'text-strong'
                         }`}
                       >
                         {para}
@@ -891,14 +889,14 @@ const StoryReader = ({
                               setAudioError(null);
                               setAudioRetry((n) => n + 1);
                             }}
-                            className='rounded-full border border-[#EC4007] px-3 py-1 text-xs font-semibold text-[#EC4007] transition hover:bg-[#EC4007]/5'
+                            className='rounded-full border border-brand px-3 py-1 text-xs font-semibold text-brand-text transition hover:bg-brand/5'
                           >
                             Retry
                           </button>
                         </span>
                       ) : null}
                       {!(paraReady || paraFailed) ? (
-                        <span className='mt-1 flex items-center gap-2 px-2 text-sm text-[#4A413F] font-abeezee'>
+                        <span className='mt-1 flex items-center gap-2 px-2 text-sm text-body font-abeezee'>
                           <span className='inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#83E9FB] border-t-transparent' />
                           Preparing audio…
                         </span>
@@ -913,7 +911,7 @@ const StoryReader = ({
                       <button
                         type='button'
                         onClick={() => setStoryFinished(true)}
-                        className='rounded-full bg-[#EC4007] px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90'
+                        className='rounded-full bg-brand px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90'
                       >
                         Finished reading — Take the quiz
                       </button>
@@ -929,7 +927,7 @@ const StoryReader = ({
           disabled={!audioUrl || audioLoading}
           aria-label={isPlaying ? 'Pause' : 'Play'}
           aria-pressed={isPlaying}
-          className={`mt-12 rounded-full transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EC4007] focus-visible:ring-offset-2 ${
+          className={`mt-12 rounded-full transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 ${
             !audioUrl || audioLoading
               ? 'opacity-50 cursor-not-allowed'
               : 'cursor-pointer'
@@ -946,7 +944,7 @@ const StoryReader = ({
                 setAudioError(null);
                 setAudioRetry((n) => n + 1);
               }}
-              className='rounded-full border border-[#EC4007] px-5 py-2 font-abeezee text-sm font-semibold text-[#EC4007] transition hover:bg-[#EC4007]/5'
+              className='rounded-full border border-brand px-5 py-2 font-abeezee text-sm font-semibold text-brand-text transition hover:bg-brand/5'
             >
               Try again
             </button>
@@ -963,7 +961,7 @@ const StoryReader = ({
                 type='button'
                 onClick={() => setStoryFinished(true)}
                 disabled={completion === 'saving'}
-                className='rounded-full border border-[#EC4007] px-6 py-3 font-abeezee text-sm font-semibold text-[#EC4007] transition hover:bg-[#EC4007]/5 disabled:opacity-60'
+                className='rounded-full border border-brand px-6 py-3 font-abeezee text-sm font-semibold text-brand-text transition hover:bg-brand/5 disabled:opacity-60'
               >
                 {completion === 'saving' ? 'Saving…' : 'Finish story'}
               </button>

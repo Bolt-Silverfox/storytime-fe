@@ -14,6 +14,7 @@ import {
 import { isUserLoggedIn } from '@/lib/services';
 import { cn } from '@/lib/utils';
 import { Logo } from './logo';
+import { ModeToggle } from './mode-toggle';
 import { buttonVariants } from './ui/button';
 import { ScrollProgress } from './ui/scroll-progress';
 
@@ -56,6 +57,7 @@ export function AppNavbar() {
           <Logo />
           <NavItems items={navItems} />
           <div className='flex items-center gap-4 relative'>
+            <ModeToggle />
             {loggedIn ? (
               <Link
                 href='/dashboard'
@@ -94,10 +96,13 @@ export function AppNavbar() {
         <MobileNav>
           <MobileNavHeader>
             <Logo />
-            <MobileNavToggle
-              isOpen={isMobileMenuOpen}
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            />
+            <div className='flex items-center gap-3'>
+              <ModeToggle />
+              <MobileNavToggle
+                isOpen={isMobileMenuOpen}
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              />
+            </div>
           </MobileNavHeader>
 
           <MobileNavMenu

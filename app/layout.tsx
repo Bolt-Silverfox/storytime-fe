@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { ABeeZee } from 'next/font/google';
 import './globals.css';
 import localFont from 'next/font/local';
@@ -44,6 +44,13 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#FAF4F2' },
+    { media: '(prefers-color-scheme: dark)', color: '#1A1514' },
+  ],
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -60,7 +67,7 @@ export default function RootLayout({
         </a>
         <ThemeProvider
           attribute='class'
-          defaultTheme='light'
+          defaultTheme='system'
           enableSystem
           disableTransitionOnChange
         >

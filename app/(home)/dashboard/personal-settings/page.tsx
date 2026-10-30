@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import BackButton from '@/components/back-button';
 import Header from '@/components/header';
 import KidsCard from '@/components/kids-card';
+import { ThemeSegmented } from '@/components/mode-toggle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Modal from '@/components/ui/modal';
@@ -375,6 +376,12 @@ const PersonalSettingsPage = () => {
             {kids.length} kids
           </p>
         </div>
+      </div>
+      <div className='mt-16'>
+        <h2 className='text-body text-base not-italic font-normal leading-5 font-abeezee mb-4 uppercase'>
+          Appearance
+        </h2>
+        <ThemeSegmented />
       </div>
       <div className='mt-16'>
         <h2 className='text-body text-base not-italic font-normal leading-5 font-abeezee mb-4 uppercase'>

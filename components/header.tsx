@@ -9,6 +9,7 @@ import arrow_down from '@/public/arrow-down.svg';
 import avatar from '@/public/avatar.svg';
 import heart from '@/public/heart.svg';
 import { Logo } from './logo';
+import { ModeToggle } from './mode-toggle';
 import ProfileDropdown from './ui/profile-dropdown';
 
 const Header = ({ white = false }: { white?: boolean }) => {
@@ -26,7 +27,8 @@ const Header = ({ white = false }: { white?: boolean }) => {
         >
           Good day! {user?.name}
         </h1>
-        <div className='flex items-center'>
+        <div className='flex items-center gap-3'>
+          <ModeToggle />
           <Link
             href='/favorites'
             aria-label='Favorites'

@@ -4,14 +4,11 @@ export const AuthFooter = () => {
   return (
     <footer className='max-w-[437px] mx-auto pt-4 text-center text-xs font-abeezee'>
       By accepting to continue, you agree to storytime's{' '}
-      <Link
-        href='/terms-and-conditions'
-        className='text-[#0731EC] hover:underline'
-      >
+      <Link href='/terms-and-conditions' className='text-link hover:underline'>
         Terms and Conditions
       </Link>{' '}
       and{' '}
-      <Link href='/privacy-policy' className='text-[#0731EC] hover:underline'>
+      <Link href='/privacy-policy' className='text-link hover:underline'>
         Privacy Policy
       </Link>
     </footer>

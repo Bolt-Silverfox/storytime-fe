@@ -91,21 +91,21 @@ export default async function StorySharePage({
   const age = story ? ageLabel(story) : null;
 
   return (
-    <main className='min-h-dvh bg-[#FFF8ED] text-[#1B1300]'>
+    <main className='min-h-dvh bg-cream text-ink'>
       {/* Header */}
       <header className='mx-auto flex max-w-3xl items-center justify-between px-6 py-5'>
         <div className='flex items-center gap-3'>
           <BackButton />
           <a
             href='/'
-            className='font-[family-name:var(--font-qilka)] text-2xl font-bold text-[#EC4007]'
+            className='font-[family-name:var(--font-qilka)] text-2xl font-bold text-brand-text'
           >
             Storytime
           </a>
         </div>
         <a
           href={APP_STORE_URL}
-          className='rounded-full bg-[#EC4007] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90'
+          className='rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90'
         >
           Get the app
         </a>
@@ -113,7 +113,7 @@ export default async function StorySharePage({
 
       <section className='mx-auto grid max-w-3xl gap-8 px-6 pb-16 pt-4'>
         {/* Cover */}
-        <div className='overflow-hidden rounded-3xl bg-[#FCE9CE] shadow-sm'>
+        <div className='overflow-hidden rounded-3xl bg-sand shadow-sm'>
           {cover ? (
             // eslint-disable-next-line @next/next/no-img-element -- remote Cloudinary host, avoids next.config image allowlist
             <img
@@ -131,16 +131,14 @@ export default async function StorySharePage({
         {/* Details */}
         <div className='grid gap-4'>
           {age && (
-            <span className='w-fit rounded-full bg-[#4807EC]/10 px-3 py-1 text-sm font-semibold text-[#4807EC]'>
+            <span className='w-fit rounded-full bg-blue/10 px-3 py-1 text-sm font-semibold text-blue'>
               {age}
             </span>
           )}
           <h1 className='font-[family-name:var(--font-qilka)] text-3xl font-bold leading-tight sm:text-4xl'>
             {title}
           </h1>
-          <p className='text-lg leading-relaxed text-[#5B4B33]'>
-            {description}
-          </p>
+          <p className='text-lg leading-relaxed text-sepia'>{description}</p>
         </div>
 
         {/* Read it here (guest) */}
@@ -151,19 +149,19 @@ export default async function StorySharePage({
           {story && <OpenInAppButton storyId={story.id} />}
           <a
             href={APP_STORE_URL}
-            className='flex items-center justify-center rounded-2xl border border-[#1B1300]/15 bg-white px-6 py-4 text-center text-base font-semibold transition hover:border-[#1B1300]/30'
+            className='flex items-center justify-center rounded-2xl border border-ink/15 bg-surface px-6 py-4 text-center text-base font-semibold transition hover:border-ink/30'
           >
             Download on the App Store
           </a>
           <a
             href={PLAY_STORE_URL}
-            className='flex items-center justify-center rounded-2xl border border-[#1B1300]/15 bg-white px-6 py-4 text-center text-base font-semibold transition hover:border-[#1B1300]/30'
+            className='flex items-center justify-center rounded-2xl border border-ink/15 bg-surface px-6 py-4 text-center text-base font-semibold transition hover:border-ink/30'
           >
             Get it on Google Play
           </a>
         </div>
 
-        <p className='text-center text-sm text-[#5B4B33]/70'>
+        <p className='text-center text-sm text-sepia/70'>
           Don&apos;t have the app yet? Install Storytime to read this story and
           hundreds more.
         </p>

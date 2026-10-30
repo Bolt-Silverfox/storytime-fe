@@ -38,10 +38,10 @@ const ModeSelector = ({
   return (
     <div className='flex flex-col justify-between h-[90%]'>
       <div className=''>
-        <h3 className='text-[#221D1D] text-xl not-italic font-normal leading-5 font-qilka'>
+        <h3 className='text-strong text-xl not-italic font-normal leading-5 font-qilka'>
           Choose story mode
         </h3>
-        <p className='text-[#4A413F] text-xs not-italic font-normal leading-4'>
+        <p className='text-body text-xs not-italic font-normal leading-4'>
           Select the type of story you want to read
         </p>
         <div
@@ -70,9 +70,7 @@ const ModeSelector = ({
       <button
         type='button'
         className={`w-full justify-self-end py-4 cursor-pointer hover:scale-105 transition-all duration-300 rounded-[3.125rem] font-semibold ${
-          selectedMode
-            ? 'bg-[#EC4007] text-white'
-            : 'bg-[#FEEAE6] text-[#FB9583]'
+          selectedMode ? 'bg-brand text-white' : 'bg-tint text-brand-soft'
         }`}
         disabled={!selectedMode}
         onClick={handleSetMode}

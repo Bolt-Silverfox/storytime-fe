@@ -112,10 +112,10 @@ const VerifyEmailPage = () => {
   return (
     <div className='max-w-[440px] mx-auto space-y-8'>
       <div className='space-y-1.5 text-center'>
-        <h1 className='font-qilka font-bold text-[26px] text-[#221D1D] dark:text-white'>
+        <h1 className='font-qilka font-bold text-[26px] text-strong'>
           Verify your email
         </h1>
-        <p className='text-[#4A413F] dark:text-white font-abeezee text-sm'>
+        <p className='text-body font-abeezee text-sm'>
           {phase === 'email'
             ? 'Enter your email and we’ll send you a verification code.'
             : email
@@ -156,7 +156,7 @@ const VerifyEmailPage = () => {
             <button
               type='button'
               onClick={() => setPhase('code')}
-              className='block mx-auto text-sm font-abeezee text-[#0731EC] hover:underline'
+              className='block mx-auto text-sm font-abeezee text-link hover:underline'
             >
               Already have a code? Enter it
             </button>
@@ -182,7 +182,7 @@ const VerifyEmailPage = () => {
             type='button'
             onClick={() => email && sendCode(email)}
             disabled={timeLeft > 0 || sending || !email}
-            className='py-2.5 px-6 rounded-[50px] mx-auto max-w-max bg-white border-[#FAF4F2] shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] border dark:bg-neutral-950 text-[#221D1D] dark:text-white'
+            className='py-2.5 px-6 rounded-[50px] mx-auto max-w-max bg-surface border-hairline-warm shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] border text-strong'
           >
             {timeLeft > 0
               ? `Resend in 0:${String(timeLeft).padStart(2, '0')}`
@@ -200,15 +200,15 @@ const VerifyEmailPage = () => {
           <button
             type='button'
             onClick={() => setPhase('email')}
-            className='block mx-auto text-sm font-abeezee text-[#0731EC] hover:underline'
+            className='block mx-auto text-sm font-abeezee text-link hover:underline'
           >
             Use a different email
           </button>
         </div>
       )}
 
-      <p className='text-center text-sm font-abeezee text-[#4A413F] dark:text-white'>
-        <Link href='/login' className='text-[#0731EC] hover:underline'>
+      <p className='text-center text-sm font-abeezee text-body'>
+        <Link href='/login' className='text-link hover:underline'>
           Back to login
         </Link>
       </p>

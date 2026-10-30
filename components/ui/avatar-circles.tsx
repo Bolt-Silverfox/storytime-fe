@@ -21,7 +21,7 @@ export const AvatarCircles = ({
       {avatarUrls.map((url) => (
         <img
           key={url.imageUrl}
-          className='md:size-[64px] size-[62px] rounded-full border-2 border-white dark:border-gray-800 relative transition-transform duration-200 hover:z-10 hover:scale-110'
+          className='md:size-[64px] size-[62px] rounded-full border-2 border-surface relative transition-transform duration-200 hover:z-10 hover:scale-110'
           src={url.imageUrl}
           width={40}
           height={40}
@@ -29,7 +29,7 @@ export const AvatarCircles = ({
         />
       ))}
       {(numPeople ?? 0) > 0 && (
-        <span className='flex md:size-[64px] size-[62px] items-center justify-center rounded-full border-2 border-white bg-black text-center text-xs font-medium text-white dark:border-gray-800 dark:bg-white dark:text-black'>
+        <span className='flex md:size-[64px] size-[62px] items-center justify-center rounded-full border-2 border-surface bg-black text-center text-xs font-medium text-white dark:bg-strong dark:text-page'>
           +{numPeople}
         </span>
       )}

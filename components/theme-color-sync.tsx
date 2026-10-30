@@ -1,0 +1,32 @@
+'use client';
+
+import { useTheme } from 'next-themes';
+import { useEffect } from 'react';
+
+const COLORS = { light: '#FAF4F2', dark: '#1A1514' } as const;
+
+/**
+ * The viewport `themeColor` metas follow the OS scheme via media queries. When
+ * the user picks Light or Dark explicitly, point both metas at that colour so
+ * the mobile browser bar matches; on System, restore the media-based originals.
+ */
+export function ThemeColorSync() {
+  const { theme } = useTheme();
+
+  useEffect(() => {
+    const metas = document.querySelectorAll<HTMLMetaElement>(
+      'meta[name="theme-color"]'
+    );
+    for (const meta of metas) {
+      if (meta.dataset.origContent === undefined) {
+        meta.dataset.origContent = meta.content;
+      }
+      meta.content =
+        theme === 'light' || theme === 'dark'
+          ? COLORS[theme]
+          : meta.dataset.origContent;
+    }
+  }, [theme]);
+
+  return null;
+}

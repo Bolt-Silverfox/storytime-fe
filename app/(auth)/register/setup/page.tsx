@@ -114,14 +114,14 @@ const Page = () => {
         <div className='space-y-[26px] flex flex-col items-center'>
           <div className='space-y-[26px] flex flex-col items-center'>
             <div className='space-y-1.5 text-center w-full'>
-              <p className="text-[26px] [font-feature-settings:'liga'_off,_'clig'_off] text-[#221D1D] text-center dark:text-white font-abeezee">
+              <p className="text-[26px] [font-feature-settings:'liga'_off,_'clig'_off] text-strong text-center font-abeezee">
                 Almost there {getFirstName(registrationData?.name)} 👏 🥳
               </p>
 
-              <p className='text-[#221D1D] dark:text-white text-[34px] font-bold font-qilka'>
+              <p className='text-strong text-[34px] font-bold font-qilka'>
                 Finalize your profile
               </p>
-              <p className='text-[#4A413F] dark:text-white font-abeezee'>
+              <p className='text-body font-abeezee'>
                 Complete setting up your profile information
               </p>
             </div>
@@ -134,7 +134,7 @@ const Page = () => {
               <h2 className='text-[26px] font-bold font-qilka'>
                 Complete your account
               </h2>
-              <p className='text-[#4A413F] font-abeezee'>
+              <p className='text-body font-abeezee'>
                 We would love to learn more about you
               </p>
             </div>
@@ -218,7 +218,7 @@ const Page = () => {
                     </Select>
                     <FormMessage
                       className={cn(
-                        'text-[#4A413F] ',
+                        'text-body ',
                         form.formState.errors.kids && 'text-destructive'
                       )}
                     >
@@ -233,7 +233,7 @@ const Page = () => {
                   href='/dashboard'
                   className={cn(
                     buttonVariants({ variant: 'outline' }),
-                    'w-full py-[15px] max-w-[115px] h-auto rounded-full border-[#EC4007] text-[#EC4007]'
+                    'w-full py-[15px] max-w-[115px] h-auto rounded-full border-brand text-brand-text'
                   )}
                   type='button'
                 >
@@ -253,7 +253,7 @@ const Page = () => {
               </div>
             </div>
           </div>
-          <div className='p-[42px] border-[#FAF4F2] border bg-white rounded-[29px] w-full'>
+          <div className='p-[42px] border-hairline-warm border bg-surface rounded-[29px] w-full'>
             {/* todo: fix logic */}
 
             {!isPartialFormValid ? (

@@ -9,10 +9,10 @@ const Page = () => {
         <InteractiveGridPattern width={150} height={150} />
 
         <div className='flex relative flex-col items-center gap-5 w-full'>
-          <h1 className='font-qilka font-bold text-[#221D1D] text-[59.8px] max-w-[926px] mx-auto text-center leading-[68px]'>
+          <h1 className='font-qilka font-bold text-strong text-[59.8px] max-w-[926px] mx-auto text-center leading-[68px]'>
             Terms and conditions
           </h1>
-          <p className='w-full max-w-[556px] text-lg text-[#4A413F] font-abeezee text-center'>
+          <p className='w-full max-w-[556px] text-lg text-body font-abeezee text-center'>
             Updated last 6/19/2025
           </p>
         </div>
@@ -25,11 +25,11 @@ const Page = () => {
                 key={`terms-${section.title}`}
                 className='flex flex-col items-start gap-3 w-full'
               >
-                <h2 className='w-full text-xl text-[#221D1D] font-bold font-qilka'>
+                <h2 className='w-full text-xl text-strong font-bold font-qilka'>
                   {section.title}
                 </h2>
 
-                <p className='w-full font-abeezee text-xl text-[#4A413F]'>
+                <p className='w-full font-abeezee text-xl text-body'>
                   {section.content}
                 </p>
 
@@ -38,7 +38,7 @@ const Page = () => {
                     {section.bulletPoints.map((point) => (
                       <li
                         key={point}
-                        className='w-full font-abeezee text-xl text-[#4A413F]'
+                        className='w-full font-abeezee text-xl text-body'
                       >
                         {point}
                       </li>

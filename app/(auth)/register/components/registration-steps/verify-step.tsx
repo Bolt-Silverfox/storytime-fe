@@ -92,10 +92,10 @@ export const VerifyStep = () => {
       >
         <div className='space-y-6'>
           <div className='space-y-1.5'>
-            <h1 className='text-center font-qilka font-bold text-[26px] text-[#221D1D] dark:text-white'>
+            <h1 className='text-center font-qilka font-bold text-[26px] text-strong'>
               Verify your email
             </h1>
-            <p className='text-center text-[#4A413F] dark:text-white font-abeezee'>
+            <p className='text-center text-body font-abeezee'>
               We have sent a special code to your registered email address{' '}
               {maskEmail(registrationData?.email || '')}.
             </p>
@@ -117,7 +117,7 @@ export const VerifyStep = () => {
                 </FormControl>
                 <div className=''>
                   <FormMessage />
-                  <p className='text-[#0731EC] font-abeezee text-end'>
+                  <p className='text-link font-abeezee text-end'>
                     {`0:${timeLeft < 10 ? `0${timeLeft}` : timeLeft}`}
                   </p>
                 </div>
@@ -130,7 +130,7 @@ export const VerifyStep = () => {
           type='button'
           onClick={handleResend}
           disabled={timeLeft > 0}
-          className='py-2.5 px-6 rounded-[50px] !mx-auto max-w-max bg-white border-[#FAF4F2] shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] border dark:bg-neutral-950 text-[#221D1D] dark:text-white'
+          className='py-2.5 px-6 rounded-[50px] !mx-auto max-w-max bg-surface border-hairline-warm shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] border text-strong'
         >
           Resend OTP
         </Button>

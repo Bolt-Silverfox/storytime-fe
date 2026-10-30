@@ -114,16 +114,16 @@ const KidPicker = ({
     <div>
       <div className='flex items-center justify-between mt-10'>
         <div className=''>
-          <h2 className='text-[#221D1D] text-xl not-italic font-bold leading-6 font-qilka'>
+          <h2 className='text-strong text-xl not-italic font-bold leading-6 font-qilka'>
             YOUR KIDS
           </h2>
-          <p className='text-[#4A413F] text-base not-italic font-normal leading-5'>
+          <p className='text-body text-base not-italic font-normal leading-5'>
             Select a child and start enjoying unlimited stories
           </p>
         </div>
         <button
           type='button'
-          className='bg-[#EC4007] text-white rounded-[3.12rem] py-3 px-6 font-abeezee text-base'
+          className='bg-brand text-white rounded-[3.12rem] py-3 px-6 font-abeezee text-base'
           onClick={() => setModalOpen(true)}
         >
           Add child
@@ -136,8 +136,8 @@ const KidPicker = ({
             className={`cursor-pointer transition-all duration-200 border-[0.5px] overflow-hidden rounded-2xl
         ${
           selectedKidId === kid.id
-            ? 'bg-[#EC4007] shadow-[0px_0px_0px_4px_rgba(236,64,7,0.15)] rounded-3xl border-[#F84020] text-white'
-            : 'bg-white shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] border-stone-100'
+            ? 'bg-brand shadow-[0px_0px_0px_4px_rgba(236,64,7,0.15)] rounded-3xl border-brand-edge text-white'
+            : 'bg-surface shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] border-hairline'
         }
       `}
             onClick={() => handleKidSelect(kid)}
@@ -148,7 +148,7 @@ const KidPicker = ({
               }
             }}
           >
-            <div className='w-full h-48 bg-gray-100 flex items-center justify-center'>
+            <div className='w-full h-48 bg-gray-100 dark:bg-sunken flex items-center justify-center'>
               <Image
                 src={kid.img}
                 alt={kid.name}
@@ -158,13 +158,13 @@ const KidPicker = ({
               />
             </div>
             <div className='p-6'>
-              <p className='text-[#EC4007] text-sm font-abeezee mb-1'>
+              <p className='text-brand-text text-sm font-abeezee mb-1'>
                 0 Stories completed
               </p>
-              <h3 className='text-[#221D1D] text-2xl font-bold font-qilka mb-1'>
+              <h3 className='text-strong text-2xl font-bold font-qilka mb-1'>
                 {kid.name}
               </h3>
-              <p className='text-[#221D1D] text-base font-abeezee'>{kid.age}</p>
+              <p className='text-strong text-base font-abeezee'>{kid.age}</p>
             </div>
           </div>
         ))}
@@ -178,12 +178,12 @@ const KidPicker = ({
         <div className='flex flex-col gap-6 min-h-[80vh] justify-between'>
           <div>
             <div className='mb-6 mt-2'>
-              <p className='mb-2 text-[#4A413F] text-sm font-abeezee'>
+              <p className='mb-2 text-body text-sm font-abeezee'>
                 Choose an avatar
               </p>
               <div className='flex flex-wrap gap-3'>
                 {systemAvatars.length === 0 ? (
-                  <p className='text-[#4A413F] text-sm font-abeezee'>
+                  <p className='text-body text-sm font-abeezee'>
                     Loading avatars…
                   </p>
                 ) : (
@@ -205,7 +205,7 @@ const KidPicker = ({
                         }
                         className={`h-16 w-16 overflow-hidden rounded-full border-2 transition ${
                           isSelected
-                            ? 'border-[#EC4007]'
+                            ? 'border-brand'
                             : 'border-transparent hover:border-[#F8C6B8]'
                         }`}
                       >
@@ -223,7 +223,7 @@ const KidPicker = ({
 
             <label
               htmlFor='kid-name'
-              className='block mb-1 text-[#4A413F] text-sm font-abeezee'
+              className='block mb-1 text-body text-sm font-abeezee'
             >
               Name
             </label>
@@ -239,7 +239,7 @@ const KidPicker = ({
             <div className='mt-6'>
               <label
                 htmlFor='kid-age'
-                className='block mb-1 text-[#4A413F] text-sm font-abeezee'
+                className='block mb-1 text-body text-sm font-abeezee'
               >
                 Age
               </label>
@@ -264,14 +264,14 @@ const KidPicker = ({
           <div className='flex justify-between gap-4 mt-8'>
             <button
               type='button'
-              className='w-1/2 border border-[#EC4007] text-[#EC4007] hover:bg-[#FEEAE6] rounded-full py-4 font-abeezee text-base'
+              className='w-1/2 border border-brand text-brand-text hover:bg-tint rounded-full py-4 font-abeezee text-base'
               onClick={() => setModalOpen(false)}
             >
               Close
             </button>
             <button
               type='submit'
-              className='w-1/2 bg-[#EC4007] text-white rounded-full py-4 font-abeezee text-base'
+              className='w-1/2 bg-brand text-white rounded-full py-4 font-abeezee text-base'
               disabled={formLoading}
               onClick={handleAddChild}
             >

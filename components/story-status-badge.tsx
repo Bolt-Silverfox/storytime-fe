@@ -18,8 +18,8 @@ const StoryStatusBadge = ({
   const isDone = status === 'done';
   const label = isDone ? 'Done' : 'Reading';
   const colors = isDone
-    ? 'bg-green-100 text-green-700'
-    : 'bg-[#FFEFB8] text-[#8A5A00]';
+    ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+    : 'bg-[#FFEFB8] text-[#8A5A00] dark:bg-reader-hl dark:text-[#E8C26A]';
 
   return (
     <span

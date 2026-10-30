@@ -49,7 +49,7 @@ const StoryCard = ({
           }
         }
       }}
-      className='border border-stone-100 shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] rounded-3xl border-solid hover:scale-105 transition-all duration-300 cursor-pointer relative'
+      className='border border-hairline shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] rounded-3xl border-solid hover:scale-105 transition-all duration-300 cursor-pointer relative'
     >
       <CategoryImage
         src={img}
@@ -75,13 +75,13 @@ const StoryCard = ({
         />
       )}
       <div className='p-6'>
-        <h3 className='text-[#221D1D] text-xl not-italic font-bold leading-6 font-qilka'>
+        <h3 className='text-strong text-xl not-italic font-bold leading-6 font-qilka'>
           {title}
         </h3>
-        <p className='text-[#4A413F] text-base not-italic font-normal leading-5 mt-1.5 font-abeezee'>
+        <p className='text-body text-base not-italic font-normal leading-5 mt-1.5 font-abeezee'>
           {desc}
         </p>
-        {/* <p className='text-[#4A413F] text-xs not-italic font-normal leading-4 mt-6 font-abeezee'>
+        {/* <p className='text-body text-xs not-italic font-normal leading-4 mt-6 font-abeezee'>
           Written by: {author}
         </p> */}
       </div>

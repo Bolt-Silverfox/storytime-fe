@@ -26,7 +26,7 @@ export const KidsInformationCard = ({ index }: KidsInformationCardProps) => {
   });
 
   return (
-    <div className='p-6 rounded-[23px] border-[#F5F5F4] space-y-5 bg-white shadow-[0_0_17px_0_#221D29]/5'>
+    <div className='p-6 rounded-[23px] border-hairline space-y-5 bg-surface shadow-[0_0_17px_0_#221D29]/5'>
       <KidsAvatarSheet
         avatar={avatar}
         setAvatar={(newAvatar) =>

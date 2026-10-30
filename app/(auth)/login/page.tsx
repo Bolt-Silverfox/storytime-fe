@@ -96,17 +96,15 @@ const Page = () => {
       <div className='space-y-[26px] flex flex-col items-center'>
         <div className='space-y-1.5 text-center w-full'>
           <div className='relative'>
-            <p className="text-[26px] [font-feature-settings:'liga'_off,_'clig'_off] text-[#221D1D] text-center dark:text-white font-abeezee">
+            <p className="text-[26px] [font-feature-settings:'liga'_off,_'clig'_off] text-strong text-center font-abeezee">
               Hello! 👋 🥰
             </p>
             <div />
           </div>
-          <p className='text-[#221D1D] dark:text-white text-[34px] font-bold font-qilka'>
+          <p className='text-strong text-[34px] font-bold font-qilka'>
             Welcome back
           </p>
-          <p className='text-[#4A413F] dark:text-white font-abeezee'>
-            Glad to have you back
-          </p>
+          <p className='text-body font-abeezee'>Glad to have you back</p>
         </div>
       </div>
       <Form {...form}>
@@ -115,7 +113,7 @@ const Page = () => {
           className='max-w-[539px] mx-auto space-y-10'
         >
           <div className='space-y-6'>
-            <h1 className='text-center font-qilka font-bold text-[26px] text-[#221D1D] dark:text-white'>
+            <h1 className='text-center font-qilka font-bold text-[26px] text-strong'>
               Provide your details
             </h1>
 
@@ -160,7 +158,7 @@ const Page = () => {
                   </FormControl>
                   <FormMessage
                     className={cn(
-                      'text-[#4A413F]',
+                      'text-body',
                       form.formState.errors.password && 'text-destructive'
                     )}
                   >
@@ -171,7 +169,7 @@ const Page = () => {
             />
             <Link
               href='/forgot-password'
-              className='text-[#0731EC] hover:underline text-end block font-abeezee'
+              className='text-link hover:underline text-end block font-abeezee'
             >
               Forgot password?
             </Link>
@@ -187,13 +185,13 @@ const Page = () => {
 
           <OAuthButtons mode='login' />
 
-          <p className='font-abeezee text-[#221D1D] dark:text-white text-center space-x-3'>
+          <p className='font-abeezee text-strong text-center space-x-3'>
             Don't have an account?{' '}
-            <Link href='/register' className='text-[#0731EC] hover:underline'>
+            <Link href='/register' className='text-link hover:underline'>
               Register
             </Link>
           </p>
-          <p className='font-abeezee text-[#221D1D] dark:text-white text-center'>
+          <p className='font-abeezee text-strong text-center'>
             Need to verify your email?{' '}
             <Link
               href={
@@ -201,7 +199,7 @@ const Page = () => {
                   ? `/verify-email?email=${encodeURIComponent(form.watch('email'))}`
                   : '/verify-email'
               }
-              className='text-[#0731EC] hover:underline'
+              className='text-link hover:underline'
             >
               Verify here
             </Link>

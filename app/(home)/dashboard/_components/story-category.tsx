@@ -80,11 +80,13 @@ const StoryCategory = () => {
 
   return (
     <div className='mt-[5.25rem]'>
-      <h2 className='text-[#4A413F] text-base not-italic font-normal leading-5 font-abeezee mb-4'>
+      <h2 className='text-body text-base not-italic font-normal leading-5 font-abeezee mb-4'>
         STORIES BY CATEGORIES
       </h2>
       {loading ? (
-        <div className='text-center text-gray-400'>Loading...</div>
+        <div className='text-center text-gray-400 dark:text-subtle'>
+          Loading...
+        </div>
       ) : error ? (
         <div className='text-center text-red-500'>{error}</div>
       ) : (

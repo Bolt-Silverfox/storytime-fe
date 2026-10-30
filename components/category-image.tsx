@@ -26,7 +26,7 @@ const CategoryImageFallback = ({
   return (
     <div
       className={cn(
-        'flex items-center justify-center bg-gradient-to-br from-[#FCE9CE] to-[#FDEEE9]',
+        'flex items-center justify-center bg-gradient-to-br from-sand to-[#FDEEE9] dark:to-tint',
         className
       )}
     >
@@ -35,7 +35,7 @@ const CategoryImageFallback = ({
           📚
         </span>
         {label ? (
-          <span className='font-qilka text-sm font-bold leading-5 text-[#221D1D] line-clamp-2'>
+          <span className='font-qilka text-sm font-bold leading-5 text-strong line-clamp-2'>
             {label}
           </span>
         ) : null}

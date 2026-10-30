@@ -17,10 +17,10 @@ const Page = () => {
         />
         <div className='space-y-[26px] flex flex-col items-center'>
           <div className='space-y-1.5 text-center w-full'>
-            <p className='text-[#221D1D] dark:text-white text-[34px] font-bold font-qilka'>
+            <p className='text-strong text-[34px] font-bold font-qilka'>
               Account created successfully
             </p>
-            <p className='text-[#4A413F] dark:text-white font-abeezee'>
+            <p className='text-body font-abeezee'>
               Glad to have you on-board. You can now give your kids their
               favorite memorable moments any time. below
             </p>

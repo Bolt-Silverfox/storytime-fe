@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { ABeeZee } from 'next/font/google';
 import './globals.css';
 import localFont from 'next/font/local';
+import { ThemeColorSync } from '@/components/theme-color-sync';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { cn } from '@/lib/utils';
@@ -71,6 +72,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <ThemeColorSync />
           <Providers>{children}</Providers>
           <Toaster />
         </ThemeProvider>

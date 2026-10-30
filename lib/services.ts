@@ -1510,6 +1510,58 @@ export const startStoryAudioBatchService = async (
   }
 };
 
+// Guest variant of the batch TTS start. Same response shape as the authed
+// endpoint, so the reader reuses its playback code. The backend always uses the
+// default voice for guests (any voiceId is ignored), so none is sent. The guest
+// must already have opened the story (GET guest/stories/:id), which records the
+// access that authorizes generation; the session id travels in the
+// X-Guest-Session-Id header added by the axios interceptor.
+export const startGuestStoryAudioBatchService = async (
+  storyId: string
+): Promise<StoryAudioBatch> => {
+  try {
+    const response = await api.post(`guest/stories/${storyId}/audio`, {});
+    return normalizeAudioBatch(response.data);
+  } catch (error: unknown) {
+    if (error instanceof AxiosError && error.response) {
+      throw {
+        message: error.response.data?.message || 'Failed to start story audio',
+        status: error.response.status,
+        data: error.response.data,
+      };
+    }
+    throw {
+      message: error instanceof Error ? error.message : 'Unexpected error',
+      status: null,
+    };
+  }
+};
+
+// Poll a running guest batch for newly completed paragraphs.
+export const getGuestStoryAudioBatchStatusService = async (
+  storyId: string,
+  batchJobId: string
+): Promise<StoryAudioBatch> => {
+  try {
+    const response = await api.get(
+      `guest/stories/${storyId}/audio/${batchJobId}`
+    );
+    return normalizeAudioBatch(response.data);
+  } catch (error: unknown) {
+    if (error instanceof AxiosError && error.response) {
+      throw {
+        message: error.response.data?.message || 'Failed to fetch audio status',
+        status: error.response.status,
+        data: error.response.data,
+      };
+    }
+    throw {
+      message: error instanceof Error ? error.message : 'Unexpected error',
+      status: null,
+    };
+  }
+};
+
 // Poll a running batch for newly completed paragraphs.
 export const getStoryAudioBatchStatusService = async (
   batchJobId: string

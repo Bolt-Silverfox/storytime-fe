@@ -6,12 +6,14 @@ import { ensureGuestSession } from '@/lib/guest';
 import { STORY_QUOTA_QUERY_KEY } from '@/lib/hooks/use-story-quota';
 import { markDone, markReading } from '@/lib/progress-store';
 import {
+  getGuestStoryAudioBatchStatusService,
   getGuestStoryService,
   getStoryAudioBatchStatusService,
   getStoryByIdService,
   recordUserProgressService,
   type StoryAudioBatch,
   type StoryAudioParagraph,
+  startGuestStoryAudioBatchService,
   startStoryAudioBatchService,
 } from '@/lib/services';
 import edit from '@/public/edit.svg';
@@ -99,6 +101,10 @@ const StoryReader = ({
   const [error, setError] = useState<string | null>(null);
   const [quotaReached, setQuotaReached] = useState(false);
   const [guestAudioUrl, setGuestAudioUrl] = useState<string | null>(null);
+  // True once the guest story GET succeeded. That call records the guest's
+  // access, which is what authorizes per-paragraph audio generation, so the
+  // guest audio batch must not start before it.
+  const [guestStoryReady, setGuestStoryReady] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showAnswer, setShowAnswer] = useState(false);
@@ -160,6 +166,7 @@ const StoryReader = ({
       setLoading(true);
       setError(null);
       setQuotaReached(false);
+      setGuestStoryReady(false);
       setStoryFinished(false);
       setCompletion('idle');
       try {
@@ -168,6 +175,7 @@ const StoryReader = ({
           const guestStory = await getGuestStoryService(storyId);
           setStory(guestStory as unknown as Story);
           setGuestAudioUrl(guestStory.audioUrl ?? null);
+          setGuestStoryReady(true);
         } else {
           const storyData = await getStoryByIdService(storyId);
           setStory(storyData);
@@ -201,19 +209,20 @@ const StoryReader = ({
         return;
       }
 
-      // Guests get a single pre-generated narration clip from the guest story
-      // endpoint; the authenticated batch TTS endpoint is not available to them.
-      if (isGuest) {
-        if (guestAudioUrl) {
-          setAudioError(null);
-          playlistRef.current = [guestAudioUrl];
-          clipIndexRef.current = 0;
-          setAudioUrl(guestAudioUrl);
-        } else {
-          setAudioError(
-            'Audio is still being prepared. Please try again shortly.'
-          );
-        }
+      // A story with a stored narration file keeps the single-clip path for
+      // guests, so nothing regresses where `audioUrl` is populated.
+      if (isGuest && guestAudioUrl) {
+        setAudioError(null);
+        playlistRef.current = [guestAudioUrl];
+        clipIndexRef.current = 0;
+        setAudioUrl(guestAudioUrl);
+        return;
+      }
+
+      // Otherwise guests use the same per-paragraph batch flow as signed-in
+      // users, via the guest endpoints (default voice only, enforced by the
+      // backend). Wait until the guest story has loaded (access recorded).
+      if (isGuest && !guestStoryReady) {
         return;
       }
 
@@ -237,6 +246,19 @@ const StoryReader = ({
       // ready audio URLs (the status endpoint reports these cumulatively).
       const textByIndex = new Map<number, string>();
       const readyByIndex = new Map<number, string>();
+      // Latest paragraph list built by applyBatch, so a failed poll can mark
+      // the still-pending paragraphs as failed (retryable) without discarding
+      // the ones that already have playable audio.
+      let latestParagraphs: StoryAudioParagraph[] = [];
+
+      // Release an auto-advance that was waiting for a clip that will never
+      // arrive, so playback doesn't sit "playing" with nothing to play.
+      const releaseWaiting = () => {
+        if (waitingForNextRef.current) {
+          waitingForNextRef.current = false;
+          setIsPlaying(false);
+        }
+      };
 
       // Fold a batch snapshot into playable state. Enables playback as soon as
       // the first paragraph is ready and, if auto-advance is waiting, resumes.
@@ -288,6 +310,7 @@ const StoryReader = ({
             text: textByIndex.get(i),
           });
         }
+        latestParagraphs = paras;
         setAudioParagraphs(paras);
         setFailedIndices(failed);
 
@@ -312,16 +335,22 @@ const StoryReader = ({
           setAudioUrl(playlist[next]);
         }
 
+        // Still waiting, but the paragraph we're waiting on has failed: it will
+        // never arrive, so surface the retry instead of stalling.
+        if (waitingForNextRef.current && failed.has(clipIndexRef.current + 1)) {
+          releaseWaiting();
+          setAudioError('Some of the audio couldn’t be prepared.');
+        }
+
         const stillGenerating = accounted < total;
         setAudioGenerating(stillGenerating);
         return { playlist, accounted, total, failedSize: failed.size };
       };
 
       try {
-        const initial = await startStoryAudioBatchService(
-          storyId,
-          voiceId ?? undefined
-        );
+        const initial = isGuest
+          ? await startGuestStoryAudioBatchService(storyId)
+          : await startStoryAudioBatchService(storyId, voiceId ?? undefined);
         if (cancelled) {
           return;
         }
@@ -330,23 +359,28 @@ const StoryReader = ({
         // Keep polling in the background for the remaining paragraphs. Playback
         // is already possible off the eager clips while this runs.
         let attempts = 0;
+        let terminal =
+          initial.status === 'failed' || initial.status === 'completed';
         while (
-          !cancelled &&
+          !(cancelled || terminal) &&
           initial.batchJobId &&
           snap.accounted < snap.total &&
           attempts < 60
         ) {
           await new Promise((resolve) => setTimeout(resolve, 2000));
           attempts += 1;
-          const batch = await getStoryAudioBatchStatusService(
-            initial.batchJobId
-          );
+          const batch = isGuest
+            ? await getGuestStoryAudioBatchStatusService(
+                storyId,
+                initial.batchJobId
+              )
+            : await getStoryAudioBatchStatusService(initial.batchJobId);
           if (cancelled) {
             return;
           }
           snap = applyBatch(batch);
           if (batch.status === 'failed' || batch.status === 'completed') {
-            break;
+            terminal = true;
           }
         }
         if (cancelled) {
@@ -356,6 +390,20 @@ const StoryReader = ({
         // Real failure ONLY when nothing at all is playable AND something failed.
         if (snap.playlist.length === 0 && snap.failedSize > 0) {
           setAudioError('We couldn’t prepare the audio for this story.');
+          releaseWaiting();
+          setAudioGenerating(false);
+        } else if (snap.accounted < snap.total) {
+          // The poll loop has exited (terminal status, poll limit reached or no
+          // batch to poll) with paragraphs never delivered: nothing more will
+          // arrive, so mark them failed (ref first — handleEnded
+          // reads it), release any waiting auto-advance and offer a retry.
+          const missing = new Set(
+            latestParagraphs.filter((p) => !p.audioUrl).map((p) => p.index)
+          );
+          failedIndicesRef.current = missing;
+          setFailedIndices(missing);
+          releaseWaiting();
+          setAudioError('Some of the audio couldn’t be prepared.');
           setAudioGenerating(false);
         } else if (snap.accounted >= snap.total) {
           // Everything accounted for (ready and/or failed) — stop the spinner.
@@ -366,7 +414,21 @@ const StoryReader = ({
           return;
         }
         console.error('Failed to fetch audio:', error);
-        setAudioError('Failed to load audio');
+        // A failed start/poll (e.g. a guest 429) must not leave the calm
+        // "Preparing audio…" indicator spinning forever next to the error.
+        setAudioGenerating(false);
+        const failedOnError = new Set(
+          latestParagraphs.filter((p) => !p.audioUrl).map((p) => p.index)
+        );
+        // Keep the ref in sync: handleEnded reads it, not the state.
+        failedIndicesRef.current = failedOnError;
+        setFailedIndices(failedOnError);
+        releaseWaiting();
+        setAudioError(
+          isGuest && (error as { status?: number | null })?.status === 429
+            ? 'Audio is busy right now. Please try again in a minute.'
+            : 'Failed to load audio'
+        );
       } finally {
         if (!cancelled) {
           setAudioLoading(false);
@@ -378,7 +440,7 @@ const StoryReader = ({
     return () => {
       cancelled = true;
     };
-  }, [storyId, isGuest, voiceId, guestAudioUrl, audioRetry]);
+  }, [storyId, isGuest, voiceId, guestAudioUrl, guestStoryReady, audioRetry]);
 
   // Keep a ref of isPlaying so the audio-element listeners (mounted once) can
   // read the latest value without stale closures.

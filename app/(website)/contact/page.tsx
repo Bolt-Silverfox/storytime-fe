@@ -137,7 +137,7 @@ const Page = () => {
                     <Input
                       {...field}
                       placeholder='Enter your full name'
-                      className='mt-2 bg-surface border-hairline focus:border-brand-edge focus:ring-brand-edge'
+                      className='mt-2 bg-surface border-field-soft focus:border-brand-edge focus:ring-brand-edge'
                     />
                   </FormControl>
                   <FormMessage />
@@ -156,7 +156,7 @@ const Page = () => {
                       {...field}
                       type='email'
                       placeholder='Enter your email'
-                      className='mt-2 bg-surface border-hairline focus:border-brand-edge focus:ring-brand-edge'
+                      className='mt-2 bg-surface border-field-soft focus:border-brand-edge focus:ring-brand-edge'
                     />
                   </FormControl>
                   <FormMessage />
@@ -176,7 +176,7 @@ const Page = () => {
                     <Input
                       {...field}
                       placeholder='Enter message subject'
-                      className='mt-2 bg-surface border-hairline focus:border-brand-edge focus:ring-brand-edge'
+                      className='mt-2 bg-surface border-field-soft focus:border-brand-edge focus:ring-brand-edge'
                     />
                   </FormControl>
                   <FormMessage />
@@ -193,7 +193,7 @@ const Page = () => {
                     <Textarea
                       {...field}
                       placeholder='Type your message'
-                      className='bg-surface border-hairline focus:border-brand-edge focus:ring-brand-edge min-h-[120px]'
+                      className='bg-surface border-field-soft focus:border-brand-edge focus:ring-brand-edge min-h-[120px]'
                     />
                   </FormControl>
                   <FormMessage />

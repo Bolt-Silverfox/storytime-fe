@@ -294,10 +294,10 @@ export default function Home() {
                 className='md:max-w-[301px] px-5 space-y-3 bg-transparent border-none shadow-none'
               >
                 <CardContent className='flex  flex-col items-start gap-3 relative self-stretch w-full p-0'>
-                  <h3 className='text-[26px] font-bold text-strong font-qilka'>
+                  <h3 className='text-[26px] font-bold text-[#221D1D] font-qilka'>
                     {feature.title}
                   </h3>
-                  <p className='text-xl font-abeezee text-body'>
+                  <p className='text-xl font-abeezee text-[#4A413F]'>
                     {feature.description}
                   </p>
                 </CardContent>

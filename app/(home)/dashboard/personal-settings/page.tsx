@@ -518,7 +518,7 @@ const PersonalSettingsPage = () => {
               <button
                 key={option.id}
                 type='button'
-                className='flex items-center gap-2.5 rounded-2xl border border-hairline-warm bg-surface p-6 w-full hover:border-brand-soft'
+                className='flex items-center gap-2.5 rounded-2xl border border-field-warm bg-surface p-6 w-full hover:border-brand-soft'
                 onClick={() => handleSelectSystemAvatar(option.id)}
               >
                 <Image
@@ -665,10 +665,10 @@ const PersonalSettingsPage = () => {
                       key={option.id}
                       type='button'
                       aria-pressed={kidForm.avatarId === option.id}
-                      className={`flex items-center gap-2.5 rounded-2xl border border-hairline-warm bg-surface p-6 shadow-[0_0_17px_0_#221D29]/5 w-full ${
+                      className={`flex items-center gap-2.5 rounded-2xl border bg-surface p-6 shadow-[0_0_17px_0_#221D29]/5 w-full ${
                         kidForm.avatarId === option.id
                           ? 'border-brand-soft ring-2 ring-brand-soft/50'
-                          : ''
+                          : 'border-field-warm'
                       }`}
                       onClick={() => {
                         setKidForm((prev) => ({
@@ -694,7 +694,7 @@ const PersonalSettingsPage = () => {
                         className={`ml-auto h-4 w-4 shrink-0 rounded-full border-2 ${
                           kidForm.avatarId === option.id
                             ? 'border-brand-soft bg-brand-soft'
-                            : 'border-line-light'
+                            : 'border-field-light'
                         }`}
                       />
                     </button>

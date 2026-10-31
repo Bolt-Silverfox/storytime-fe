@@ -100,7 +100,7 @@ const VoiceSetupPage = () => {
                 className={`flex flex-1 items-center gap-3 rounded-2xl border bg-surface p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
                   active
                     ? 'border-brand ring-2 ring-brand/40'
-                    : 'border-hairline-warm'
+                    : 'border-field-warm'
                 }`}
               >
                 {voice.voiceAvatar ? (
@@ -121,7 +121,7 @@ const VoiceSetupPage = () => {
                 <span
                   aria-hidden='true'
                   className={`h-4 w-4 shrink-0 rounded-full border-2 ${
-                    active ? 'border-brand bg-brand' : 'border-line-light'
+                    active ? 'border-brand bg-brand' : 'border-field-light'
                   }`}
                 />
               </button>

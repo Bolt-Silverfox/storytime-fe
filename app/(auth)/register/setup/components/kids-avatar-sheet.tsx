@@ -158,7 +158,7 @@ export const KidsAvatarSheet = ({
                     >
                       {avatarOptions.map((option) => (
                         <FormItem key={option.avatar}>
-                          <FormLabel className='w-full cursor-pointer flex items-center justify-between gap-3 rounded-2xl border border-hairline-warm bg-surface p-6 shadow-[0_0_17px_0_#221D29]/5 [&:has(>button[data-state=checked])]:border-brand-soft [&:has(>button[data-state=checked])]:ring-2 [&:has(>button[data-state=checked])]:ring-brand-soft/50'>
+                          <FormLabel className='w-full cursor-pointer flex items-center justify-between gap-3 rounded-2xl border border-field-warm bg-surface p-6 shadow-[0_0_17px_0_#221D29]/5 [&:has(>button[data-state=checked])]:border-brand-soft [&:has(>button[data-state=checked])]:ring-2 [&:has(>button[data-state=checked])]:ring-brand-soft/50'>
                             <div className='flex items-center gap-2.5'>
                               <Image
                                 src={option.avatar}
@@ -192,7 +192,7 @@ export const KidsAvatarSheet = ({
                               <FormItem>
                                 <FormLabel
                                   htmlFor={file.id}
-                                  className='w-full cursor-pointer flex items-center justify-between gap-3 rounded-2xl border border-hairline-warm bg-surface p-6 shadow-[0_0_17px_0_#221D29]/5 [&:has(>button[data-state=checked])]:border-brand-soft [&:has(>button[data-state=checked])]:ring-2 [&:has(>button[data-state=checked])]:ring-brand-soft/50'
+                                  className='w-full cursor-pointer flex items-center justify-between gap-3 rounded-2xl border border-field-warm bg-surface p-6 shadow-[0_0_17px_0_#221D29]/5 [&:has(>button[data-state=checked])]:border-brand-soft [&:has(>button[data-state=checked])]:ring-2 [&:has(>button[data-state=checked])]:ring-brand-soft/50'
                                 >
                                   <div className='flex items-center gap-2.5'>
                                     {file.status === 'pending' && (

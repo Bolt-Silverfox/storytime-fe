@@ -27,6 +27,9 @@
   --color-line-mid: var(--line-mid);
   --color-line-hover: var(--line-hover);
   --color-field: var(--field);
+  --color-field-soft: var(--field-soft);
+  --color-field-warm: var(--field-warm);
+  --color-field-light: var(--field-light);
   --color-brand: var(--brand);
   --color-brand-edge: var(--brand-edge);
   --color-brand-text: var(--brand-text);
@@ -129,6 +132,9 @@
   --line-mid: #e7e5e4;
   --line-hover: #d1d5dc;
   --field: #4a413f;
+  --field-soft: #f5f5f4;
+  --field-warm: #faf4f2;
+  --field-light: #d9d9d9;
   --brand: #ec4007;
   --brand-edge: #f84020;
   --brand-text: #ec4007;
@@ -196,6 +202,9 @@
   --line-mid: #3a302d;
   --line-hover: #6e625d;
   --field: #766a65;
+  --field-soft: #766a65;
+  --field-warm: #766a65;
+  --field-light: #766a65;
   --brand: #ec4007;
   --brand-edge: #f84020;
   --brand-text: #ff6b3d;

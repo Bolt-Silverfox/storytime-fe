@@ -84,6 +84,9 @@ export function ThemeSegmented() {
             tabIndex={active ? 0 : -1}
             onClick={() => setTheme(value)}
             onKeyDown={(e) => {
+              if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) {
+                return;
+              }
               const rtl = getComputedStyle(e.currentTarget).direction === 'rtl';
               const last = THEME_OPTIONS.length - 1;
               let target = -1;

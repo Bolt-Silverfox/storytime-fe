@@ -16,7 +16,20 @@ const COLORS = { light: '#FAF4F2', dark: '#1A1514' } as const;
  * does not see, so it cannot loop.
  */
 export function ThemeColorSync() {
-  const { theme } = useTheme();
+  const { theme, setTheme } = useTheme();
+
+  // A stale/unknown stored value (e.g. localStorage.theme='bogus') would leave
+  // the page unthemed while the controls claim System; normalise it.
+  useEffect(() => {
+    if (
+      theme !== undefined &&
+      theme !== 'light' &&
+      theme !== 'dark' &&
+      theme !== 'system'
+    ) {
+      setTheme('system');
+    }
+  }, [theme, setTheme]);
 
   useEffect(() => {
     const apply = () => {

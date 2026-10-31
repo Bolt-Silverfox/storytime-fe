@@ -60,7 +60,12 @@ export function ThemeSegmented() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  const current = mounted ? (theme ?? 'system') : 'system';
+  const stored = mounted ? (theme ?? 'system') : 'system';
+  // Unknown stored values (e.g. a stale localStorage entry) fall back to System
+  // so one radio is always tabbable.
+  const current = THEME_OPTIONS.some((o) => o.value === stored)
+    ? stored
+    : 'system';
 
   return (
     <div
@@ -79,20 +84,25 @@ export function ThemeSegmented() {
             tabIndex={active ? 0 : -1}
             onClick={() => setTheme(value)}
             onKeyDown={(e) => {
-              const step =
-                e.key === 'ArrowRight' || e.key === 'ArrowDown'
-                  ? 1
-                  : e.key === 'ArrowLeft' || e.key === 'ArrowUp'
-                    ? -1
-                    : 0;
-              if (!step) {
+              const rtl = getComputedStyle(e.currentTarget).direction === 'rtl';
+              const last = THEME_OPTIONS.length - 1;
+              let target = -1;
+              if (e.key === 'Home') {
+                target = 0;
+              } else if (e.key === 'End') {
+                target = last;
+              } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                const step = e.key === 'ArrowDown' ? 1 : -1;
+                target = (index + step + last + 1) % (last + 1);
+              } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                const step = (e.key === 'ArrowRight') !== rtl ? 1 : -1;
+                target = (index + step + last + 1) % (last + 1);
+              }
+              if (target < 0) {
                 return;
               }
               e.preventDefault();
-              const next =
-                THEME_OPTIONS[
-                  (index + step + THEME_OPTIONS.length) % THEME_OPTIONS.length
-                ];
+              const next = THEME_OPTIONS[target];
               setTheme(next.value);
               const buttons =
                 e.currentTarget.parentElement?.querySelectorAll('button');

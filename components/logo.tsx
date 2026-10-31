@@ -23,7 +23,6 @@ export const Logo = ({ href = '/' }: { href?: string }) => {
         aria-hidden='true'
         width={140}
         height={24}
-        priority
         draggable={false}
         className='hidden dark:block'
       />

@@ -72,4 +72,15 @@ describe('AppNavbar auth state', () => {
       '<noscript><style>.auth-pending{visibility:visible!important}</style></noscript>'
     );
   });
+
+  it('reserves the guest-button width in the slot so the theme toggle never shifts', () => {
+    // jsdom has no layout; measured in a real browser (toggle x identical for
+    // unknown, guest and signed-in). This guards the class that does it.
+    for (const cookie of [null, 'refreshToken=r; path=/']) {
+      if (cookie) document.cookie = cookie;
+      const { container, unmount } = render(<AppNavbar />);
+      expect(container.querySelector('.min-w-\\[272px\\]')).not.toBeNull();
+      unmount();
+    }
+  });
 });

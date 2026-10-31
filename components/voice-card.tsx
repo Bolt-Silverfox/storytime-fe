@@ -96,10 +96,10 @@ const VoiceCard = ({
         {description}
       </p>
       <div
-        className={` mt-6 shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] px-4 sm:px-6 py-2.5 rounded-[3.125rem] border-[0.5px] border-solid border-hairline-warm hover:scale-105 transition-all duration-300 flex items-center justify-center gap-3 w-fit max-w-full text-center cursor-pointer ${
+        className={` mt-6 shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] px-4 sm:px-6 py-2.5 rounded-[3.125rem] border-[0.5px] border-solid hover:scale-105 transition-all duration-300 flex items-center justify-center gap-3 w-fit max-w-full text-center cursor-pointer ${
           highlight
-            ? 'bg-brand-edge text-white border-brand-edge'
-            : 'bg-surface text-body'
+            ? 'bg-brand-edge text-white border-hairline-warm dark:border-brand-edge'
+            : 'bg-surface text-body border-hairline-warm'
         }`}
         onClick={(e) => {
           onListen(e);

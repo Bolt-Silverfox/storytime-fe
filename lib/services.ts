@@ -871,17 +871,13 @@ export const clearUserFromStorage = () => {
   Cookies.remove('refreshToken');
 };
 
-export const isUserLoggedIn = () => {
-  const user = getUserFromStorage();
-  // The access token cookie expires after ~1h, but the refresh token lasts 7
-  // days and the axios interceptor transparently refreshes on the next API
-  // call. Treat either token as "still signed in" so the UI (favorites heart,
-  // save-to-favorites, etc.) doesn't disappear the moment the access token
-  // lapses.
-  const accessToken = Cookies.get('accessToken');
-  const refreshToken = Cookies.get('refreshToken');
-  return !!(user && (accessToken || refreshToken));
-};
+// Single source of truth for "signed in": a token cookie, exactly as
+// middleware.ts decides. The stored user profile is NOT required (it may be
+// missing or stale); read it lazily with getUserFromStorage() where needed.
+// The access token lasts ~1h but the refresh token 7 days and the axios
+// interceptor refreshes transparently, so either cookie means signed in.
+export const isUserLoggedIn = () =>
+  !!(Cookies.get('accessToken') || Cookies.get('refreshToken'));
 
 export const getStoryCategoriesService = async () => {
   try {

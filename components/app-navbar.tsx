@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   MobileNav,
   MobileNavHeader,
@@ -11,7 +11,7 @@ import {
   Navbar,
   NavItems,
 } from '@/components/ui/resizable-navbar';
-import { isUserLoggedIn } from '@/lib/services';
+import { useAuthState } from '@/lib/use-auth-state';
 import { cn } from '@/lib/utils';
 import { Logo } from './logo';
 import { ModeToggle } from './mode-toggle';
@@ -19,14 +19,12 @@ import { buttonVariants } from './ui/button';
 import { ScrollProgress } from './ui/scroll-progress';
 
 export function AppNavbar() {
-  // Reflect auth state so a signed-in visitor sees "Go to app" instead of
-  // Login/Get started. Read after mount to avoid an SSR/client hydration
-  // mismatch (both render logged-out first, then this updates).
-  const [loggedIn, setLoggedIn] = useState(false);
+  // 'unknown' during SSR/hydration: the guest buttons are rendered invisible
+  // (same size, so no layout shift) and never shown to a signed-in visitor.
+  const auth = useAuthState();
+  const loggedIn = auth === 'in';
+  const pending = auth === 'unknown';
   const pathname = usePathname();
-  useEffect(() => {
-    setLoggedIn(isUserLoggedIn());
-  }, []);
 
   const navItems = [
     {
@@ -69,7 +67,14 @@ export function AppNavbar() {
                 Go to app
               </Link>
             ) : (
-              <>
+              <div
+                className={cn(
+                  'flex items-center gap-4',
+                  pending && 'invisible'
+                )}
+                aria-hidden={pending || undefined}
+                inert={pending || undefined}
+              >
                 <Link
                   href='/login'
                   className={cn(
@@ -88,7 +93,7 @@ export function AppNavbar() {
                 >
                   Get started
                 </Link>
-              </>
+              </div>
             )}
           </div>
         </NavBody>
@@ -135,7 +140,11 @@ export function AppNavbar() {
                   Go to app
                 </Link>
               ) : (
-                <>
+                <div
+                  className={cn('flex flex-col gap-4', pending && 'invisible')}
+                  aria-hidden={pending || undefined}
+                  inert={pending || undefined}
+                >
                   <Link
                     href='/login'
                     onClick={() => setIsMobileMenuOpen(false)}
@@ -156,7 +165,7 @@ export function AppNavbar() {
                   >
                     Get started
                   </Link>
-                </>
+                </div>
               )}
             </div>
           </MobileNavMenu>

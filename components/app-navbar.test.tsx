@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -32,7 +32,9 @@ describe('AppNavbar auth state', () => {
   it('cookie only (no stored user): shows Go to app, never Login/Get started', () => {
     document.cookie = 'accessToken=abc; path=/';
     render(<AppNavbar />);
-    expect(screen.getAllByText('Go to app').length).toBe(2); // desktop + mobile
+    expect(screen.getAllByText('Go to app').length).toBe(1); // desktop
+    fireEvent.click(screen.getByLabelText('Toggle menu'));
+    expect(screen.getAllByText('Go to app').length).toBe(2); // + mobile menu
     expect(screen.queryByText('Login')).toBeNull();
     expect(screen.queryByText('Get started')).toBeNull();
   });
@@ -41,7 +43,7 @@ describe('AppNavbar auth state', () => {
     document.cookie = 'accessToken=abc; path=/';
     localStorage.setItem('user', USER);
     render(<AppNavbar />);
-    expect(screen.getAllByText('Go to app').length).toBe(2);
+    expect(screen.getAllByText('Go to app').length).toBe(1);
     expect(screen.queryByText('Login')).toBeNull();
     expect(screen.queryByText('Get started')).toBeNull();
   });
@@ -49,7 +51,7 @@ describe('AppNavbar auth state', () => {
   it('expired access token + valid refresh token: shows Go to app', () => {
     document.cookie = 'refreshToken=ref; path=/';
     render(<AppNavbar />);
-    expect(screen.getAllByText('Go to app').length).toBe(2);
+    expect(screen.getAllByText('Go to app').length).toBe(1);
     expect(screen.queryByText('Login')).toBeNull();
   });
 
@@ -60,9 +62,11 @@ describe('AppNavbar auth state', () => {
     expect(screen.queryByText('Go to app')).toBeNull();
   });
 
-  it('server render (auth unknown) shows neither Login/Get started nor Go to app as visible links', () => {
+  it('server render (auth unknown): no Go to app, guest buttons invisible and inert', () => {
     const html = renderToString(<AppNavbar />);
     expect(html).not.toContain('Go to app');
-    expect(html).not.toMatch(/href="\/(login|register)"/);
+    expect(html).toMatch(
+      /class="[^"]*\binvisible\b[^"]*" aria-hidden="true" inert=""><a[^>]*href="\/login"/
+    );
   });
 });

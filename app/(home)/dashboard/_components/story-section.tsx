@@ -30,9 +30,9 @@ const StoryRowCard = ({ story }: { story: StoryListItem }) => {
       />
       <Link
         href={`/story/${story.id}`}
-        className='group block overflow-hidden rounded-3xl border border-stone-100 bg-white shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] transition-all duration-300 hover:scale-[1.03]'
+        className='group block overflow-hidden rounded-3xl border border-hairline bg-surface shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] transition-all duration-300 hover:scale-[1.03]'
       >
-        <div className='aspect-[4/3] w-full overflow-hidden bg-[#FCE9CE]'>
+        <div className='aspect-[4/3] w-full overflow-hidden bg-sand'>
           {story.coverImageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- remote Cloudinary host, avoids next.config image allowlist
             <img
@@ -47,11 +47,11 @@ const StoryRowCard = ({ story }: { story: StoryListItem }) => {
           )}
         </div>
         <div className='p-4'>
-          <h3 className='truncate text-[#221D1D] text-lg not-italic font-bold leading-6 font-qilka'>
+          <h3 className='truncate text-strong text-lg not-italic font-bold leading-6 font-qilka'>
             {story.title}
           </h3>
           {age && (
-            <span className='mt-1 inline-block text-sm font-semibold text-[#4807EC] font-abeezee'>
+            <span className='mt-1 inline-block text-sm font-semibold text-blue font-abeezee'>
               {age}
             </span>
           )}
@@ -77,13 +77,13 @@ const StorySection = ({
   return (
     <section className='mt-12'>
       <div className='mb-4 flex items-center justify-between'>
-        <h2 className='text-[#221D1D] text-xl not-italic font-bold leading-6 font-qilka'>
+        <h2 className='text-strong text-xl not-italic font-bold leading-6 font-qilka'>
           {title}
         </h2>
         {viewAllHref && (
           <Link
             href={viewAllHref}
-            className='text-sm font-semibold text-[#EC4007] font-abeezee hover:underline'
+            className='text-sm font-semibold text-brand-text font-abeezee hover:underline'
           >
             View all
           </Link>
@@ -95,12 +95,12 @@ const StorySection = ({
           {[1, 2, 3, 4].map((i) => (
             <div
               key={i}
-              className='h-[16rem] w-[15rem] shrink-0 animate-pulse rounded-3xl bg-stone-100'
+              className='h-[16rem] w-[15rem] shrink-0 animate-pulse rounded-3xl bg-sunken'
             />
           ))}
         </div>
       ) : stories.length === 0 ? (
-        <p className='text-[#4A413F] text-sm not-italic font-normal leading-5 font-abeezee'>
+        <p className='text-body text-sm not-italic font-normal leading-5 font-abeezee'>
           No stories here yet.
         </p>
       ) : (

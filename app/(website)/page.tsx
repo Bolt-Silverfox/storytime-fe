@@ -38,17 +38,17 @@ export default function Home() {
               <div className='flex flex-col items-center gap-6 w-full'>
                 <Badge
                   variant='outline'
-                  className='px-[22px] py-2 border-none bg-[#E6FBFE] text-[#07CAEC] font-abeezee rounded-[50px]'
+                  className='px-[22px] py-2 border-none bg-reader-panel text-[#07CAEC] font-abeezee rounded-[50px]'
                 >
                   WELCOME TO STORYTIME
                 </Badge>
 
-                <h1 className='font-qilka font-bold text-[#221D1D] md:text-[60px] text-[44px] md:leading-[68px] leading-[50px] max-w-[926px] mx-auto text-center'>
+                <h1 className='font-qilka font-bold text-strong md:text-[60px] text-[44px] md:leading-[68px] leading-[50px] max-w-[926px] mx-auto text-center'>
                   Re-defining storytelling for kids with big imaginations
                 </h1>
               </div>
 
-              <p className='w-full max-w-[556px] text-lg text-[#4A413F] font-abeezee text-center'>
+              <p className='w-full max-w-[556px] text-lg text-body font-abeezee text-center'>
                 Discover beautifully told tales, stories, created just for
                 kids&nbsp;&nbsp;from bedtime snuggles to learning adventures and
                 so much more.
@@ -79,10 +79,10 @@ export default function Home() {
           <div className='flex items-center gap-4'>
             <AvatarCircles avatarUrls={avatars} />
             <div className='flex items-center gap-1.5'>
-              <span className='text-xs whitespace-nowrap text-[#4A413F] font-abeezee'>
+              <span className='text-xs whitespace-nowrap text-body font-abeezee'>
                 Visited by over
               </span>
-              <span className='font-bold whitespace-nowrap text-xl font-qilka text-[#EC4007] text-center'>
+              <span className='font-bold whitespace-nowrap text-xl font-qilka text-brand-text text-center'>
                 5k visitors
               </span>
             </div>
@@ -113,11 +113,11 @@ export default function Home() {
       <section className='flex md:flex-row flex-col px-5 gap-[50px] py-16 w-full max-w-[1140px] mx-auto'>
         <div className='max-w-[419px] space-y-4'>
           <div className='space-y-3'>
-            <h2 className='font-qilka font-bold text-[#221D1D] md:text-[60px] text-[44px] md:leading-[68px] leading-[50px]'>
+            <h2 className='font-qilka font-bold text-strong md:text-[60px] text-[44px] md:leading-[68px] leading-[50px]'>
               Explore story-telling like never before
             </h2>
 
-            <p className='font-abeezee text-xl text-[#4A413F]'>
+            <p className='font-abeezee text-xl text-body'>
               Designed especially for children. With handpicked stories,
               friendly voices, and smart filters, it&apos;s more than
               entertainment it&apos;s a safe space for growth, imagination, and
@@ -131,7 +131,7 @@ export default function Home() {
           {featureCards.map((card) => (
             <Card
               key={`feature-card-${card.title}`}
-              className='border-[0.5px] border-solid shadow-none border-stone-100 rounded-[21px] bg-white'
+              className='border-[0.5px] border-solid shadow-none border-hairline rounded-[21px] bg-surface'
             >
               <CardContent className='flex flex-col items-start gap-2.5 p-8'>
                 <div className='flex flex-col items-start gap-6 w-full'>
@@ -142,11 +142,11 @@ export default function Home() {
                   </div>
 
                   <div className='space-y-3'>
-                    <h3 className='font-bold font-qilka text-[#221D1D] text-xl'>
+                    <h3 className='font-bold font-qilka text-strong text-xl'>
                       {card.title}
                     </h3>
 
-                    <p className='font-abeezee text-xl text-[#4A413F]'>
+                    <p className='font-abeezee text-xl text-body'>
                       {card.description}
                     </p>
                   </div>
@@ -159,10 +159,10 @@ export default function Home() {
       <section className='flex px-5 flex-col items-center gap-[60px] w-full py-16 max-w-[1240px] mx-auto'>
         <div className='flex flex-col items-center gap-[60px] w-full'>
           <div className='space-y-3'>
-            <h2 className='w-full max-w-[654px] leading-[113.636%] font-bold md:text-[44px] text-[34px] text-[#221D1D] font-qilka text-center'>
+            <h2 className='w-full max-w-[654px] leading-[113.636%] font-bold md:text-[44px] text-[34px] text-strong font-qilka text-center'>
               A world of endless possibilities
             </h2>
-            <p className='w-full max-w-[596px] text-xl text-[#4A413F] font-abeezee text-center'>
+            <p className='w-full max-w-[596px] text-xl text-body font-abeezee text-center'>
               We have so many categories to explore from
             </p>
           </div>
@@ -171,7 +171,7 @@ export default function Home() {
             {storyCategories.map((category) => (
               <Card
                 key={`category-${category.title}`}
-                className='md:[&:nth-child(1)]:border-t-0 md:[&:nth-child(1)]:border-l-0 md:[&:nth-child(2)]:border-t-0 md:[&:nth-child(3)]:border-t-0 md:[&:nth-child(3)]:border-r-0 !border-b-0 md:[&:nth-child(4)]:border-l-0 md:last:border-r-0 md:border-4 border-l-0 p-8 border-[#F8EEEB] rounded-none shadow-none bg-transparent'
+                className='md:[&:nth-child(1)]:border-t-0 md:[&:nth-child(1)]:border-l-0 md:[&:nth-child(2)]:border-t-0 md:[&:nth-child(3)]:border-t-0 md:[&:nth-child(3)]:border-r-0 !border-b-0 md:[&:nth-child(4)]:border-l-0 md:last:border-r-0 md:border-4 border-l-0 p-8 border-[#F8EEEB] dark:border-hairline rounded-none shadow-none bg-transparent'
               >
                 <CardContent className='flex flex-col items-start gap-6 p-0'>
                   <CategoryImage
@@ -183,10 +183,10 @@ export default function Home() {
                     className='rounded-[23px] w-full md:aspect-square'
                   />
                   <div className='flex flex-col items-start gap-3 w-full'>
-                    <h3 className='text-[26px] font-bold font-qilka text-[#221D1D] '>
+                    <h3 className='text-[26px] font-bold font-qilka text-strong '>
                       {category.title}
                     </h3>
-                    <p className='text-xl font-abeezee text-[#4A413F]'>
+                    <p className='text-xl font-abeezee text-body'>
                       {category.description}
                     </p>
                   </div>
@@ -200,14 +200,14 @@ export default function Home() {
           href='/stories'
           className={cn(
             buttonVariants({ variant: 'outline' }),
-            'rounded-full bg-transparent border-[#EC4007] text-[#EC4007] px-[54px] border h-auto py-2.5'
+            'rounded-full bg-transparent border-brand text-brand-text px-[54px] border h-auto py-2.5'
           )}
         >
           Browse all stories
         </Link>
       </section>
       <section className='px-5'>
-        <Card className='w-full max-w-[1140px] md:mx-auto bg-[#EC4007] rounded-[51px] border-[0.5px] border-solid border-[#f84020] md:p-[62px] p-8'>
+        <Card className='w-full max-w-[1140px] md:mx-auto bg-brand rounded-[51px] border-[0.5px] border-solid border-brand-edge md:p-[62px] p-8'>
           <CardContent className='p-0'>
             <div className='flex md:flex-row flex-col items-center gap-[70px] w-full'>
               <div className='flex flex-col items-start gap-8 flex-1 max-w-[473px]'>
@@ -216,7 +216,7 @@ export default function Home() {
                     Built with kids in mind + AI integration
                   </h2>
 
-                  <p className='text-[#FEEAE6] font-abeezee text-xl max-w-[500px]'>
+                  <p className='text-on-brand-soft font-abeezee text-xl max-w-[500px]'>
                     A combination of intentionality, AI integration and
                     simplicity, we have created an amazing digital storybook to
                     aid your kids all the way through in their day to day lives.
@@ -308,10 +308,10 @@ export default function Home() {
       </section>
       <section className=' max-w-[1140px] px-5 space-y-[60px] mx-auto py-16'>
         <div className='space-y-3'>
-          <h2 className='font-qilka font-bold text-[#221D1D] md:text-[44px] text-[34px] text-center'>
+          <h2 className='font-qilka font-bold text-strong md:text-[44px] text-[34px] text-center'>
             Complete Parental control
           </h2>
-          <p className='font-abeezee text-xl text-[#4A413F] text-center'>
+          <p className='font-abeezee text-xl text-body text-center'>
             Control and customize your child’s story experience
           </p>
         </div>
@@ -327,10 +327,10 @@ export default function Home() {
           <div className='flex flex-col items-start gap-8 flex-1'>
             <div className='flex flex-col items-start gap-6 w-full'>
               <div className='space-y-3'>
-                <h2 className='font-qilka font-bold text-[#221D1D] md:text-[44px] text-[34px]'>
+                <h2 className='font-qilka font-bold text-strong md:text-[44px] text-[34px]'>
                   Stay in control always
                 </h2>
-                <p className='font-abeezee text-xl text-[#4A413F]'>
+                <p className='font-abeezee text-xl text-body'>
                   Access to features that help your kids stay safe.
                 </p>
               </div>
@@ -344,7 +344,7 @@ export default function Home() {
                     <span className='shrink-0'>
                       <Icons.check />
                     </span>
-                    <p className='font-abeezee text-xl text-[#4A413F] text-left'>
+                    <p className='font-abeezee text-xl text-body text-left'>
                       {feature}
                     </p>
                   </div>
@@ -367,10 +367,10 @@ export default function Home() {
       <section className='space-y-10 px-5 md:py-20 max-w-[1140px] mx-auto'>
         <div className='flex md:flex-row flex-col gap-[50px]'>
           <div className='space-y-3 col-span-5 max-w-[419px]'>
-            <h2 className='font-qilka font-bold text-[#221D1D] md:text-[60px] text-[44px] md:leading-[68px] leading-[50px]'>
+            <h2 className='font-qilka font-bold text-strong md:text-[60px] text-[44px] md:leading-[68px] leading-[50px]'>
               Loved by families everywhere
             </h2>
-            <p className='font-abeezee text-xl text-[#4A413F]'>
+            <p className='font-abeezee text-xl text-body'>
               Hear from parents who have engaged with out product.
             </p>
           </div>
@@ -378,10 +378,10 @@ export default function Home() {
             {testimonials.slice(0, 2).map((testimonial) => (
               <Card
                 key={`top-testimonial-${testimonial.name}-${testimonial.location}`}
-                className='w-full col-span-1 bg-white shadow-none rounded-[21px] border-[0.5px] border-solid border-stone-100'
+                className='w-full col-span-1 bg-surface shadow-none rounded-[21px] border-[0.5px] border-solid border-hairline'
               >
                 <CardContent className='flex flex-col items-start gap-6 p-8'>
-                  <p className='text-xl tetx-[#4A413F] font-abeezee'>
+                  <p className='text-xl text-foreground font-abeezee'>
                     &quot;{testimonial.quote}&quot;
                   </p>
                   <div className='flex items-center gap-2 self-stretch w-full'>
@@ -391,10 +391,10 @@ export default function Home() {
                       </AvatarFallback>
                     </Avatar>
                     <div className='flex flex-col items-start flex-1'>
-                      <p className='text-[#221D1D] font-abeezee'>
+                      <p className='text-strong font-abeezee'>
                         {testimonial.name}
                       </p>
-                      <p className='text-xs font-abeezee text-[#4A413F]'>
+                      <p className='text-xs font-abeezee text-body'>
                         {testimonial.location}
                       </p>
                     </div>
@@ -409,10 +409,10 @@ export default function Home() {
             <Card
               // biome-ignore lint/suspicious/noArrayIndexKey: the index disambiguates testimonials that share a name; the key is not the bare index
               key={`bottom-testimonial-${testimonial.name}-${index}`}
-              className='w-full col-span-1 bg-white shadow-none rounded-[21px] border-[0.5px] border-solid border-stone-100'
+              className='w-full col-span-1 bg-surface shadow-none rounded-[21px] border-[0.5px] border-solid border-hairline'
             >
               <CardContent className='flex flex-col items-start gap-6 p-8'>
-                <p className='text-xl tetx-[#4A413F] font-abeezee'>
+                <p className='text-xl text-foreground font-abeezee'>
                   &quot;{testimonial.quote}&quot;
                 </p>
                 <div className='flex items-center gap-2 self-stretch w-full'>
@@ -422,10 +422,10 @@ export default function Home() {
                     </AvatarFallback>
                   </Avatar>
                   <div className='flex flex-col items-start flex-1'>
-                    <p className='text-[#221D1D] font-abeezee'>
+                    <p className='text-strong font-abeezee'>
                       {testimonial.name}
                     </p>
-                    <p className='text-xs font-abeezee text-[#4A413F]'>
+                    <p className='text-xs font-abeezee text-body'>
                       {testimonial.location}
                     </p>
                   </div>
@@ -439,10 +439,10 @@ export default function Home() {
       <section className='space-y-[60px] px-5 py-[80px] md:py-[160px] max-w-[1140px] mx-auto'>
         <div className='space-y-[60px]'>
           <div className='space-y-3'>
-            <h2 className='font-qilka font-bold text-[#221D1D] md:text-[60px] text-[44px] md:leading-[68px] leading-[50px] text-center'>
+            <h2 className='font-qilka font-bold text-strong md:text-[60px] text-[44px] md:leading-[68px] leading-[50px] text-center'>
               Common questions
             </h2>
-            <p className='font-abeezee text-xl text-[#4A413F] text-center'>
+            <p className='font-abeezee text-xl text-body text-center'>
               See common questions asked
             </p>
           </div>
@@ -452,7 +452,7 @@ export default function Home() {
               <AccordionItem
                 key={`faq-${item.question}`}
                 value={`item-${item.question}`}
-                className='mb-4 bg-white rounded-[27px] border-[0.5px] border-solid border-stone-100'
+                className='mb-4 bg-surface rounded-[27px] border-[0.5px] border-solid border-hairline'
               >
                 <AccordionTrigger className='px-8 py-6 text-xl hover:no-underline'>
                   {item.question}
@@ -466,7 +466,7 @@ export default function Home() {
         </div>
         <Button
           variant='outline'
-          className='rounded-full bg-transparent mx-auto block border-[#EC4007] text-[#EC4007] px-[54px] border h-auto py-2.5 w-fit'
+          className='rounded-full bg-transparent mx-auto block border-brand text-brand-text px-[54px] border h-auto py-2.5 w-fit'
           href='/faq'
         >
           See all

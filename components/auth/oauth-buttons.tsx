@@ -227,18 +227,16 @@ export const OAuthButtons = ({
       )}
 
       <div className='flex items-center gap-4' aria-hidden='true'>
-        <span className='h-px flex-1 bg-stone-200 dark:bg-neutral-700' />
-        <span className='text-sm font-abeezee text-[#4A413F] dark:text-neutral-300'>
-          Or {verb} with
-        </span>
-        <span className='h-px flex-1 bg-stone-200 dark:bg-neutral-700' />
+        <span className='h-px flex-1 bg-line-mid' />
+        <span className='text-sm font-abeezee text-body'>Or {verb} with</span>
+        <span className='h-px flex-1 bg-line-mid' />
       </div>
 
       <div className='flex flex-col items-center gap-3'>
         {GOOGLE_CLIENT_ID && (
           <div className='relative flex min-h-[44px] w-full justify-center'>
             {!googleReady && (
-              <div className='h-[44px] w-[320px] animate-pulse rounded-full bg-stone-100 dark:bg-neutral-800' />
+              <div className='h-[44px] w-[320px] animate-pulse rounded-full bg-sunken' />
             )}
             {/* Google renders its own compliant button into this element. */}
             <div
@@ -255,7 +253,7 @@ export const OAuthButtons = ({
             type='button'
             onClick={signInWithApple}
             disabled={loading !== null}
-            className='flex h-[44px] w-[320px] items-center justify-center gap-2 rounded-full bg-black px-6 font-abeezee text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60'
+            className='flex h-[44px] w-[320px] items-center justify-center gap-2 rounded-full border border-transparent bg-black px-6 dark:border-line font-abeezee text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60'
           >
             <svg
               width='16'

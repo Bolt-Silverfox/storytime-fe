@@ -11,7 +11,7 @@ export const StepProgress = () => {
     const activeIndex = registrationSteps.indexOf(registrationStep);
 
     return `rounded-[12px] w-[30px] h-1 ${
-      currentIndex <= activeIndex ? 'bg-[#EC4007]' : 'bg-[#FEEAE6]'
+      currentIndex <= activeIndex ? 'bg-brand' : 'bg-tint dark:bg-field'
     }`;
   };
 

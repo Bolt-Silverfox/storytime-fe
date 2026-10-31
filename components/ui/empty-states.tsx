@@ -16,8 +16,8 @@ const EmptyIcon = ({
   icon: React.ElementType;
   children: React.ReactNode;
 }) => (
-  <div className='flex flex-col items-center gap-4 md:gap-5'>
-    <Icon size='78' color='#4D4D4D' className='size-[57px] md:size-auto' />
+  <div className='flex flex-col items-center gap-4 text-[#4D4D4D] dark:text-subtle md:gap-5'>
+    <Icon size='78' color='currentColor' className='size-[57px] md:size-auto' />
     <p className='md:max-w-auto max-w-[182px] text-center text-sm text-[#B3B3B3] md:text-xl'>
       {children}
     </p>

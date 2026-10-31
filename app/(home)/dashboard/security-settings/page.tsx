@@ -66,29 +66,29 @@ const SecuritySettingsPage = () => {
   };
 
   return (
-    <div className='bg-white rounded-[2.5625rem] border-[0.5px] border-solid border-[#FAF4F2] px-4 sm:px-6 md:px-10 py-6 md:py-[2.125rem] w-full max-w-6xl mx-auto my-6 md:my-12'>
+    <div className='bg-surface rounded-[2.5625rem] border-[0.5px] border-solid border-hairline-warm px-4 sm:px-6 md:px-10 py-6 md:py-[2.125rem] w-full max-w-6xl mx-auto my-6 md:my-12'>
       <Header white={false} />
 
       <section className='mt-12'>
         <div className='mb-4 flex items-center gap-3'>
           <BackButton />
-          <span className='font-abeezee text-sm text-[#4A413F]'>Back</span>
+          <span className='font-abeezee text-sm text-body'>Back</span>
         </div>
-        <h2 className='mb-1 text-[#221D1D] text-2xl not-italic font-bold leading-7 font-qilka'>
+        <h2 className='mb-1 text-strong text-2xl not-italic font-bold leading-7 font-qilka'>
           Security settings
         </h2>
-        <p className='mb-6 text-[#4A413F] text-sm not-italic font-normal leading-5 font-abeezee'>
+        <p className='mb-6 text-body text-sm not-italic font-normal leading-5 font-abeezee'>
           Update the password you use to sign in.
         </p>
 
         {!loggedIn ? (
-          <div className='rounded-3xl border border-stone-100 bg-[#FFF8ED] px-6 py-10 text-center'>
-            <p className='text-[#4A413F] font-abeezee'>
+          <div className='rounded-3xl border border-hairline bg-cream px-6 py-10 text-center'>
+            <p className='text-body font-abeezee'>
               Log in to change your password.
             </p>
             <Link
               href='/login'
-              className='mt-4 inline-block rounded-2xl bg-[#EC4007] px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90'
+              className='mt-4 inline-block rounded-2xl bg-brand px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90'
             >
               Log in
             </Link>
@@ -102,7 +102,7 @@ const SecuritySettingsPage = () => {
               <div>
                 <label
                   htmlFor='current-password'
-                  className='block mb-1 text-[#4A413F] text-sm font-abeezee'
+                  className='block mb-1 text-body text-sm font-abeezee'
                 >
                   Current password
                 </label>
@@ -118,7 +118,7 @@ const SecuritySettingsPage = () => {
               <div>
                 <label
                   htmlFor='new-password'
-                  className='block mb-1 text-[#4A413F] text-sm font-abeezee'
+                  className='block mb-1 text-body text-sm font-abeezee'
                 >
                   New password
                 </label>
@@ -130,7 +130,7 @@ const SecuritySettingsPage = () => {
                   placeholder='Enter a new password'
                   autoComplete='new-password'
                 />
-                <p className='mt-1 text-[#4A413F] text-xs not-italic font-normal leading-4 font-abeezee'>
+                <p className='mt-1 text-body text-xs not-italic font-normal leading-4 font-abeezee'>
                   At least 8 characters with uppercase, lowercase, a number, and
                   a symbol.
                 </p>
@@ -138,7 +138,7 @@ const SecuritySettingsPage = () => {
               <div>
                 <label
                   htmlFor='confirm-password'
-                  className='block mb-1 text-[#4A413F] text-sm font-abeezee'
+                  className='block mb-1 text-body text-sm font-abeezee'
                 >
                   Confirm new password
                 </label>

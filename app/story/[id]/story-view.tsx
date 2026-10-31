@@ -177,7 +177,7 @@ export default function StoryView({ storyId }: { storyId: string }) {
             type='button'
             onClick={handleStart}
             disabled={preparing}
-            className='rounded-2xl bg-[#EC4007] px-8 py-4 text-base font-semibold text-white transition hover:opacity-90 disabled:opacity-60'
+            className='rounded-2xl bg-brand px-8 py-4 text-base font-semibold text-white transition hover:opacity-90 disabled:opacity-60'
           >
             {preparing ? 'Opening…' : 'Read this story'}
           </button>
@@ -189,13 +189,15 @@ export default function StoryView({ storyId }: { storyId: string }) {
           type='button'
           onClick={toggleFavorite}
           disabled={favoriteBusy}
-          className='flex items-center gap-2 rounded-2xl border border-stone-200 px-5 py-2.5 text-sm font-semibold text-[#4A413F] transition hover:bg-[#FFF8ED] disabled:opacity-60'
+          className='flex items-center gap-2 rounded-2xl border border-line-mid px-5 py-2.5 text-sm font-semibold text-body transition hover:bg-cream disabled:opacity-60'
         >
           <span>{isFavorite ? '❤️' : '🤍'}</span>
           {isFavorite ? 'Saved to favorites' : 'Save to favorites'}
         </button>
       )}
-      {startError && <p className='text-sm text-red-600'>{startError}</p>}
+      {startError && (
+        <p className='text-sm text-red-600 dark:text-red-400'>{startError}</p>
+      )}
 
       <Modal
         open={modalOpen}

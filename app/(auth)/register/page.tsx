@@ -49,15 +49,15 @@ const RegisterPage = () => {
           <div className='space-y-1.5 text-center w-full'>
             <div className='relative'>
               <StepBackButton onClick={handleRegistrationStepBackward} />
-              <p className="text-[26px] [font-feature-settings:'liga'_off,_'clig'_off] text-[#221D1D] text-center dark:text-white font-abeezee">
+              <p className="text-[26px] [font-feature-settings:'liga'_off,_'clig'_off] text-strong text-center font-abeezee">
                 Hello! {getFirstName(registrationData?.name)}👋 🥰
               </p>
               <div />
             </div>
-            <p className='text-[#221D1D] dark:text-white text-[34px] font-bold font-qilka'>
+            <p className='text-strong text-[34px] font-bold font-qilka'>
               Welcome to storytime
             </p>
-            <p className='text-[#4A413F] dark:text-white font-abeezee'>
+            <p className='text-body font-abeezee'>
               The worlds first kids story library
             </p>
           </div>

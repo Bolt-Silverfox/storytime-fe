@@ -16,12 +16,12 @@ const Page = () => {
           <div className='flex flex-col items-center gap-[42px] w-full px-5'>
             <div className='flex flex-col items-center gap-5 w-full'>
               <div className='flex flex-col items-center gap-6 w-full'>
-                <h1 className='font-qilka font-bold text-[#221D1D] md:text-[60px] text-[44px] md:leading-[68px] leading-[50px] max-w-[926px] mx-auto text-center'>
+                <h1 className='font-qilka font-bold text-strong md:text-[60px] text-[44px] md:leading-[68px] leading-[50px] max-w-[926px] mx-auto text-center'>
                   More than stories, a world of wonder for every child
                 </h1>
               </div>
 
-              <p className='w-full max-w-[556px] text-lg text-[#4A413F] font-abeezee text-center'>
+              <p className='w-full max-w-[556px] text-lg text-body font-abeezee text-center'>
                 At Storytime, we believe storytelling can shape hearts, spark
                 imaginations, and bring families closer.
               </p>
@@ -57,17 +57,17 @@ const Page = () => {
       </section>
       <section className='flex md:flex-row flex-col px-5 md:gap-2 gap-10 max-w-[1140px] mx-auto md:py-[80px]'>
         <div className='space-y-4 max-w-[505px]'>
-          <h2 className='font-qilka font-bold text-[#221D1D] text-6xl'>
+          <h2 className='font-qilka font-bold text-strong text-6xl'>
             Our intention building StoryTime
           </h2>
 
-          <p className='font-abeezee text-xl text-[#4A413F]'>
+          <p className='font-abeezee text-xl text-body'>
             Storytime was created by parents, educators, and storytellers who
             saw the need for safe, meaningful, and screen-free entertainment. In
             a world full of noise, we imagined a space where children could
             enjoy calming, inspiring stories anytime, anywhere.
           </p>
-          <p className='font-qilka text-xl text-[#4A413F] pt-2'>
+          <p className='font-qilka text-xl text-body pt-2'>
             We built Storytime to nurture curiosity and connection. Our stories
             help children fall asleep, wake up happy, and grow with values that
             matter.
@@ -83,10 +83,10 @@ const Page = () => {
       </section>
       <section className='max-w-[1140px] px-5 mx-auto space-y-[60px]'>
         <div className='space-y-3'>
-          <h2 className='w-full max-w-[654px] mx-auto leading-[113.636%] font-bold text-[44px] text-[#221D1D] font-qilka text-center'>
+          <h2 className='w-full max-w-[654px] mx-auto leading-[113.636%] font-bold text-[44px] text-strong font-qilka text-center'>
             What makes us different
           </h2>
-          <p className='w-full max-w-[596px] mx-auto text-xl text-[#4A413F] font-abeezee text-center'>
+          <p className='w-full max-w-[596px] mx-auto text-xl text-body font-abeezee text-center'>
             StoryTime is built with intentionality in mind
           </p>
         </div>
@@ -95,7 +95,7 @@ const Page = () => {
           {featureCard2.map((card) => (
             <Card
               key={`feature-card-${card.title}`}
-              className='border-[0.5px] border-solid shadow-none border-stone-100 rounded-[21px] bg-white'
+              className='border-[0.5px] border-solid shadow-none border-hairline rounded-[21px] bg-surface'
             >
               <CardContent className='flex flex-col items-start gap-2.5 p-8'>
                 <div className='flex flex-col items-start gap-6 w-full'>
@@ -106,11 +106,11 @@ const Page = () => {
                   </div>
 
                   <div className='space-y-3'>
-                    <h3 className='font-bold font-qilka text-[#221D1D] text-xl'>
+                    <h3 className='font-bold font-qilka text-strong text-xl'>
                       {card.title}
                     </h3>
 
-                    <p className='font-abeezee text-xl text-[#4A413F]'>
+                    <p className='font-abeezee text-xl text-body'>
                       {card.description}
                     </p>
                   </div>
@@ -122,12 +122,12 @@ const Page = () => {
       </section>
 
       <section className='max-w-[1140px] md:py-[80px] px-5 mx-auto flex md:flex-row flex-col items-center gap-8'>
-        <div className='rounded-[37px] overflow-hidden  bg-white '>
+        <div className='rounded-[37px] overflow-hidden  bg-surface '>
           <div className='space-y-3 py-[42px] px-8'>
-            <h2 className='text-center leading-[113.636%] font-bold text-[44px] text-[#221D1D] font-qilka'>
+            <h2 className='text-center leading-[113.636%] font-bold text-[44px] text-strong font-qilka'>
               Our mission
             </h2>
-            <p className='text-center text-xl text-[#4A413F] font-abeezee'>
+            <p className='text-center text-xl text-body font-abeezee'>
               To make storytelling magical again by giving every child access to
               stories that are joyful, calming, and full of meaning.
             </p>
@@ -140,12 +140,12 @@ const Page = () => {
             className=''
           />
         </div>
-        <div className='rounded-[37px] overflow-hidden bg-white'>
+        <div className='rounded-[37px] overflow-hidden bg-surface'>
           <div className='space-y-3 py-[42px] px-8'>
-            <h2 className=' text-center leading-[113.636%] font-bold text-[44px] text-[#221D1D] font-qilka '>
+            <h2 className=' text-center leading-[113.636%] font-bold text-[44px] text-strong font-qilka '>
               Our vision
             </h2>
-            <p className='text-center text-xl text-[#4A413F] font-abeezee '>
+            <p className='text-center text-xl text-body font-abeezee '>
               A future where screen-free, audio-first experiences become the
               foundation for how kids learn, imagine, and connect.
             </p>
@@ -155,7 +155,7 @@ const Page = () => {
       </section>
 
       <section className='md:pb-[160px] pb-[60px] px-5'>
-        <Card className='w-full max-w-[1140px] mx-auto bg-[#EC4007] rounded-[51px] border-[0.5px] border-solid border-[#f84020] md:p-[62px] p-6'>
+        <Card className='w-full max-w-[1140px] mx-auto bg-brand rounded-[51px] border-[0.5px] border-solid border-brand-edge md:p-[62px] p-6'>
           <CardContent className='p-0'>
             <div className='flex md:flex-row flex-col items-center gap-[70px] w-full'>
               <div className='flex flex-col items-start gap-8 flex-1 max-w-[473px]'>
@@ -164,7 +164,7 @@ const Page = () => {
                     Want to join the movement
                   </h2>
 
-                  <p className='text-[#FEEAE6] font-abeezee text-xl max-w-[500px]'>
+                  <p className='text-on-brand-soft font-abeezee text-xl max-w-[500px]'>
                     Let’s build a world where stories still matter.
                   </p>
                 </div>

@@ -116,20 +116,20 @@ export const KidsAvatarSheet = ({
           src={avatar}
           height={60}
           width={60}
-          className='rounded-full size-[60px] border border-[#FAF4F2] shadow-[0_0_17px_0_#221D29]/5'
+          className='rounded-full size-[60px] border border-hairline-warm shadow-[0_0_17px_0_#221D29]/5'
           alt=''
         />
         <SheetTrigger
           className={cn(
             buttonVariants({ size: 'icon', variant: 'ghost' }),
-            'rounded-full p-1.5 bg-white shadow-[0_0_17px_0_#EC4007]/10 absolute -right-2.5 -bottom-2.5'
+            'rounded-full p-1.5 bg-surface shadow-[0_0_17px_0_#EC4007]/10 absolute -right-2.5 -bottom-2.5'
           )}
         >
           <Icons.edit />
         </SheetTrigger>
       </div>
       <SheetContent className='py-8 overflow-auto'>
-        <SheetTitle className='text-[#221D1D] px-8 font-normal font-abeezee'>
+        <SheetTitle className='text-strong px-8 font-normal font-abeezee'>
           Upload your kids avatar
         </SheetTitle>
 
@@ -141,7 +141,7 @@ export const KidsAvatarSheet = ({
           >
             <div className='space-y-0.5 px-8'>
               <h2 className='text-lg font-bold font-qilka'>Select avatar</h2>
-              <p className='text-[#4A413F] text-xs font-abeezee'>
+              <p className='text-body text-xs font-abeezee'>
                 Select customized avatar to save time
               </p>
             </div>
@@ -158,7 +158,7 @@ export const KidsAvatarSheet = ({
                     >
                       {avatarOptions.map((option) => (
                         <FormItem key={option.avatar}>
-                          <FormLabel className='w-full cursor-pointer flex items-center justify-between gap-3 rounded-2xl border border-[#FAF4F2] bg-white p-6 shadow-[0_0_17px_0_#221D29]/5 [&:has(>button[data-state=checked])]:border-[#FB9583] [&:has(>button[data-state=checked])]:ring-2 [&:has(>button[data-state=checked])]:ring-[#FB9583]/50'>
+                          <FormLabel className='w-full cursor-pointer flex items-center justify-between gap-3 rounded-2xl border border-field-warm bg-surface p-6 shadow-[0_0_17px_0_#221D29]/5 [&:has(>button[data-state=checked])]:border-brand-soft [&:has(>button[data-state=checked])]:ring-2 [&:has(>button[data-state=checked])]:ring-brand-soft/50'>
                             <div className='flex items-center gap-2.5'>
                               <Image
                                 src={option.avatar}
@@ -169,7 +169,7 @@ export const KidsAvatarSheet = ({
                               />
                               <span
                                 title={option.name}
-                                className='text-[#221D1D] truncate font-abeezee'
+                                className='text-strong truncate font-abeezee'
                               >
                                 {option.name}
                               </span>
@@ -192,7 +192,7 @@ export const KidsAvatarSheet = ({
                               <FormItem>
                                 <FormLabel
                                   htmlFor={file.id}
-                                  className='w-full cursor-pointer flex items-center justify-between gap-3 rounded-2xl border border-[#FAF4F2] bg-white p-6 shadow-[0_0_17px_0_#221D29]/5 [&:has(>button[data-state=checked])]:border-[#FB9583] [&:has(>button[data-state=checked])]:ring-2 [&:has(>button[data-state=checked])]:ring-[#FB9583]/50'
+                                  className='w-full cursor-pointer flex items-center justify-between gap-3 rounded-2xl border border-field-warm bg-surface p-6 shadow-[0_0_17px_0_#221D29]/5 [&:has(>button[data-state=checked])]:border-brand-soft [&:has(>button[data-state=checked])]:ring-2 [&:has(>button[data-state=checked])]:ring-brand-soft/50'
                                 >
                                   <div className='flex items-center gap-2.5'>
                                     {file.status === 'pending' && (
@@ -249,17 +249,17 @@ export const KidsAvatarSheet = ({
             <div className='px-8 space-y-4'>
               <div className='space-y-0.5'>
                 <h2 className='text-lg font-bold font-qilka'>Upload image</h2>
-                <p className='text-[#4A413F] text-xs font-abeezee'>
+                <p className='text-body text-xs font-abeezee'>
                   Upload your child image instead
                 </p>
               </div>
               <div className='not-prose flex flex-col gap-4'>
                 <Dropzone {...dropzone}>
                   <div className='space-y-1.5'>
-                    <DropZoneArea className='rounded-[34px] bg-[#FAF4F2] custom-border border-0'>
+                    <DropZoneArea className='rounded-[34px] bg-page custom-border border-0'>
                       <DropzoneTrigger className='flex items-center gap-3 bg-transparent py-10 px-2.5 text-center'>
                         <Icons.upload />
-                        <p className='font-semibold text-[#221D1D] font-abeezee'>
+                        <p className='font-semibold text-strong font-abeezee'>
                           Upload image
                         </p>
                       </DropzoneTrigger>
@@ -267,7 +267,7 @@ export const KidsAvatarSheet = ({
 
                     <DropzoneMessage
                       className={cn(
-                        'text-[#4A413F] ',
+                        'text-body ',
                         dropzone.rootError && 'text-destructive'
                       )}
                     >

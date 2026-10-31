@@ -16,7 +16,7 @@ import {
 
 const StoryCard = ({ story }: { story: StoryListItem }) => {
   return (
-    <div className='group relative overflow-hidden rounded-3xl border border-stone-100 bg-white shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] transition-all duration-300 hover:scale-[1.02]'>
+    <div className='group relative overflow-hidden rounded-3xl border border-hairline bg-surface shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] transition-all duration-300 hover:scale-[1.02]'>
       <StoryStatusBadge
         storyId={story.id}
         className='absolute left-3 top-3 z-10'
@@ -26,7 +26,7 @@ const StoryCard = ({ story }: { story: StoryListItem }) => {
         className='absolute right-3 top-3 z-10'
       />
       <Link href={`/story/${story.id}`}>
-        <div className='aspect-[4/3] w-full overflow-hidden bg-[#FCE9CE]'>
+        <div className='aspect-[4/3] w-full overflow-hidden bg-sand'>
           {story.coverImageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- remote Cloudinary host
             <img
@@ -41,12 +41,12 @@ const StoryCard = ({ story }: { story: StoryListItem }) => {
           )}
         </div>
         <div className='p-4'>
-          <h3 className='text-[#221D1D] text-base not-italic font-bold leading-5 font-qilka line-clamp-2'>
+          <h3 className='text-strong text-base not-italic font-bold leading-5 font-qilka line-clamp-2'>
             {story.title}
           </h3>
           {typeof story.ageMin === 'number' &&
             typeof story.ageMax === 'number' && (
-              <span className='mt-1 inline-block text-sm font-semibold text-[#4807EC] font-abeezee'>
+              <span className='mt-1 inline-block text-sm font-semibold text-blue font-abeezee'>
                 Ages {story.ageMin}–{story.ageMax}
               </span>
             )}
@@ -67,7 +67,7 @@ const StoryGrid = ({
 }) => {
   if (stories.length === 0) {
     return (
-      <p className='text-[#4A413F] text-sm not-italic font-normal leading-5 font-abeezee'>
+      <p className='text-body text-sm not-italic font-normal leading-5 font-abeezee'>
         {emptyMessage}
       </p>
     );
@@ -113,13 +113,13 @@ const LibraryPage = () => {
     const base =
       'rounded-full px-5 py-2.5 text-sm font-semibold font-abeezee transition';
     if (activeTab === tab) {
-      return `${base} bg-[#EC4007] text-white`;
+      return `${base} bg-brand text-white`;
     }
-    return `${base} text-[#4A413F] hover:bg-[#FEEAE6]`;
+    return `${base} text-body hover:bg-tint`;
   };
 
   return (
-    <div className='bg-white rounded-[2.5625rem] border-[0.5px] border-solid border-[#FAF4F2] px-4 sm:px-6 md:px-10 py-6 md:py-[2.125rem] w-full max-w-6xl mx-auto my-6 md:my-12'>
+    <div className='bg-surface rounded-[2.5625rem] border-[0.5px] border-solid border-hairline-warm px-4 sm:px-6 md:px-10 py-6 md:py-[2.125rem] w-full max-w-6xl mx-auto my-6 md:my-12'>
       <Header white={false} />
 
       <QuotaIndicator className='mt-6' />
@@ -127,23 +127,23 @@ const LibraryPage = () => {
       <section className='mt-12'>
         <div className='mb-4 flex items-center gap-3'>
           <BackButton />
-          <span className='font-abeezee text-sm text-[#4A413F]'>Back</span>
+          <span className='font-abeezee text-sm text-body'>Back</span>
         </div>
-        <h2 className='mb-1 text-[#221D1D] text-2xl not-italic font-bold leading-7 font-qilka'>
+        <h2 className='mb-1 text-strong text-2xl not-italic font-bold leading-7 font-qilka'>
           Your library
         </h2>
-        <p className='mb-6 text-[#4A413F] text-sm not-italic font-normal leading-5 font-abeezee'>
+        <p className='mb-6 text-body text-sm not-italic font-normal leading-5 font-abeezee'>
           Pick up where you left off and revisit the stories you've finished.
         </p>
 
         {!loggedIn ? (
-          <div className='rounded-3xl border border-stone-100 bg-[#FFF8ED] px-6 py-10 text-center'>
-            <p className='text-[#4A413F] font-abeezee'>
+          <div className='rounded-3xl border border-hairline bg-cream px-6 py-10 text-center'>
+            <p className='text-body font-abeezee'>
               Log in to see your library.
             </p>
             <Link
               href='/login'
-              className='mt-4 inline-block rounded-2xl bg-[#EC4007] px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90'
+              className='mt-4 inline-block rounded-2xl bg-brand px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90'
             >
               Log in
             </Link>
@@ -153,13 +153,13 @@ const LibraryPage = () => {
             {[1, 2, 3, 4].map((i) => (
               <div
                 key={i}
-                className='h-[16rem] animate-pulse rounded-3xl bg-stone-100'
+                className='h-[16rem] animate-pulse rounded-3xl bg-sunken'
               />
             ))}
           </div>
         ) : (
           <div>
-            <div className='mb-6 inline-flex gap-2 rounded-full bg-[#FAF4F2] p-1'>
+            <div className='mb-6 inline-flex gap-2 rounded-full bg-page p-1'>
               <button
                 type='button'
                 onClick={() => setActiveTab('in-progress')}

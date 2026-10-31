@@ -87,7 +87,7 @@ const DailyChallenge = () => {
             <br />
             challenge
           </h2>
-          <p className='text-[#FEEAE6] text-xl font-normal font-abeezee mb-6'>
+          <p className='text-on-brand-soft text-xl font-normal font-abeezee mb-6'>
             Complete your daily challenge
             <br />
             to win amazing prices today

@@ -107,7 +107,7 @@ export default function ProfileDropdown({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.2 }}
-          className='absolute right-0 mt-2 w-72 border-stone-100 bg-white shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] rounded-[1.6875rem] border-[0.5px] border-solid z-50'
+          className='absolute right-0 mt-2 w-72 border-hairline bg-surface shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] rounded-[1.6875rem] border-[0.5px] border-solid z-50'
           onClick={(e) => e.stopPropagation()}
           role='menu'
           aria-label='Profile menu'
@@ -116,23 +116,35 @@ export default function ProfileDropdown({
             <Link
               key={item.label}
               role='menuitem'
-              className='flex items-center gap-3 py-6 px-4 hover:bg-gray-50  rounded-[1.6875rem] cursor-pointer transition-colors border-b-[0.5px] border-solid border-stone-100'
+              className='flex items-center gap-3 py-6 px-4 hover:bg-gray-50 dark:hover:bg-sunken  rounded-[1.6875rem] cursor-pointer transition-colors border-b-[0.5px] border-solid border-hairline'
               href={item.link}
             >
-              <Image src={item.icon} alt='' width={24} height={24} />
-              <span className='text-[#4A413F] not-italic leading-6 font-abeezee text-base'>
+              <Image
+                src={item.icon}
+                alt=''
+                width={24}
+                height={24}
+                className='dark:brightness-0 dark:invert'
+              />
+              <span className='text-body not-italic leading-6 font-abeezee text-base'>
                 {item.label}
               </span>
             </Link>
           ))}
           <button
             role='menuitem'
-            className='flex items-center gap-3 py-6 px-4 hover:bg-gray-50  rounded-[1.6875rem] cursor-pointer transition-colors border-b-[0.5px] border-solid border-stone-100 w-full text-left'
+            className='flex items-center gap-3 py-6 px-4 hover:bg-gray-50 dark:hover:bg-sunken  rounded-[1.6875rem] cursor-pointer transition-colors border-b-[0.5px] border-solid border-hairline w-full text-left'
             onClick={handleLogout}
             type='button'
           >
-            <Image src='/logout.svg' alt='' width={24} height={24} />
-            <span className='text-[#4A413F] not-italic leading-6 font-abeezee text-base'>
+            <Image
+              src='/logout.svg'
+              alt=''
+              width={24}
+              height={24}
+              className='dark:brightness-0 dark:invert'
+            />
+            <span className='text-body not-italic leading-6 font-abeezee text-base'>
               Logout
             </span>
           </button>

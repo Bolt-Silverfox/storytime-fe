@@ -138,7 +138,7 @@ const InboxTab = () => {
             type='button'
             onClick={handleMarkAll}
             disabled={marking}
-            className='shrink-0 rounded-full border border-[#EC4007] px-5 py-2.5 text-sm font-semibold text-[#EC4007] font-abeezee transition hover:bg-[#FEEAE6] disabled:opacity-50'
+            className='shrink-0 rounded-full border border-brand px-5 py-2.5 text-sm font-semibold text-brand-text font-abeezee transition hover:bg-tint disabled:opacity-50'
           >
             {marking ? 'Marking…' : 'Mark all as read'}
           </button>
@@ -150,13 +150,13 @@ const InboxTab = () => {
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className='h-[5rem] animate-pulse rounded-3xl bg-stone-100'
+              className='h-[5rem] animate-pulse rounded-3xl bg-sunken'
             />
           ))}
         </div>
       ) : notifications.length === 0 ? (
-        <div className='rounded-3xl border border-stone-100 bg-[#FFF8ED] px-6 py-12 text-center'>
-          <p className='text-[#4A413F] font-abeezee'>
+        <div className='rounded-3xl border border-hairline bg-cream px-6 py-12 text-center'>
+          <p className='text-body font-abeezee'>
             You're all caught up — no notifications yet.
           </p>
         </div>
@@ -170,25 +170,25 @@ const InboxTab = () => {
                 key={item.id ?? index}
                 className={`rounded-3xl border px-6 py-5 shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)] transition-all ${
                   unread
-                    ? 'border-[#F84020]/30 bg-[#FFF8ED]'
-                    : 'border-stone-100 bg-white'
+                    ? 'border-brand-edge/30 bg-cream'
+                    : 'border-hairline bg-surface'
                 }`}
               >
                 <div className='flex items-start justify-between gap-4'>
-                  <h3 className='text-[#221D1D] text-base not-italic font-bold leading-5 font-qilka'>
+                  <h3 className='text-strong text-base not-italic font-bold leading-5 font-qilka'>
                     {item.title ?? ''}
                   </h3>
                   {unread && (
-                    <span className='mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-[#EC4007]' />
+                    <span className='mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-brand' />
                   )}
                 </div>
                 {body && (
-                  <p className='mt-1 text-[#4A413F] text-sm not-italic font-normal leading-5 font-abeezee'>
+                  <p className='mt-1 text-body text-sm not-italic font-normal leading-5 font-abeezee'>
                     {body}
                   </p>
                 )}
                 {formatDate(item.createdAt) && (
-                  <p className='mt-2 text-[#4A413F] text-xs not-italic font-normal leading-4 font-abeezee'>
+                  <p className='mt-2 text-body text-xs not-italic font-normal leading-4 font-abeezee'>
                     {formatDate(item.createdAt)}
                   </p>
                 )}
@@ -214,16 +214,16 @@ const BrowserNotificationsRow = () => {
 
   return (
     <div className='flex flex-col gap-3'>
-      <h3 className='text-[#221D1D] text-lg not-italic font-bold leading-6 font-qilka'>
+      <h3 className='text-strong text-lg not-italic font-bold leading-6 font-qilka'>
         Browser notifications
       </h3>
-      <div className='rounded-3xl border border-stone-100 bg-white px-6 py-2 shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)]'>
+      <div className='rounded-3xl border border-hairline bg-surface px-6 py-2 shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)]'>
         <div className='flex items-center justify-between gap-4 py-4'>
           <div>
-            <p className='text-[#221D1D] text-base not-italic font-normal leading-5 font-abeezee'>
+            <p className='text-strong text-base not-italic font-normal leading-5 font-abeezee'>
               Enable browser notifications
             </p>
-            <p className='mt-0.5 text-[#4A413F] text-xs not-italic font-normal leading-4 font-abeezee'>
+            <p className='mt-0.5 text-body text-xs not-italic font-normal leading-4 font-abeezee'>
               {description}
             </p>
           </div>
@@ -237,7 +237,7 @@ const BrowserNotificationsRow = () => {
                 disable();
               }
             }}
-            className='data-[state=checked]:bg-[#EC4007]'
+            className='data-[state=checked]:bg-brand'
           />
         </div>
       </div>
@@ -302,13 +302,13 @@ const SettingsTab = () => {
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className='h-[4rem] animate-pulse rounded-3xl bg-stone-100'
+              className='h-[4rem] animate-pulse rounded-3xl bg-sunken'
             />
           ))}
         </div>
       ) : visibleCount === 0 ? (
-        <div className='rounded-3xl border border-stone-100 bg-[#FFF8ED] px-6 py-12 text-center'>
-          <p className='text-[#4A413F] font-abeezee'>
+        <div className='rounded-3xl border border-hairline bg-cream px-6 py-12 text-center'>
+          <p className='text-body font-abeezee'>
             No notification preferences yet.
           </p>
         </div>
@@ -324,10 +324,10 @@ const SettingsTab = () => {
           }
           return (
             <div key={section.title} className='flex flex-col gap-3'>
-              <h3 className='text-[#221D1D] text-lg not-italic font-bold leading-6 font-qilka'>
+              <h3 className='text-strong text-lg not-italic font-bold leading-6 font-qilka'>
                 {section.title}
               </h3>
-              <div className='rounded-3xl border border-stone-100 bg-white px-6 py-2 shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)]'>
+              <div className='rounded-3xl border border-hairline bg-surface px-6 py-2 shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)]'>
                 {rows.map((pref, index) => {
                   const isLast = index === rows.length - 1;
                   const channel = CHANNEL_LABELS[pref.type] ?? pref.type;
@@ -335,14 +335,14 @@ const SettingsTab = () => {
                     <div
                       key={pref.id}
                       className={`flex items-center justify-between gap-4 py-4 ${
-                        isLast ? '' : 'border-b border-stone-100'
+                        isLast ? '' : 'border-b border-hairline'
                       }`}
                     >
                       <div>
-                        <p className='text-[#221D1D] text-base not-italic font-normal leading-5 font-abeezee'>
+                        <p className='text-strong text-base not-italic font-normal leading-5 font-abeezee'>
                           {CATEGORY_LABELS[pref.category]}
                         </p>
-                        <p className='mt-0.5 text-[#4A413F] text-xs not-italic font-normal leading-4 font-abeezee'>
+                        <p className='mt-0.5 text-body text-xs not-italic font-normal leading-4 font-abeezee'>
                           {channel}
                         </p>
                       </div>
@@ -350,7 +350,7 @@ const SettingsTab = () => {
                         checked={pref.enabled}
                         disabled={pendingIds.includes(pref.id)}
                         onCheckedChange={() => handleToggle(pref)}
-                        className='data-[state=checked]:bg-[#EC4007]'
+                        className='data-[state=checked]:bg-brand'
                       />
                     </div>
                   );
@@ -378,25 +378,25 @@ const NotificationPage = () => {
     const base =
       'rounded-full px-5 py-2.5 text-sm font-semibold font-abeezee transition';
     if (activeTab === tab) {
-      return `${base} bg-[#EC4007] text-white`;
+      return `${base} bg-brand text-white`;
     }
-    return `${base} text-[#4A413F] hover:bg-[#FEEAE6]`;
+    return `${base} text-body hover:bg-tint`;
   };
 
   return (
-    <div className='bg-white rounded-[2.5625rem] border-[0.5px] border-solid border-[#FAF4F2] px-4 sm:px-6 md:px-10 py-6 md:py-[2.125rem] w-full max-w-6xl mx-auto my-6 md:my-12'>
+    <div className='bg-surface rounded-[2.5625rem] border-[0.5px] border-solid border-hairline-warm px-4 sm:px-6 md:px-10 py-6 md:py-[2.125rem] w-full max-w-6xl mx-auto my-6 md:my-12'>
       <Header white={false} />
 
       <section className='mt-12'>
         <div className='mb-4 flex items-center gap-3'>
           <BackButton />
-          <span className='font-abeezee text-sm text-[#4A413F]'>Back</span>
+          <span className='font-abeezee text-sm text-body'>Back</span>
         </div>
         <div className='mb-6'>
-          <h2 className='mb-1 text-[#221D1D] text-2xl not-italic font-bold leading-7 font-qilka'>
+          <h2 className='mb-1 text-strong text-2xl not-italic font-bold leading-7 font-qilka'>
             Notifications
           </h2>
-          <p className='text-[#4A413F] text-sm not-italic font-normal leading-5 font-abeezee'>
+          <p className='text-body text-sm not-italic font-normal leading-5 font-abeezee'>
             Updates, reminders and preferences from Storytime.
           </p>
         </div>
@@ -406,25 +406,25 @@ const NotificationPage = () => {
             {[1, 2, 3].map((i) => (
               <div
                 key={i}
-                className='h-[5rem] animate-pulse rounded-3xl bg-stone-100'
+                className='h-[5rem] animate-pulse rounded-3xl bg-sunken'
               />
             ))}
           </div>
         ) : !loggedIn ? (
-          <div className='rounded-3xl border border-stone-100 bg-[#FFF8ED] px-6 py-10 text-center'>
-            <p className='text-[#4A413F] font-abeezee'>
+          <div className='rounded-3xl border border-hairline bg-cream px-6 py-10 text-center'>
+            <p className='text-body font-abeezee'>
               Log in to see your notifications.
             </p>
             <Link
               href='/login'
-              className='mt-4 inline-block rounded-2xl bg-[#EC4007] px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90'
+              className='mt-4 inline-block rounded-2xl bg-brand px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90'
             >
               Log in
             </Link>
           </div>
         ) : (
           <div>
-            <div className='mb-6 inline-flex gap-2 rounded-full bg-[#FAF4F2] p-1'>
+            <div className='mb-6 inline-flex gap-2 rounded-full bg-page p-1'>
               <button
                 type='button'
                 onClick={() => setActiveTab('inbox')}

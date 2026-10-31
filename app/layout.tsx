@@ -1,7 +1,8 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { ABeeZee } from 'next/font/google';
 import './globals.css';
 import localFont from 'next/font/local';
+import { ThemeColorSync } from '@/components/theme-color-sync';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { cn } from '@/lib/utils';
@@ -44,6 +45,13 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#FAF4F2' },
+    { media: '(prefers-color-scheme: dark)', color: '#1A1514' },
+  ],
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -54,16 +62,17 @@ export default function RootLayout({
       <body className={cn(abeezee.variable, qilka.variable, 'antialiased')}>
         <a
           href='#main'
-          className='sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:font-abeezee focus:text-[#221D1D] focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#EC4007]'
+          className='sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-surface focus:px-4 focus:py-2 focus:font-abeezee focus:text-strong focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-brand'
         >
           Skip to content
         </a>
         <ThemeProvider
           attribute='class'
-          defaultTheme='light'
+          defaultTheme='system'
           enableSystem
           disableTransitionOnChange
         >
+          <ThemeColorSync />
           <Providers>{children}</Providers>
           <Toaster />
         </ThemeProvider>

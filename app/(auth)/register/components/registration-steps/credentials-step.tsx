@@ -121,7 +121,7 @@ export const CredentialsStep = () => {
         className='max-w-[539px] mx-auto space-y-10'
       >
         <div className='space-y-6'>
-          <h1 className='text-center font-qilka font-bold text-[26px] text-[#221D1D] dark:text-white'>
+          <h1 className='text-center font-qilka font-bold text-[26px] text-strong'>
             Provide your email and password
           </h1>
 
@@ -148,7 +148,7 @@ export const CredentialsStep = () => {
             control={form.control}
             name='password'
             render={({ field }) => (
-              <FormItem className='bg-background dark:bg-background z-[1] relative px-1'>
+              <FormItem className='bg-background z-[1] relative px-1'>
                 <FormLabel>Password</FormLabel>
                 <FormControl>
                   <div className='relative'>
@@ -167,7 +167,7 @@ export const CredentialsStep = () => {
                 </FormControl>
                 <FormMessage
                   className={cn(
-                    'text-[#4A413F]',
+                    'text-body',
                     form.formState.errors.password && 'text-destructive'
                   )}
                 >

@@ -33,7 +33,7 @@ const RecommendedCard = ({
 
   return (
     <div
-      className='border-stone-100 bg-white shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)]  pr-6 rounded-3xl border-[0.5px] border-solid hover:scale-105 transition-all duration-300 cursor-pointer'
+      className='border-hairline bg-surface shadow-[0px_0px_17px_0px_rgba(34,29,29,0.05)]  pr-6 rounded-3xl border-[0.5px] border-solid hover:scale-105 transition-all duration-300 cursor-pointer'
       onClick={handleClick}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -56,7 +56,7 @@ const RecommendedCard = ({
         </div>
         <div className='flex flex-col py-3'>
           <div className='flex flex-row justify-between items-center'>
-            <h3 className='text-[#221D1D] text-xl not-italic font-bold leading-6 font-qilka'>
+            <h3 className='text-strong text-xl not-italic font-bold leading-6 font-qilka'>
               {title}
             </h3>
             <Image
@@ -64,16 +64,17 @@ const RecommendedCard = ({
               alt='heart'
               width={20}
               height={20}
+              className={isFavorite ? '' : 'dark:brightness-0 dark:invert'}
               onClick={(e) => {
                 e.stopPropagation();
                 setIsFavorite(!isFavorite);
               }}
             />
           </div>
-          <p className='text-[#4A413F] text-base not-italic font-normal leading-5 font-abeezee mt-[0.37rem] w-[85%]'>
+          <p className='text-body text-base not-italic font-normal leading-5 font-abeezee mt-[0.37rem] w-[85%]'>
             {description}
           </p>
-          <p className='text-[#4A413F] text-xs not-italic font-normal leading-4 mt-6 font-abeezee'>
+          <p className='text-body text-xs not-italic font-normal leading-4 mt-6 font-abeezee'>
             Written by: {author}
           </p>
         </div>

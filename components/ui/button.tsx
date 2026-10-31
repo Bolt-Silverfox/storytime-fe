@@ -11,7 +11,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         primary:
-          'rounded-[50px] bg-[#EC4007] py-2.5 h-auto text-white hover:bg-[#EC4007]/80 disabled:bg-[#FEEAE6] disabled:text-[#FB9583]',
+          'rounded-[50px] bg-brand py-2.5 h-auto text-white hover:bg-brand/80 disabled:bg-tint disabled:text-brand-soft',
         default:
           'bg-primary text-primary-foreground shadow-xs hover:bg-primary/90',
         destructive:

@@ -77,7 +77,9 @@ describe('AppNavbar auth state', () => {
     // jsdom has no layout; measured in a real browser (toggle x identical for
     // unknown, guest and signed-in). This guards the class that does it.
     for (const cookie of [null, 'refreshToken=r; path=/']) {
-      if (cookie) document.cookie = cookie;
+      if (cookie) {
+        document.cookie = cookie;
+      }
       const { container, unmount } = render(<AppNavbar />);
       expect(container.querySelector('.min-w-\\[272px\\]')).not.toBeNull();
       unmount();

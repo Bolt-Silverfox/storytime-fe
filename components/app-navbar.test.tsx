@@ -62,11 +62,14 @@ describe('AppNavbar auth state', () => {
     expect(screen.queryByText('Go to app')).toBeNull();
   });
 
-  it('server render (auth unknown): no Go to app, guest buttons invisible and inert', () => {
+  it('server render (auth unknown): no Go to app, guest buttons hidden, no-JS fallback present', () => {
     const html = renderToString(<AppNavbar />);
     expect(html).not.toContain('Go to app');
     expect(html).toMatch(
-      /class="[^"]*\binvisible\b[^"]*" aria-hidden="true" inert=""><a[^>]*href="\/login"/
+      /class="[^"]*\bauth-pending invisible\b[^"]*"><a[^>]*href="\/login"/
+    );
+    expect(html).toContain(
+      '<noscript><style>.auth-pending{visibility:visible!important}</style></noscript>'
     );
   });
 });

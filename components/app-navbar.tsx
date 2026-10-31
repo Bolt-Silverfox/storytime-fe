@@ -11,16 +11,21 @@ import {
   Navbar,
   NavItems,
 } from '@/components/ui/resizable-navbar';
-import { useAuthState } from '@/lib/use-auth-state';
+import { AUTH_PENDING, useAuthState } from '@/lib/use-auth-state';
 import { cn } from '@/lib/utils';
+import { NoScriptAuthStyle } from './auth-link';
 import { Logo } from './logo';
 import { ModeToggle } from './mode-toggle';
 import { buttonVariants } from './ui/button';
 import { ScrollProgress } from './ui/scroll-progress';
 
 export function AppNavbar() {
-  // 'unknown' during SSR/hydration: the guest buttons are rendered invisible
-  // (same size, so no layout shift) and never shown to a signed-in visitor.
+  // 'unknown' during SSR/hydration: the guest buttons are rendered
+  // `visibility: hidden` (they keep their size, and hidden elements can't be
+  // focused or clicked) so a signed-in visitor never sees them. The right-hand
+  // button slot has a fixed minimum width (the guest buttons' width, right
+  // aligned) in every state, so the theme toggle does not move when auth resolves to guest or signed in. Without JS the state
+  // never resolves, so the <noscript> rule below shows the guest buttons.
   const auth = useAuthState();
   const loggedIn = auth === 'in';
   const pending = auth === 'unknown';
@@ -49,6 +54,7 @@ export function AppNavbar() {
 
   return (
     <div className='relative w-full'>
+      <NoScriptAuthStyle />
       <Navbar className='fixed top-5 inset-x-0 mx-auto z-50'>
         <NavBody visible={true}>
           <ScrollProgress className='top-[-5px]' />
@@ -56,45 +62,45 @@ export function AppNavbar() {
           <NavItems items={navItems} />
           <div className='flex items-center gap-4 relative'>
             <ModeToggle />
-            {loggedIn ? (
-              <Link
-                href='/dashboard'
-                className={cn(
-                  buttonVariants({ variant: 'primary' }),
-                  'px-9 h-auto py-4'
-                )}
-              >
-                Go to app
-              </Link>
-            ) : (
-              <div
-                className={cn(
-                  'flex items-center gap-4',
-                  pending && 'invisible'
-                )}
-                aria-hidden={pending || undefined}
-                inert={pending || undefined}
-              >
+            <div className='flex min-w-[272px] justify-end'>
+              {loggedIn ? (
                 <Link
-                  href='/login'
-                  className={cn(
-                    buttonVariants({ variant: 'outline' }),
-                    'rounded-full bg-transparent border-brand border px-9 h-auto py-4'
-                  )}
-                >
-                  Login
-                </Link>
-                <Link
-                  href='/register'
+                  href='/dashboard'
                   className={cn(
                     buttonVariants({ variant: 'primary' }),
                     'px-9 h-auto py-4'
                   )}
                 >
-                  Get started
+                  Go to app
                 </Link>
-              </div>
-            )}
+              ) : (
+                <div
+                  className={cn(
+                    'flex items-center gap-4',
+                    pending && AUTH_PENDING
+                  )}
+                >
+                  <Link
+                    href='/login'
+                    className={cn(
+                      buttonVariants({ variant: 'outline' }),
+                      'rounded-full bg-transparent border-brand border px-9 h-auto py-4'
+                    )}
+                  >
+                    Login
+                  </Link>
+                  <Link
+                    href='/register'
+                    className={cn(
+                      buttonVariants({ variant: 'primary' }),
+                      'px-9 h-auto py-4'
+                    )}
+                  >
+                    Get started
+                  </Link>
+                </div>
+              )}
+            </div>
           </div>
         </NavBody>
 
@@ -141,9 +147,7 @@ export function AppNavbar() {
                 </Link>
               ) : (
                 <div
-                  className={cn('flex flex-col gap-4', pending && 'invisible')}
-                  aria-hidden={pending || undefined}
-                  inert={pending || undefined}
+                  className={cn('flex flex-col gap-4', pending && AUTH_PENDING)}
                 >
                   <Link
                     href='/login'

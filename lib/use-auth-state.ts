@@ -2,6 +2,10 @@
 import { useSyncExternalStore } from 'react';
 import { isUserLoggedIn } from '@/lib/services';
 
+/** Class for auth-dependent UI that must stay hidden (but keep its size) until
+ * auth state is known. Shown again without JS by <NoScriptAuthStyle />. */
+export const AUTH_PENDING = 'auth-pending invisible';
+
 export type AuthState = 'unknown' | 'in' | 'out';
 
 const subscribe = (cb: () => void) => {

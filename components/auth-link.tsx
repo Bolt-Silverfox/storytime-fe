@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { useAuthState } from '@/lib/use-auth-state';
+import { AUTH_PENDING, useAuthState } from '@/lib/use-auth-state';
 import { cn } from '@/lib/utils';
 
 type Props = {
@@ -32,11 +32,19 @@ export function AuthLink({
   return (
     <Link
       href={auth === 'in' ? signedInHref : href}
-      className={cn(className, hide && 'invisible')}
-      aria-hidden={hide || undefined}
-      tabIndex={hide ? -1 : undefined}
+      className={cn(className, hide && AUTH_PENDING)}
     >
       {auth === 'in' && relabel ? signedInChildren : children}
     </Link>
+  );
+}
+
+/** Without JS auth state never resolves; show the guest links instead of
+ * leaving them hidden forever. */
+export function NoScriptAuthStyle() {
+  return (
+    <noscript>
+      <style>{'.auth-pending{visibility:visible!important}'}</style>
+    </noscript>
   );
 }

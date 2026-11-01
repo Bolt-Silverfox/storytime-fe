@@ -147,3 +147,78 @@ export const useStoryStatus = (storyId: string): StoryStatus => {
     () => null
   );
 };
+
+// Per-story reading position (page index), so reopening resumes where the
+// reader left off. Device-local for guests and signed-in users alike; the page
+// count is stored with it so a position is dropped if the story text changed.
+const POSITIONS_KEY = 'readerPositions';
+
+type PositionMap = Record<string, { page: number; count: number }>;
+
+const readPositions = (): PositionMap => {
+  if (typeof window === 'undefined') {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(
+      window.localStorage.getItem(POSITIONS_KEY) ?? 'null'
+    );
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as PositionMap)
+      : {};
+  } catch {
+    return {};
+  }
+};
+
+const writePositions = (map: PositionMap) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    window.localStorage.setItem(POSITIONS_KEY, JSON.stringify(map));
+  } catch {
+    // Ignore — persistence is best-effort.
+  }
+};
+
+export const getReadingPosition = (
+  storyId: string,
+  pageCount: number
+): number | null => {
+  const entry = readPositions()[storyId];
+  if (
+    !entry ||
+    entry.count !== pageCount ||
+    !Number.isInteger(entry.page) ||
+    entry.page < 0 ||
+    entry.page >= pageCount
+  ) {
+    return null;
+  }
+  return entry.page;
+};
+
+export const saveReadingPosition = (
+  storyId: string,
+  page: number,
+  pageCount: number
+) => {
+  if (pageCount <= 0) {
+    return;
+  }
+  const map = readPositions();
+  map[storyId] = {
+    page: Math.min(Math.max(Math.trunc(page) || 0, 0), pageCount - 1),
+    count: pageCount,
+  };
+  writePositions(map);
+};
+
+export const clearReadingPosition = (storyId: string) => {
+  const map = readPositions();
+  if (storyId in map) {
+    delete map[storyId];
+    writePositions(map);
+  }
+};

@@ -8,12 +8,37 @@ updates:
     open-pull-requests-limit: 10
     labels:
       - 'dependencies'
+    ignore:
+      # @vercel/otel 2.x peers on @opentelemetry/instrumentation >=0.200 <0.300.
+      # The 0.300 (OpenTelemetry JS 3.0) jump breaks it; revisit when
+      # @vercel/otel declares support.
+      # 0.x minors count as "minor" to Dependabot, so block by version range.
+      # Only the experimental 0.x packages are affected; the stable 1.x/2.x
+      # @opentelemetry packages keep updating.
+      - dependency-name: '@opentelemetry/api-logs'
+        versions: ['>=0.300.0']
+      - dependency-name: '@opentelemetry/instrumentation'
+        versions: ['>=0.300.0']
+      - dependency-name: '@opentelemetry/sdk-logs'
+        versions: ['>=0.300.0']
+      # @vercel/otel 2.1.x also peers these at <3.0.0.
+      - dependency-name: '@opentelemetry/resources'
+        versions: ['>=3.0.0']
+      - dependency-name: '@opentelemetry/sdk-metrics'
+        versions: ['>=3.0.0']
+      - dependency-name: '@opentelemetry/sdk-trace-base'
+        versions: ['>=3.0.0']
+      # NOTE: ignore rules also apply to Dependabot SECURITY updates. An advisory
+      # fixed only in an ignored range gets no PR; handle those manually.
     groups:
       # Batch low-risk updates into a single PR to cut noise.
       minor-and-patch:
         update-types:
           - 'minor'
           - 'patch'
+        # Keep OTel out of the batch so it cannot drag the group PR.
+        exclude-patterns:
+          - '@opentelemetry/*'
 
   # Keep GitHub Actions pinned versions current.
   - package-ecosystem: 'github-actions'

@@ -34,10 +34,9 @@
 # ---------------------------------------------------------------------------
 
 ARG NODE_VERSION=24.21.0
-# package.json has engines.node ">=24" and no `packageManager` field, so
-# corepack cannot infer a pnpm version and must be told one explicitly.
-# 9.15.9 is the latest 9.x, matching CI (pnpm/action-setup with version: 9)
-# and the lockfileVersion '9.0' in pnpm-lock.yaml.
+# package.json pins `packageManager: pnpm@9.15.9`, which CI (pnpm/action-setup)
+# and Dependabot also read. This ARG is passed to corepack explicitly and MUST
+# match that field; the lockfileVersion '9.0' in pnpm-lock.yaml needs pnpm 9.
 ARG PNPM_VERSION=9.15.9
 
 

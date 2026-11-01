@@ -79,11 +79,11 @@ const SENSITIVE_STEMS = [
   'bearer',
   'cvv',
   'cardnumber',
-  'otp',
 ];
 // Short words match only as the whole key (substring would hit "keyboard",
 // "shipping", "statusCode", ...).
 const SENSITIVE_EXACT = new Set([
+  'otp',
   'pass',
   'pwd',
   'pin',
@@ -133,32 +133,72 @@ const AUTH_HEADER =
   /(authorization["']?\s*[:=]\s*)(?:"[^"]{0,2000}"|'[^']{0,2000}'|(?:[A-Za-z]{1,20}\s+)?[^\s,;"'&]+)/gi;
 const SCHEME_TOKEN = /\b(Bearer|Basic|Token|Digest)\s+[\w.~+/=-]+/gi;
 // key=value / key: value / "key":"value" pairs. Bounded so it stays linear.
+// Unquoted values stop at whitespace and , & ; # } so a fragment or the next
+// query parameter is its own pair.
 const PAIR =
-  /(["']?)([A-Za-z][\w.-]{0,40})\1(\s{0,3}[:=](?!\/\/)\s{0,3})(?:"([^"]{0,500})"|'([^']{0,500})'|([^\s,&;}"']{1,500}))/g;
+  /(["']?)([A-Za-z][\w.-]{0,40})\1(\s{0,3}[:=](?!\/\/)\s{0,3})(?:"([^"]{0,500})"|'([^']{0,500})'|([^\s,&;#}"']{1,500}))/g;
+const FILE_NAME = /\.(?:m?[jt]sx?|map|css|html?)$/i;
+const POSITION_ONLY = /^\d+(?::\d+)*\)?$/;
 // Bounded quantifiers keep this linear; the TLD must be letters, so
 // "pkg@1.2.3" is left alone.
 const EMAIL =
   /[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){0,5}\.[A-Za-z]{2,24}/g;
 
+// Input is cut to this before scanning so a megabyte string cannot stall the
+// logger; the result is cut again to MAX_STRING AFTER redaction, so a secret
+// is never half-cut before it is masked.
+const MAX_SCAN = 64_000;
+
+function redactPairs(input: string, depth = 0): string {
+  return input.replace(
+    PAIR,
+    (
+      match,
+      quote: string,
+      key: string,
+      sep: string,
+      dq: string | undefined,
+      sq: string | undefined,
+      bare: string | undefined
+    ) => {
+      const valueQuote = dq !== undefined ? '"' : sq !== undefined ? "'" : '';
+      const value = dq ?? sq ?? bare ?? '';
+      const head = `${quote}${key}${quote}${sep}`;
+      const strict = quote !== '' || sep.trim() === '=';
+      if (FILE_NAME.test(key) && POSITION_ONLY.test(value)) {
+        return match;
+      }
+      if (isSensitiveKey(key, true, strict)) {
+        return `${head}${valueQuote}${REDACTED}${valueQuote}`;
+      }
+      // A non-secret label ("Failed: password=x", "url=https://a?token=x"):
+      // scan its value on its own so a nested secret is not swallowed.
+      return depth < 4
+        ? `${head}${valueQuote}${redactPairs(value, depth + 1)}${valueQuote}`
+        : match;
+    }
+  );
+}
+
 function redactString(input: string): string {
   let value = input;
-  let truncated = false;
-  if (value.length > MAX_STRING) {
-    value = value.slice(0, MAX_STRING);
-    truncated = true;
+  if (value.length > MAX_SCAN) {
+    value = value.slice(0, MAX_SCAN);
+    // Don't leave a half-cut token at the boundary.
+    const cut = value.search(/[\s,&;"'][^\s,&;"']*$/);
+    if (cut > MAX_SCAN - 1024) {
+      value = value.slice(0, cut);
+    }
   }
-  value = value
-    .replace(JWT, REDACTED)
-    .replace(AUTH_HEADER, `$1${REDACTED}`)
-    .replace(SCHEME_TOKEN, `$1 ${REDACTED}`)
-    .replace(PAIR, (match, quote: string, key: string, sep: string) => {
-      const strict = quote !== '' || sep.trim() === '=';
-      return isSensitiveKey(key, true, strict)
-        ? `${quote}${key}${quote}${sep}${quote ? `${quote}${REDACTED}${quote}` : REDACTED}`
-        : match;
-    })
-    .replace(EMAIL, REDACTED);
-  return truncated ? `${value}…[truncated]` : value;
+  value = redactPairs(
+    value
+      .replace(JWT, REDACTED)
+      .replace(AUTH_HEADER, `$1${REDACTED}`)
+      .replace(SCHEME_TOKEN, `$1 ${REDACTED}`)
+  ).replace(EMAIL, REDACTED);
+  return value.length > MAX_STRING || input.length > MAX_SCAN
+    ? `${value.slice(0, MAX_STRING)}…[truncated]`
+    : value;
 }
 
 function isAxiosLike(value: object): boolean {
@@ -170,20 +210,69 @@ function isAxiosLike(value: object): boolean {
 
 const ID_SEGMENT =
   /^(?:\d+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{16,}|c[a-z0-9]{20,})$/i;
+// Parents whose next segment is an entity (slug / code / id), not a route word.
+const DYNAMIC_PARENTS = new Set([
+  'verify',
+  'invite',
+  'reset-password',
+  'stories',
+  'story',
+  'users',
+  'user',
+  'kids',
+  'share',
+]);
+// Route words that legitimately follow those parents.
+const STATIC_WORDS = new Set([
+  'me',
+  'categories',
+  'user',
+  'library',
+  'completed',
+  'continue-reading',
+  'progress',
+  'quota',
+  'daily-challenge',
+  'kid',
+  'recommended',
+  'search',
+  'audio',
+  'avatar',
+  'upload-avatar',
+]);
 
-/** Path only (no origin/query/fragment), with ids replaced by ":id". */
+function normaliseSegment(seg: string, parent: string): string {
+  if (seg === '' || STATIC_WORDS.has(seg)) {
+    return seg;
+  }
+  if (
+    ID_SEGMENT.test(seg) ||
+    (seg.length >= 20 && /\d/.test(seg)) ||
+    (seg.length >= 6 && /\d/.test(seg) && /[a-z]/i.test(seg))
+  ) {
+    return ':id';
+  }
+  return DYNAMIC_PARENTS.has(parent) ? ':slug' : seg;
+}
+
+/** Path only (no origin/query/fragment), with ids/slugs replaced by ":id"/":slug". */
 function normalisePath(url: unknown): string | undefined {
   if (typeof url !== 'string') {
     return undefined;
   }
   let path = url.split(/[?#]/)[0];
   path = path.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]*/i, '');
-  const segments = path
-    .split('/')
-    .map((seg) =>
-      ID_SEGMENT.test(seg) || (seg.length >= 20 && /\d/.test(seg)) ? ':id' : seg
-    );
-  return redactString(segments.join('/')) || '/';
+  const segments = path.split('/');
+  let parent = '';
+  const out = segments.map((seg) => {
+    const next = normaliseSegment(seg, parent);
+    if (seg !== '') {
+      parent = seg;
+    }
+    return next;
+  });
+  const joined = out.join('/');
+  return redactString(joined.startsWith('/') ? joined : `/${joined}`);
 }
 
 interface HttpErrorSummary {
@@ -211,13 +300,26 @@ function summariseAxios(err: Record<string, unknown>): HttpErrorSummary {
   };
 }
 
+// Total serialised size allowed for one redacted value.
+const MAX_TOTAL = 64_000;
+
+interface Budget {
+  left: number;
+}
+
 function redactInner(
   value: unknown,
   depth: number,
-  seen: WeakSet<object>
+  seen: WeakSet<object>,
+  budget: Budget
 ): unknown {
+  if (budget.left <= 0) {
+    return '[truncated]';
+  }
   if (typeof value === 'string') {
-    return redactString(value);
+    const out = redactString(value);
+    budget.left -= out.length;
+    return out;
   }
   if (value === null || typeof value !== 'object') {
     return typeof value === 'function' ? '[Function]' : value;
@@ -241,17 +343,18 @@ function redactInner(
       cause:
         value.cause === undefined
           ? undefined
-          : redactInner(value.cause, depth + 1, seen),
+          : redactInner(value.cause, depth + 1, seen, budget),
     };
   }
   if (Array.isArray(value)) {
-    return value.map((item) => redactInner(item, depth + 1, seen));
+    return value.map((item) => redactInner(item, depth + 1, seen, budget));
   }
   const out: Record<string, unknown> = {};
   for (const [key, inner] of Object.entries(value)) {
+    budget.left -= key.length + 4;
     out[key] = isSensitiveKey(key)
       ? REDACTED
-      : redactInner(inner, depth + 1, seen);
+      : redactInner(inner, depth + 1, seen, budget);
   }
   return out;
 }
@@ -259,7 +362,7 @@ function redactInner(
 /** Deep-copy `value` with secrets (tokens, auth headers, cookies, emails, passwords, session ids) masked. */
 export function redact(value: unknown): unknown {
   try {
-    return redactInner(value, 0, new WeakSet());
+    return redactInner(value, 0, new WeakSet(), { left: MAX_TOTAL });
   } catch {
     return '[Unserializable]';
   }
@@ -512,8 +615,12 @@ function report(
 // failing with ERR_NETWORK / CORS) or a misrouted bearer (401 on a normal
 // endpoint). Send one warning-level event per endpoint per minute for those.
 const OUTAGE_EVENT_INTERVAL_MS = 60_000;
+// Auth *actions* (a 401 here is a normal wrong-credentials / expired-refresh
+// outcome). Other /auth/* endpoints (auth/kids, auth/linked-accounts, ...) are
+// ordinary authenticated calls: a 401 there is worth one event per minute.
 const AUTH_PATH =
-  /\/(auth|login|logout|register|refresh|session|verify|password|token|oauth)\b/i;
+  /(?:^|\/)(?:auth\/(?:login|logout|register|refresh|refresh-token|apple|google|send-verification|verify-email|request-password-reset|reset-password|validate-reset-token|change-password)|login|logout|oauth)(?:\/|$)/i;
+const MAX_OUTAGE_KEYS = 200;
 const lastOutageEvent = new Map<string, number>();
 
 function maybeReportExpectedOutage(
@@ -543,7 +650,14 @@ function maybeReportExpectedOutage(
   if (last !== undefined && now - last < OUTAGE_EVENT_INTERVAL_MS) {
     return;
   }
+  lastOutageEvent.delete(key);
   lastOutageEvent.set(key, now);
+  if (lastOutageEvent.size > MAX_OUTAGE_KEYS) {
+    const oldest = lastOutageEvent.keys().next().value;
+    if (oldest !== undefined) {
+      lastOutageEvent.delete(oldest);
+    }
+  }
   Sentry.captureMessage(
     `Expected failure: ${network ? 'network error' : 'unauthorised'} ${http.method ?? ''} ${http.path ?? ''}`.trim(),
     {
@@ -603,7 +717,7 @@ export function createLogger(scope?: string): Logger {
     safely(() => {
       const safeMessage = redactString(String(message));
       const safeData = data.map(redact);
-      writeConsole('warn', scope, safeMessage, safeData);
+      safely(() => writeConsole('warn', scope, safeMessage, safeData));
       sendBreadcrumb('warning', scope, safeMessage, safeData);
     });
   return {
@@ -628,11 +742,14 @@ export function createLogger(scope?: string): Logger {
           return;
         }
         const safeMessage = redactString(String(message));
-        writeConsole('error', scope, safeMessage, [
-          ...(error === undefined ? [] : [redact(error)]),
-          ...(options.context ? [redact(options.context)] : []),
-        ]);
-        sendBreadcrumb('error', scope, safeMessage, []);
+        // Each step is isolated: a throwing console must not stop reporting.
+        safely(() =>
+          writeConsole('error', scope, safeMessage, [
+            ...(error === undefined ? [] : [redact(error)]),
+            ...(options.context ? [redact(options.context)] : []),
+          ])
+        );
+        safely(() => sendBreadcrumb('error', scope, safeMessage, []));
         safely(() => report(scope, safeMessage, error, options));
       }),
   };

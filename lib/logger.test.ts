@@ -499,3 +499,164 @@ describe('error breadcrumbs', () => {
     );
   });
 });
+
+describe('round 2: nested pairs, labels and urls', () => {
+  it.each([
+    ['Failed: password=hunter2', 'hunter2'],
+    ['Error: token=abc123', 'abc123'],
+    ['url=https://api/x?access_token=abc123', 'abc123'],
+    ['Error: https://s3/x?X-Amz-Signature=sigXYZ', 'sigXYZ'],
+    ['next=https://a/b#access_token=frag1', 'frag1'],
+  ])('masks %s', (input, secret) => {
+    expect(redact(input)).not.toContain(secret);
+  });
+
+  it('masks every secret in a partially safe url', () => {
+    const out = redact(
+      'redirect: https://api/x?token=abc123&otp=999111&page=2'
+    ) as string;
+    expect(out).not.toMatch(/abc123|999111/);
+    expect(out).toContain('page=2');
+  });
+
+  it('logger.error with a labelled secret leaks nowhere', () => {
+    logger.error('Failed: password=hunter2');
+    logger.warn('Failed: password=hunter2');
+    const all = JSON.stringify([
+      spies.error.mock.calls,
+      spies.warn.mock.calls,
+      sentry.captureMessage.mock.calls,
+      sentry.addBreadcrumb.mock.calls,
+    ]);
+    expect(all).not.toContain('hunter2');
+  });
+
+  it('masks the exception message and the first stack line', () => {
+    for (const msg of ['password=hunter2', 'Failed: password=hunter2']) {
+      sentry.captureException.mockClear();
+      logger.error('x', new Error(msg));
+      const copy = sentry.captureException.mock.calls[0][0] as Error;
+      expect(copy.message).not.toContain('hunter2');
+      expect(copy.stack).not.toContain('hunter2');
+    }
+  });
+
+  it('redacts the whole string before truncating (no cut JWT leaks)', () => {
+    const jwt = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzZWNyZXRwYXlsb2FkIn0.c2ln';
+    const input = `${'a '.repeat(3_990)}${jwt}`;
+    const out = redact(input) as string;
+    expect(out).not.toMatch(/eyJ|secretpayload/);
+    expect(redact(`${'a '.repeat(3_995)}${jwt}`)).not.toMatch(/eyJhbGci/);
+  });
+
+  it('does not mask stack-frame positions or look-alike words', () => {
+    expect(redact('at f (use-token-4f3a.js:12:345)')).toBe(
+      'at f (use-token-4f3a.js:12:345)'
+    );
+    expect(redact('footprint: 3')).toBe('footprint: 3');
+  });
+
+  it('caps the total size of a context object', () => {
+    const big = Object.fromEntries(
+      Array.from({ length: 200 }, (_, i) => [`k${i}`, 'x'.repeat(2_000)])
+    );
+    const out = JSON.stringify(redact(big));
+    expect(out.length).toBeLessThan(80_000);
+    expect(out).toContain('[truncated]');
+  });
+});
+
+describe('round 2: endpoint normalisation', () => {
+  const path = (url: string) => {
+    sentry.captureException.mockClear();
+    logger.error('x', makeAxiosError(500, url));
+    return (
+      sentry.captureException.mock.calls[0][1] as {
+        tags: Record<string, string>;
+      }
+    ).tags['http.path'];
+  };
+  it.each([
+    ['/auth/verify/abcdef123456', '/auth/verify/:id'],
+    ['/invite/INVCODE', '/invite/:slug'],
+    ['stories/ada-and-the-moon', '/stories/:slug'],
+    ['users/abc123def', '/users/:id'],
+    ['reset-password/Xy7Qz9', '/reset-password/:id'],
+    ['stories/categories', '/stories/categories'],
+    ['stories/user/library/completed', '/stories/user/library/completed'],
+    ['auth/kids/9f1c2d3e-aaaa-bbbb-cccc-1234567890ab', '/auth/kids/:id'],
+    ['guest/quota', '/guest/quota'],
+  ])('%s -> %s', (url, expected) => {
+    expect(path(url)).toBe(expected);
+  });
+});
+
+describe('round 2: expected-outage scope and bounds', () => {
+  it('relative auth endpoints: only real auth actions are exempt from the 401 event', () => {
+    logger.error('x', makeAxiosError(401, 'auth/login'), { expected: true });
+    logger.error('x', makeAxiosError(401, 'auth/change-password'), {
+      expected: true,
+    });
+    logger.error('x', makeAxiosError(401, 'auth/refresh'), { expected: true });
+    expect(sentry.captureMessage).not.toHaveBeenCalled();
+    logger.error('x', makeAxiosError(401, 'auth/kids'), { expected: true });
+    logger.error('x', makeAxiosError(401, 'auth/linked-accounts'), {
+      expected: true,
+    });
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the rate-limiter map bounded', () => {
+    vi.useFakeTimers();
+    for (let i = 0; i < 400; i++) {
+      logger.error(
+        'x',
+        makeAxiosError(
+          401,
+          `/thing${'abcdefghij'.repeat(0)}/n${'q'.repeat(i % 5)}x/v${i}w`
+        ),
+        { expected: true }
+      );
+    }
+    // Oldest keys were evicted, so a very early key is reportable again.
+    sentry.captureMessage.mockClear();
+    logger.error('x', makeAxiosError(401, '/thing/nx/v0w'), { expected: true });
+    expect(sentry.captureMessage).toHaveBeenCalledOnce();
+    vi.useRealTimers();
+  });
+});
+
+describe('round 2: isolation', () => {
+  it('a throwing console does not stop Sentry reporting or leave the flag set', () => {
+    spies.error.mockImplementation(() => {
+      throw new Error('console broke');
+    });
+    expect(() => logger.error('x', new Error('e'))).not.toThrow();
+    expect(sentry.captureException).toHaveBeenCalledOnce();
+    expect(isLoggerConsoleEmit()).toBe(false);
+  });
+
+  it('console.error receives only redacted message and data', () => {
+    logger.error('fail token=abc123 for me@x.io', new Error('Bearer q.w.e'), {
+      context: { password: 'pw9' },
+    });
+    expect(JSON.stringify(spies.error.mock.calls)).not.toMatch(
+      /abc123|me@x\.io|q\.w\.e|pw9/
+    );
+  });
+
+  it('Authorization header without a known scheme is masked', () => {
+    expect(redact('Authorization: opaquevalue123')).not.toContain(
+      'opaquevalue123'
+    );
+    expect(redact('authorization=Negotiate xyz987')).not.toContain('xyz987');
+  });
+
+  it('the copied stack is redacted', () => {
+    const err = new Error('boom');
+    err.stack = 'Error: boom\n    at x (https://a/b?token=stk123:1:2)';
+    logger.error('x', err);
+    const copy = sentry.captureException.mock.calls[0][0] as Error;
+    expect(copy.stack).not.toContain('stk123');
+  });
+});

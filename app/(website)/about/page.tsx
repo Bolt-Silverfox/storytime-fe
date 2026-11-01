@@ -1,5 +1,5 @@
 import Image from 'next/image';
-import Link from 'next/link';
+import { AuthLink } from '@/components/auth-link';
 import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Icons } from '@/components/ui/icons';
@@ -27,15 +27,16 @@ const Page = () => {
               </p>
             </div>
 
-            <Link
+            <AuthLink
               href='/register'
+              signedInChildren='Go to app'
               className={cn(
                 buttonVariants({ variant: 'primary' }),
                 'md:w-[237px] w-full  text-white rounded-[50px] px-[50px] py-4 gap-2.5 h-auto'
               )}
             >
               Get started
-            </Link>
+            </AuthLink>
           </div>
         </section>
       </section>
@@ -169,15 +170,16 @@ const Page = () => {
                   </p>
                 </div>
 
-                <Link
+                <AuthLink
                   href='/register'
+                  signedInChildren='Go to app'
                   className={cn(
                     buttonVariants({ variant: 'outline' }),
                     'rounded-full bg-transparent text-white px-[54px] border h-auto py-2.5'
                   )}
                 >
                   Create an account today
-                </Link>
+                </AuthLink>
               </div>
 
               <Image

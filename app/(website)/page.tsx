@@ -1,6 +1,7 @@
 import { Volume2Icon } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { AuthLink } from '@/components/auth-link';
 import CategoryImage from '@/components/category-image';
 import {
   Accordion,
@@ -56,14 +57,17 @@ export default function Home() {
             </div>
 
             <div className='flex flex-col items-center gap-3 sm:flex-row'>
-              <Button
-                variant='primary'
-                className='md:w-[237px] w-full text-white rounded-[50px] px-[50px] py-2.5 gap-2.5'
+              <AuthLink
                 href='/register'
+                className={buttonVariants({
+                  variant: 'primary',
+                  className:
+                    'md:w-[237px] w-full text-white rounded-[50px] px-[50px] py-2.5 gap-2.5',
+                })}
               >
                 <Volume2Icon className='w-6 h-6' />
                 <span className='font-regular-body'>Start listening</span>
-              </Button>
+              </AuthLink>
               <Button
                 variant='outline'
                 className='md:w-[237px] w-full rounded-[50px] px-[50px] py-2.5 gap-2.5'
@@ -276,14 +280,17 @@ export default function Home() {
                 ))}
               </div>
 
-              <Button
-                variant='secondary'
-                type='submit'
-                className='px-[50px] h-auto py-4 rounded-full md:w-max w-full '
+              <AuthLink
                 href='/login'
+                signedInChildren='Go to app'
+                className={buttonVariants({
+                  variant: 'secondary',
+                  className:
+                    'px-[50px] h-auto py-4 rounded-full md:w-max w-full ',
+                })}
               >
                 Get started
-              </Button>
+              </AuthLink>
             </div>
           </div>
 
@@ -352,14 +359,15 @@ export default function Home() {
               </div>
             </div>
 
-            <Button
-              variant='primary'
-              type='submit'
-              className='w-full sm:w-auto px-8 sm:px-[100px] h-auto py-2.5'
+            <AuthLink
               href='/register'
+              className={buttonVariants({
+                variant: 'primary',
+                className: 'w-full sm:w-auto px-8 sm:px-[100px] h-auto py-2.5',
+              })}
             >
               Start listening
-            </Button>
+            </AuthLink>
           </div>
         </div>
       </section>

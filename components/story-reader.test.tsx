@@ -180,3 +180,23 @@ describe('batch narration with fewer clips than pages, read-along off', () => {
     expect(played[played.length - 1]).toBe('0.mp3');
   });
 });
+
+describe('pages past the narrated clips', () => {
+  beforeEach(() => {
+    guest.clips = 4;
+    guest.story = { id: 'story-1', title: 'T', textContent: TEXT };
+  });
+
+  it('shows the notice and disables Play instead of doing nothing', async () => {
+    renderReader();
+    await waitFor(() => screen.getByRole('switch'));
+    fireEvent.click(screen.getByRole('switch'));
+    await waitReady();
+    await turnTo(4); // page 5, clips cover pages 1-4
+    expect(screen.getAllByText('Page 5 of 6').length).toBeGreaterThan(0);
+    expect(screen.getByText(/No narration for this page/)).toBeTruthy();
+    expect(playButton().disabled).toBe(true);
+    fireEvent.click(playButton());
+    expect(played).toEqual([]);
+  });
+});

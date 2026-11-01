@@ -7,6 +7,12 @@ vi.mock('next/navigation', () => ({ usePathname: () => '/' }));
 
 import { AppNavbar } from './app-navbar';
 
+// A structurally valid, unexpired access token (the session check decodes it).
+const VALID_ACCESS = (() => {
+  const b64 = (o: unknown) => btoa(JSON.stringify(o)).replace(/=+$/, '');
+  return `${b64({})}.${b64({ exp: Math.floor(Date.now() / 1000) + 3600 })}.s`;
+})();
+
 const clearCookies = () => {
   for (const name of ['accessToken', 'refreshToken']) {
     document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
@@ -30,7 +36,7 @@ describe('AppNavbar auth state', () => {
   });
 
   it('cookie only (no stored user): shows Go to app, never Login/Get started', () => {
-    document.cookie = 'accessToken=abc; path=/';
+    document.cookie = `accessToken=${VALID_ACCESS}; path=/`;
     render(<AppNavbar />);
     expect(screen.getAllByText('Go to app').length).toBe(1); // desktop
     fireEvent.click(screen.getByLabelText('Toggle menu'));
@@ -40,7 +46,7 @@ describe('AppNavbar auth state', () => {
   });
 
   it('cookie + stored user: shows Go to app', () => {
-    document.cookie = 'accessToken=abc; path=/';
+    document.cookie = `accessToken=${VALID_ACCESS}; path=/`;
     localStorage.setItem('user', USER);
     render(<AppNavbar />);
     expect(screen.getAllByText('Go to app').length).toBe(1);

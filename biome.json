@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.6.4/schema.json",
   "vcs": {
     "enabled": false,
     "clientKind": "git",
@@ -14,7 +14,10 @@
       "!**/.next",
       "!**/output",
       "!**/next-env.d.ts",
-      "!**/public/firebase-messaging-sw.js"
+      "!**/public/firebase-messaging-sw.js",
+      "!**/*.md",
+      "!**/*.yml",
+      "!**/*.yaml"
     ]
   },
   "formatter": {
@@ -125,5 +128,17 @@
     "parser": {
       "tailwindDirectives": true
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["components/ui/calendar.tsx", "lib/use-auth-state.test.ts"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noComponentHookFactories": "off"
+          }
+        }
+      }
+    }
+  ]
 }

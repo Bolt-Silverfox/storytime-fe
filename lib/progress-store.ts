@@ -1,5 +1,6 @@
 'use client';
 
+import Cookies from 'js-cookie';
 import { useSyncExternalStore } from 'react';
 import {
   getCompletedStoriesService,
@@ -149,11 +150,40 @@ export const useStoryStatus = (storyId: string): StoryStatus => {
 };
 
 // Per-story reading position (page index), so reopening resumes where the
-// reader left off. Device-local for guests and signed-in users alike; the page
-// count is stored with it so a position is dropped if the story text changed.
+// reader left off. Device-local. Keyed by reader identity (guest session or
+// signed-in user) so one person's place isn't applied to another on a shared
+// browser, and stored with a content signature so it is dropped if the story
+// text changed.
 const POSITIONS_KEY = 'readerPositions';
 
-type PositionMap = Record<string, { page: number; count: number }>;
+type PositionMap = Record<
+  string,
+  { page: number; count: number; sig?: string }
+>;
+
+const jwtSubject = (token: string | undefined): string | null => {
+  try {
+    const payload = token?.split('.')[1];
+    if (!payload) {
+      return null;
+    }
+    const json = JSON.parse(
+      atob(payload.replace(/-/g, '+').replace(/_/g, '/'))
+    );
+    return typeof json?.sub === 'string' ? json.sub : null;
+  } catch {
+    return null;
+  }
+};
+
+const readerScope = (): string => {
+  if (isUserLoggedIn()) {
+    return `u:${jwtSubject(Cookies.get('accessToken') ?? Cookies.get('refreshToken')) ?? ''}`;
+  }
+  return `g:${Cookies.get('guestSessionId') ?? ''}`;
+};
+
+const positionKey = (storyId: string) => `${readerScope()}|${storyId}`;
 
 const readPositions = (): PositionMap => {
   if (typeof window === 'undefined') {
@@ -184,12 +214,14 @@ const writePositions = (map: PositionMap) => {
 
 export const getReadingPosition = (
   storyId: string,
-  pageCount: number
+  pageCount: number,
+  sig?: string
 ): number | null => {
-  const entry = readPositions()[storyId];
+  const entry = readPositions()[positionKey(storyId)];
   if (
     !entry ||
     entry.count !== pageCount ||
+    (sig !== undefined && entry.sig !== sig) ||
     !Number.isInteger(entry.page) ||
     entry.page < 0 ||
     entry.page >= pageCount
@@ -202,23 +234,26 @@ export const getReadingPosition = (
 export const saveReadingPosition = (
   storyId: string,
   page: number,
-  pageCount: number
+  pageCount: number,
+  sig?: string
 ) => {
   if (pageCount <= 0) {
     return;
   }
   const map = readPositions();
-  map[storyId] = {
+  map[positionKey(storyId)] = {
     page: Math.min(Math.max(Math.trunc(page) || 0, 0), pageCount - 1),
     count: pageCount,
+    sig,
   };
   writePositions(map);
 };
 
 export const clearReadingPosition = (storyId: string) => {
   const map = readPositions();
-  if (storyId in map) {
-    delete map[storyId];
+  const key = positionKey(storyId);
+  if (key in map) {
+    delete map[key];
     writePositions(map);
   }
 };

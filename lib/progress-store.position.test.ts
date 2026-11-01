@@ -84,7 +84,8 @@ describe('reading position persistence', () => {
     saveReadingPosition('a', 6, 10, 'sig');
     expect(getReadingPosition('a', 10, 'sig')).toBe(6);
     vi.mocked(services.isUserLoggedIn).mockReturnValue(false);
-    document.cookie = 'guestSessionId=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+    document.cookie =
+      'guestSessionId=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
     expect(getReadingPosition('a', 10, 'sig')).toBe(3);
   });
 });

@@ -83,8 +83,18 @@ const PageView = ({
 
   return (
     <section aria-label='Story pages' className='w-full'>
+      {/* One live region for the life of the reader: announces the page number
+          only, so screen readers don't read the text over the narration. */}
+      <p role='status' aria-live='polite' className='sr-only'>
+        {label}
+      </p>
       <div className='mb-3 flex items-center justify-between gap-4'>
-        <p className='font-abeezee text-sm font-semibold text-body'>{label}</p>
+        <p
+          aria-hidden='true'
+          className='font-abeezee text-sm font-semibold text-body'
+        >
+          {label}
+        </p>
         <div
           role='progressbar'
           aria-label='Reading progress'
@@ -129,8 +139,6 @@ const PageView = ({
           key={page}
           data-testid='reader-page-text'
           id={`reading-page-${page}`}
-          aria-live='polite'
-          aria-atomic='true'
           className={`min-h-[12rem] break-words rounded-xl px-3 py-4 text-left font-abeezee text-xl not-italic leading-9 transition-colors duration-300 motion-safe:animate-[reader-page-in_250ms_ease-out] sm:px-4 ${
             highlighted
               ? 'bg-reader-hl font-medium text-reader-hl-fg'

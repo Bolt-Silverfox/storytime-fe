@@ -11,11 +11,10 @@ import {
   markReading,
   saveReadingPosition,
 } from '@/lib/progress-store';
-import { resolvePages } from '@/lib/reader/paginate';
+import { pagesSignature, resolvePages } from '@/lib/reader/paginate';
 import {
   clipForPage,
   initialReaderState,
-  pageForClip,
   readerReducer,
 } from '@/lib/reader/reader-state';
 import {
@@ -155,6 +154,11 @@ const StoryReader = ({
     () => resolvePages(story?.pages, story?.textContent),
     [story]
   );
+  const pagesSig = useMemo(() => pagesSignature(pages), [pages]);
+  // The page is only "visible" (and only worth persisting / following the
+  // narration) while read-along is on.
+  const isCheckedRef = useRef(false);
+  isCheckedRef.current = isChecked;
 
   // Resume where the reader left off once the pages are known.
   useEffect(() => {
@@ -164,16 +168,25 @@ const StoryReader = ({
     dispatch({
       type: 'init',
       count: pages.length,
-      page: getReadingPosition(storyId, pages.length) ?? 0,
+      page: getReadingPosition(storyId, pages.length, pagesSig) ?? 0,
     });
-  }, [storyId, pages]);
+  }, [storyId, pages, pagesSig]);
 
-  // Remember the position (per story) as pages turn.
+  // Remember the position (per story) as pages turn. Only while the page is
+  // visible, so narration playing with the text hidden can't overwrite it.
   useEffect(() => {
-    if (storyId && reader.count > 0) {
-      saveReadingPosition(storyId, reader.page, reader.count);
+    if (storyId && reader.count > 0 && isChecked) {
+      saveReadingPosition(storyId, reader.page, reader.count, pagesSig);
     }
-  }, [storyId, reader.page, reader.count]);
+  }, [storyId, reader.page, reader.count, pagesSig, isChecked]);
+
+  // Revealing the text while narration is playing shows the narrated page.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only react to the read-along switch; the rest is read via refs.
+  useEffect(() => {
+    if (isChecked && isPlayingRef.current) {
+      dispatch({ type: 'go', page: clipIndexRef.current });
+    }
+  }, [isChecked]);
 
   useEffect(() => {
     const fetchStory = async () => {
@@ -351,11 +364,9 @@ const StoryReader = ({
           clipIndexRef.current = next;
           setCurrentClip(next);
           setAudioUrl(playlist[next]);
-          dispatch({
-            type: 'clip',
-            clip: next,
-            clipCount: totalCountRef.current,
-          });
+          if (isCheckedRef.current) {
+            dispatch({ type: 'clip', clip: next, from: next - 1 });
+          }
         }
 
         // Still waiting, but the paragraph we're waiting on has failed: it will
@@ -488,12 +499,10 @@ const StoryReader = ({
         clipIndexRef.current = next;
         setCurrentClip(next);
         setAudioUrl(playlistRef.current[next]);
-        // Turn the page with the narration.
-        dispatch({
-          type: 'clip',
-          clip: next,
-          clipCount: totalCountRef.current || playlistRef.current.length,
-        });
+        // Turn the page with the narration (only if the reader is on it).
+        if (isCheckedRef.current) {
+          dispatch({ type: 'clip', clip: next, from: next - 1 });
+        }
         return;
       }
       // The next clip isn't in the playlist yet. If that paragraph is still
@@ -511,12 +520,27 @@ const StoryReader = ({
         setAudioError('Some of the audio couldn’t be prepared.');
         return;
       }
-      // Reached the end of the narration — the story has been read through.
+      // Reached the end of the narration.
       setIsPlaying(false);
+      const last = clipIndexRef.current;
+      // Clips cover only the first N pages of a long story. Past them there is
+      // no narration: stop on the next page (if the reader is on the last
+      // narrated page) rather than calling the story finished.
+      if (readerRef.current.count > next) {
+        if (isCheckedRef.current) {
+          dispatch({ type: 'clip', clip: next, from: last });
+        }
+        return;
+      }
+      // The whole story has been read through. Rewind the narration and the
+      // page together so a replay starts from page one.
       setStoryFinished(true);
       clipIndexRef.current = 0;
       setCurrentClip(0);
       setAudioUrl(playlistRef.current[0] ?? null);
+      if (isCheckedRef.current) {
+        dispatch({ type: 'clip', clip: 0, from: last });
+      }
     };
 
     audio.addEventListener('timeupdate', updateTime);
@@ -614,13 +638,16 @@ const StoryReader = ({
 
   // Point the narration at the clip that belongs to `page` (clip N is page N).
   // 'switched' → the clip changed (the <audio> src updates on the next render);
-  // 'ok' → already there; 'unavailable' → that clip isn't generated yet.
+  // 'ok' → already there; 'unavailable' → that clip isn't generated yet;
+  // 'none' → the page has no narration (beyond the capped clips).
   const alignAudioToPage = (
     page: number
-  ): 'switched' | 'ok' | 'unavailable' => {
+  ): 'switched' | 'ok' | 'unavailable' | 'none' => {
     const list = playlistRef.current;
-    const clipCount = totalCountRef.current || list.length;
-    const target = clipForPage(page, readerRef.current.count, clipCount);
+    const target = clipForPage(page, totalCountRef.current || list.length);
+    if (target === null) {
+      return 'none';
+    }
     if (target === clipIndexRef.current) {
       return 'ok';
     }
@@ -634,7 +661,9 @@ const StoryReader = ({
     return 'switched';
   };
 
-  // Manual page turn: keep the narration on the page being read.
+  // Manual page turn: keep the narration on the page being read when its clip
+  // is ready. If it isn't, the narration carries on where it was and the
+  // reader keeps the page they chose (the narration never drags them back).
   const turnPage = (action: 'next' | 'prev') => {
     const target = readerReducer(readerRef.current, { type: action }).page;
     dispatch({ type: action });
@@ -652,14 +681,18 @@ const StoryReader = ({
       return;
     }
 
-    // Read the page on screen. If its clip isn't ready, follow the clip instead.
-    const aligned = alignAudioToPage(readerRef.current.page);
-    if (aligned === 'unavailable') {
-      dispatch({
-        type: 'clip',
-        clip: clipIndexRef.current,
-        clipCount: totalCountRef.current || playlistRef.current.length,
-      });
+    // With the text hidden there is no visible page to start from: continue
+    // from the current clip. Otherwise read the page on screen; if its clip
+    // isn't ready yet, show the page that is being narrated instead.
+    let aligned: ReturnType<typeof alignAudioToPage> = 'ok';
+    if (isChecked) {
+      aligned = alignAudioToPage(readerRef.current.page);
+      if (aligned === 'none') {
+        return;
+      }
+      if (aligned === 'unavailable') {
+        dispatch({ type: 'go', page: clipIndexRef.current });
+      }
     }
     if (aligned === 'switched') {
       // The new clip starts playing once the <audio> src updates.
@@ -690,8 +723,17 @@ const StoryReader = ({
   // single stored narration file have no per-page clips → no highlight.
   const useAudioParagraphs = audioParagraphs.length > 0;
   const clipCount = audioParagraphs.length;
-  const narratedPage = pageForClip(currentClip, clipCount, reader.count);
-  const pageClip = clipForPage(reader.page, reader.count, clipCount);
+  // Clip N is page N, so the narrated page is simply the current clip.
+  const narratedPage = currentClip;
+  const pageClip = clipForPage(reader.page, clipCount);
+  // Long stories only narrate their first clips; later pages have no audio.
+  const pageNoAudio =
+    useAudioParagraphs &&
+    pageClip === null &&
+    !audioLoading &&
+    !audioGenerating;
+
+  const playBlocked = isChecked && pageNoAudio && !isPlaying;
 
   if (loading) {
     return (
@@ -932,7 +974,14 @@ const StoryReader = ({
                 onNext={() => turnPage('next')}
                 onPrev={() => turnPage('prev')}
                 pageStatus={
-                  useAudioParagraphs && failedIndices.has(pageClip) ? (
+                  pageNoAudio ? (
+                    <span className='mt-1 block px-2 text-sm text-body font-abeezee'>
+                      No narration for this page. Go back to listen to the
+                      narrated part of the story.
+                    </span>
+                  ) : useAudioParagraphs &&
+                    pageClip !== null &&
+                    failedIndices.has(pageClip) ? (
                     <span className='mt-1 flex items-center gap-2 px-2 text-sm text-red-500 font-abeezee'>
                       Audio unavailable
                       <button
@@ -947,6 +996,7 @@ const StoryReader = ({
                       </button>
                     </span>
                   ) : useAudioParagraphs &&
+                    pageClip !== null &&
                     !audioParagraphs[pageClip]?.audioUrl ? (
                     <span className='mt-1 flex items-center gap-2 px-2 text-sm text-body font-abeezee'>
                       <span className='inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#83E9FB] border-t-transparent motion-reduce:animate-none' />
@@ -967,25 +1017,6 @@ const StoryReader = ({
                           Finished reading — Take the quiz
                         </button>
                       )}
-                    {isGuest ? null : completion === 'done' ? (
-                      <p className='font-abeezee text-sm font-semibold text-green-600'>
-                        ✓ Added to your completed stories
-                      </p>
-                    ) : (
-                      <button
-                        type='button'
-                        onClick={() => setStoryFinished(true)}
-                        disabled={completion === 'saving'}
-                        className='rounded-full border border-brand px-6 py-3 font-abeezee text-sm font-semibold text-brand-text transition hover:bg-brand/5 disabled:opacity-60'
-                      >
-                        {completion === 'saving' ? 'Saving…' : 'Finish story'}
-                      </button>
-                    )}
-                    {completion === 'error' && (
-                      <p className='font-abeezee text-sm text-red-500'>
-                        Couldn&apos;t save progress. Please try again.
-                      </p>
-                    )}
                   </div>
                 }
               />
@@ -995,11 +1026,11 @@ const StoryReader = ({
         <button
           type='button'
           onClick={handlePlayPause}
-          disabled={!audioUrl || audioLoading}
+          disabled={!audioUrl || audioLoading || playBlocked}
           aria-label={isPlaying ? 'Pause' : 'Play'}
           aria-pressed={isPlaying}
           className={`mt-12 rounded-full transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 ${
-            !audioUrl || audioLoading
+            !audioUrl || audioLoading || playBlocked
               ? 'opacity-50 cursor-not-allowed'
               : 'cursor-pointer'
           }`}
@@ -1019,6 +1050,29 @@ const StoryReader = ({
             >
               Try again
             </button>
+          </div>
+        )}
+        {!isGuest && isChecked && (
+          <div className='mt-8 text-center'>
+            {completion === 'done' ? (
+              <p className='font-abeezee text-sm font-semibold text-green-600'>
+                ✓ Added to your completed stories
+              </p>
+            ) : (
+              <button
+                type='button'
+                onClick={() => setStoryFinished(true)}
+                disabled={completion === 'saving'}
+                className='rounded-full border border-brand px-6 py-3 font-abeezee text-sm font-semibold text-brand-text transition hover:bg-brand/5 disabled:opacity-60'
+              >
+                {completion === 'saving' ? 'Saving…' : 'Finish story'}
+              </button>
+            )}
+            {completion === 'error' && (
+              <p className='mt-2 font-abeezee text-sm text-red-500'>
+                Couldn&apos;t save progress. Please try again.
+              </p>
+            )}
           </div>
         )}
       </div>

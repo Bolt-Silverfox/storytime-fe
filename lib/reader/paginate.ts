@@ -54,6 +54,16 @@ export const splitStoryIntoPages = (
     ? splitByWordCountPreservingSentences(text, STORY_WORDS_PER_PAGE)
     : [];
 
+const normalise = (t: string): string => t.replace(/\s+/g, ' ').trim();
+
+// API pages must still describe this text (a stale or truncated page list would
+// show the wrong story). Whitespace differences are fine; allow 2% drift.
+const matchesText = (pages: string[], text: string): boolean => {
+  const a = normalise(pages.join(' ')).length;
+  const b = normalise(text).length;
+  return Math.abs(a - b) <= Math.max(a, b) * 0.02;
+};
+
 // Pages sent by the API (backend >= v1.7.0) win; older backends send none, so
 // we paginate the story text ourselves. Always returns non-empty strings.
 export const resolvePages = (
@@ -65,9 +75,25 @@ export const resolvePages = (
       .filter((p): p is string => typeof p === 'string')
       .map((p) => p.trim())
       .filter(Boolean);
-    if (pages.length > 0 && pages.length === apiPages.length) {
+    if (
+      pages.length > 0 &&
+      pages.length === apiPages.length &&
+      (!text?.trim() || matchesText(pages, text))
+    ) {
       return pages;
     }
   }
   return splitStoryIntoPages(text);
+};
+
+// Cheap content fingerprint (FNV-1a) used to drop saved positions when the
+// story text changed even though the page count did not.
+export const pagesSignature = (pages: string[]): string => {
+  let h = 0x81_1c_9d_c5;
+  const text = pages.join('\u0001');
+  for (let i = 0; i < text.length; i += 1) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01_00_01_93) >>> 0;
+  }
+  return `${pages.length}:${h.toString(36)}`;
 };

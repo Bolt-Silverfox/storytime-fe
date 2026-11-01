@@ -93,11 +93,10 @@ describe('splitStoryIntoPages (mirror of the backend splitter)', () => {
 describe('resolvePages', () => {
   const text = `${words(20, 'a')}. ${words(20, 'b')}. ${words(5, 'c')}.`;
 
-  it('prefers the pages sent by the API', () => {
-    expect(resolvePages(['Page one.', 'Page two.'], text)).toEqual([
-      'Page one.',
-      'Page two.',
-    ]);
+  it('prefers the pages sent by the API (same text, its own split)', () => {
+    const api = [`${words(20, 'a')}. ${words(20, 'b')}.`, `${words(5, 'c')}.`];
+    expect(resolvePages(api, text)).toEqual(api);
+    expect(api).not.toEqual(splitStoryIntoPages(text));
   });
 
   it('falls back to client pagination when the API has no pages', () => {

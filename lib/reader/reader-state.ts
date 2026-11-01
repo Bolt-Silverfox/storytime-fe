@@ -10,8 +10,9 @@ export type ReaderAction =
   | { type: 'next' }
   | { type: 'prev' }
   | { type: 'go'; page: number }
-  // Narration moved to a new audio clip: follow it.
-  | { type: 'clip'; clip: number; clipCount: number };
+  // Narration moved from clip `from` to clip `clip`. The page only follows if
+  // it was on `from`: a reader who read ahead (or turned back) is left alone.
+  | { type: 'clip'; clip: number; from: number };
 
 export const initialReaderState: ReaderState = { page: 0, count: 0 };
 
@@ -22,35 +23,13 @@ const clamp = (page: number, count: number): number => {
   return Math.min(Math.max(page, 0), count - 1);
 };
 
-// Audio clips are the backend's TTS paragraphs, which equal the pages, so the
-// mapping is 1:1. If the counts ever differ (older backend split) scale.
-export const pageForClip = (
-  clip: number,
-  clipCount: number,
-  pageCount: number
-): number => {
-  if (pageCount <= 0 || clipCount <= 0) {
-    return 0;
-  }
-  if (clipCount === pageCount) {
-    return clamp(clip, pageCount);
-  }
-  return clamp(Math.floor((clip * pageCount) / clipCount), pageCount);
-};
+// Audio clips are the FIRST N pages of the backend split (capped, e.g. 50), so
+// clip N is page N. Pages from clipCount on have no narration (null).
+export const pageForClip = (clip: number, pageCount: number): number =>
+  clamp(clip, pageCount);
 
-export const clipForPage = (
-  page: number,
-  pageCount: number,
-  clipCount: number
-): number => {
-  if (pageCount <= 0 || clipCount <= 0) {
-    return 0;
-  }
-  if (clipCount === pageCount) {
-    return clamp(page, clipCount);
-  }
-  return clamp(Math.floor((page * clipCount) / pageCount), clipCount);
-};
+export const clipForPage = (page: number, clipCount: number): number | null =>
+  Number.isInteger(page) && page >= 0 && page < clipCount ? page : null;
 
 export const readerReducer = (
   state: ReaderState,
@@ -73,7 +52,10 @@ export const readerReducer = (
       page = clamp(action.page, state.count);
       break;
     case 'clip':
-      page = pageForClip(action.clip, action.clipCount, state.count);
+      if (state.page !== action.from) {
+        return state;
+      }
+      page = pageForClip(action.clip, state.count);
       break;
     default:
       return state;

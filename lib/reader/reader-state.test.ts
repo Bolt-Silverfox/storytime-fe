@@ -80,7 +80,9 @@ describe('readerReducer', () => {
   });
 
   it('follows a clip that lands past the last page by clamping', () => {
-    expect(readerReducer(at(9, 10), { type: 'clip', clip: 10, from: 9 }).page).toBe(9);
+    expect(
+      readerReducer(at(9, 10), { type: 'clip', clip: 10, from: 9 }).page
+    ).toBe(9);
   });
 });
 

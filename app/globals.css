@@ -261,3 +261,40 @@ body {
 .lenis.lenis-scrolling iframe {
   pointer-events: none;
 }
+
+/* Story reader: page turn. Applied only under motion-safe (see PageView). */
+@keyframes reader-page-in {
+  from {
+    opacity: 0;
+    transform: translateX(0.75rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Story reader: the synth image pulses like a voice while narration plays.
+   Still when paused, buffering, finished, or for reduced motion. */
+@keyframes synth-wave-pulse {
+  0%,
+  100% {
+    transform: scaleY(0.82) scaleX(0.99);
+    opacity: 0.75;
+  }
+  35% {
+    transform: scaleY(1.1) scaleX(1.01);
+    opacity: 1;
+  }
+  65% {
+    transform: scaleY(0.92) scaleX(1);
+    opacity: 0.9;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .synth-wave[data-playing="true"] img {
+    transform-origin: center;
+    animation: synth-wave-pulse 1.1s ease-in-out infinite;
+  }
+}

@@ -153,6 +153,28 @@ describe('resolvePages', () => {
     expect(out.length).toBe(dropped.length + 1);
   });
 
+  it('length tolerance is 0.5%: just inside accepted, just outside rejected', () => {
+    const long = Array.from(
+      { length: 300 },
+      (_, i) => `Sentence number ${i} is here.`
+    ).join(' ');
+    const split = splitStoryIntoPages(long);
+    const total = long.length;
+    const cut = (chars: number) => {
+      const pages = [...split];
+      // remove `chars` characters from the middle of page 0 (tail untouched)
+      const p0 = pages[0];
+      const mid = Math.floor(p0.length / 2);
+      pages[0] = p0.slice(0, mid) + p0.slice(mid + chars);
+      return pages;
+    };
+    const inside = Math.floor(total * 0.005) - 1;
+    const outside = Math.ceil(total * 0.005) + 2;
+    expect(inside).toBeGreaterThan(0);
+    expect(resolvePages(cut(inside), long)).toEqual(cut(inside));
+    expect(resolvePages(cut(outside), long)).toEqual(split);
+  });
+
   it('rejects pages with an empty entry', () => {
     const api = splitStoryIntoPages(text);
     expect(resolvePages([...api, ' '], text)).toEqual(api);

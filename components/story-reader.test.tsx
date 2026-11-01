@@ -21,6 +21,7 @@ const TEXT = ['a', 'b', 'c', 'd', 'e', 'f']
 const guest = vi.hoisted(() => ({
   story: {} as Record<string, unknown>,
   clips: 0,
+  pending: 0,
 }));
 
 vi.mock('next/image', () => ({
@@ -39,12 +40,13 @@ vi.mock('@/lib/services', () => {
       text: `t${i}`,
     }));
     return {
-      status: 'completed',
+      status: guest.pending ? 'processing' : 'completed',
       completedParagraphs: paras,
       allParagraphs: paras,
       failedParagraphs: [],
-      pendingParagraphs: 0,
-      totalQueued: n,
+      pendingParagraphs: guest.pending,
+      totalQueued: n + guest.pending,
+      ...(guest.pending ? { batchJobId: 'job-1' } : {}),
     };
   };
   return {
@@ -143,16 +145,34 @@ describe('guest with a single stored narration file', () => {
     expect(played).toEqual(['full.mp3']);
   });
 
-  it('(b) finishes the story when the file ends, whatever page is showing', async () => {
+  it('(b) finishes the story when the file ends, on a middle page, without moving the page', async () => {
     renderReader();
     await waitFor(() => screen.getByRole('switch'));
     fireEvent.click(screen.getByRole('switch'));
     await waitReady();
+    await turnTo(2); // page 3 of 6
     fireEvent.click(playButton());
     await endAudio();
     expect(doneIds()).toContain('story-1');
-    // the page is not dragged along by the file ending
-    expect(screen.getAllByText('Page 1 of 6').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Page 3 of 6').length).toBeGreaterThan(0);
+  });
+
+  it('toggling read-along off and on mid-file keeps the page and the saved position', async () => {
+    renderReader();
+    await waitFor(() => screen.getByRole('switch'));
+    fireEvent.click(screen.getByRole('switch'));
+    await waitReady();
+    await turnTo(4); // page 5
+    fireEvent.click(playButton());
+    expect(screen.getAllByText('Page 5 of 6').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('switch')); // off
+    fireEvent.click(screen.getByRole('switch')); // on again
+    await waitFor(() => screen.getAllByText(/^Page \d of 6$/));
+    expect(screen.getAllByText('Page 5 of 6').length).toBeGreaterThan(0);
+    const saved = Object.values(
+      JSON.parse(window.localStorage.getItem('readerPositions') ?? '{}')
+    ) as { page: number }[];
+    expect(saved.map((e) => e.page)).toEqual([4]);
   });
 });
 
@@ -185,6 +205,22 @@ describe('pages past the narrated clips', () => {
   beforeEach(() => {
     guest.clips = 4;
     guest.story = { id: 'story-1', title: 'T', textContent: TEXT };
+  });
+
+  it('does the same while the batch is still generating (in-progress)', async () => {
+    guest.pending = 1; // 4 ready + 1 generating = 5 clips for 6 pages
+    renderReader();
+    await waitFor(() => screen.getByRole('switch'));
+    fireEvent.click(screen.getByRole('switch'));
+    await waitReady();
+    await turnTo(5); // page 6, past the 5 clips
+    expect(screen.getAllByText('Page 6 of 6').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Preparing audio/i).length).toBeGreaterThan(0); // batch still running
+    expect(screen.getByText(/No narration for this page/)).toBeTruthy();
+    expect(playButton().disabled).toBe(true);
+    fireEvent.click(playButton());
+    expect(played).toEqual([]);
+    guest.pending = 0;
   });
 
   it('shows the notice and disables Play instead of doing nothing', async () => {

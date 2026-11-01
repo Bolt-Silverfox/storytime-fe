@@ -148,6 +148,19 @@ describe('reading position persistence', () => {
     await signOut();
   });
 
+  it('drops legacy bare-id keys on the next save even with few entries', () => {
+    window.localStorage.setItem(
+      'readerPositions',
+      JSON.stringify({ 'bare-story-id': { page: 1, count: 5, at: 9e15 } })
+    );
+    saveReadingPosition('a', 2, 5, 'sig');
+    const map = JSON.parse(
+      window.localStorage.getItem('readerPositions') ?? '{}'
+    );
+    expect(Object.keys(map)).toHaveLength(1);
+    expect('bare-story-id' in map).toBe(false);
+  });
+
   it('prunes to 200 entries (oldest first) and drops legacy bare keys', () => {
     window.localStorage.setItem(
       'readerPositions',

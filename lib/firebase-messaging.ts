@@ -14,6 +14,7 @@ import {
   type Messaging,
   onMessage,
 } from 'firebase/messaging';
+import { logger } from '@/lib/logger';
 
 // The Firebase web config is public by design (it ships in the client bundle
 // and identifies the project; access is gated by Firebase rules + authorized
@@ -73,7 +74,7 @@ export const getMessagingInstance = async (): Promise<Messaging | null> => {
     }
     return getMessaging(getFirebaseApp());
   } catch (error) {
-    console.error('Failed to initialize Firebase messaging:', error);
+    logger.error('Failed to initialize Firebase messaging', error);
     return null;
   }
 };
@@ -133,7 +134,7 @@ export const requestPushPermissionAndToken = async (): Promise<
     });
     return token || null;
   } catch (error) {
-    console.error('Failed to request push permission/token:', error);
+    logger.error('Failed to request push permission/token', error);
     return null;
   }
 };
@@ -153,7 +154,7 @@ export const onForegroundPush = (
       unsubscribe = onMessage(messaging, cb);
     })
     .catch((error) => {
-      console.error('Failed to subscribe to foreground push:', error);
+      logger.error('Failed to subscribe to foreground push', error);
     });
   return () => {
     cancelled = true;
@@ -172,7 +173,7 @@ export const deletePushToken = async (): Promise<boolean> => {
     }
     return await deleteToken(messaging);
   } catch (error) {
-    console.error('Failed to delete push token:', error);
+    logger.error('Failed to delete push token', error);
     return false;
   }
 };

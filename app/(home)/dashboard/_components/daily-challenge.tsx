@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
+import { isExpectedFailure, logger } from '@/lib/logger';
 import { getDailyChallengesService } from '@/lib/services';
 import arrowRight from '@/public/arrow-right.svg';
 import slice1 from '@/public/slice-1.svg';
@@ -39,7 +40,9 @@ const DailyChallenge = () => {
         const challengesData = await getDailyChallengesService(selectedKid.id);
         setChallenges(challengesData);
       } catch (error) {
-        console.error('Failed to fetch daily challenges:', error);
+        logger.error('Failed to fetch daily challenges', error, {
+          expected: isExpectedFailure(error),
+        });
         setError('Failed to load daily challenges');
       } finally {
         setLoading(false);

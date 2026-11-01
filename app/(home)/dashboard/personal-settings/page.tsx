@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { countries } from '@/data/countries';
+import { isExpectedFailure, logger } from '@/lib/logger';
 import {
   clearUserFromStorage,
   deleteAccountService,
@@ -101,7 +102,9 @@ const PersonalSettingsPage = () => {
       }));
       setKids(mappedKids);
     } catch (error) {
-      console.error('Failed to fetch kids:', error);
+      logger.error('Failed to fetch kids', error, {
+        expected: isExpectedFailure(error),
+      });
       setKids([]);
     } finally {
       setLoading(false);

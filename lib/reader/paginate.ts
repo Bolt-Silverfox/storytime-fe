@@ -47,7 +47,9 @@ const splitByWordCountPreservingSentences = (
   return chunks;
 };
 
-export const splitStoryIntoPages = (text: string | null | undefined): string[] =>
+export const splitStoryIntoPages = (
+  text: string | null | undefined
+): string[] =>
   text?.trim()
     ? splitByWordCountPreservingSentences(text, STORY_WORDS_PER_PAGE)
     : [];

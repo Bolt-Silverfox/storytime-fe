@@ -53,7 +53,10 @@ describe('splitStoryIntoPages (mirror of the backend splitter)', () => {
   });
 
   it('handles one huge paragraph', () => {
-    const text = Array.from({ length: 50 }, (_, i) => `${words(9, `p${i}x`)}.`).join(' ');
+    const text = Array.from(
+      { length: 50 },
+      (_, i) => `${words(9, `p${i}x`)}.`
+    ).join(' ');
     const pages = splitStoryIntoPages(text);
     expect(pages.length).toBeGreaterThan(10);
     for (const p of pages) {
@@ -73,7 +76,8 @@ describe('splitStoryIntoPages (mirror of the backend splitter)', () => {
   });
 
   it('keeps unicode and emoji intact', () => {
-    const text = 'Il était une fois 🐉 très gentil. Ça va ? Oui ! 你好。 日本語です。';
+    const text =
+      'Il était une fois 🐉 très gentil. Ça va ? Oui ! 你好。 日本語です。';
     const pages = splitStoryIntoPages(text);
     expect(pages.join(' ')).toBe(text);
     expect(pages[0]).toContain('🐉');
@@ -116,7 +120,9 @@ describe('resolvePages', () => {
     const fromClient = resolvePages(undefined, text);
     expect(fromApi).toEqual(fromClient);
     expect(Array.isArray(fromApi)).toBe(true);
-    expect(fromApi.every((p) => typeof p === 'string' && p.length > 0)).toBe(true);
+    expect(fromApi.every((p) => typeof p === 'string' && p.length > 0)).toBe(
+      true
+    );
   });
 
   it('returns [] when there is nothing at all', () => {

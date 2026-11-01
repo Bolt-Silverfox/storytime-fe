@@ -4,7 +4,7 @@ import { type ReactNode, useEffect, useRef } from 'react';
 import { progressPercent, swipeDirection } from '@/lib/reader/reader-state';
 
 const NAV_BUTTON =
-  'min-h-12 min-w-[7.5rem] rounded-full border border-brand px-5 py-3 font-abeezee text-base font-semibold text-brand-text transition hover:bg-brand/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 aria-disabled:cursor-not-allowed aria-disabled:opacity-40 aria-disabled:hover:bg-transparent';
+  'min-h-12 min-w-[6.5rem] whitespace-nowrap rounded-full border border-brand px-4 py-3 font-abeezee text-base font-semibold text-brand-text transition hover:bg-brand/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 aria-disabled:cursor-not-allowed aria-disabled:opacity-40 aria-disabled:hover:bg-transparent';
 
 // Keys typed into these belong to the control, not the pager.
 const isEditable = (target: EventTarget | null): boolean => {
@@ -131,7 +131,7 @@ const PageView = ({
           id={`reading-page-${page}`}
           aria-live='polite'
           aria-atomic='true'
-          className={`min-h-[12rem] break-words rounded-xl px-3 py-4 text-left font-abeezee text-xl not-italic leading-9 transition-colors duration-300 motion-safe:animate-[reader-page-in_250ms_ease-out] sm:px-4 sm:text-2xl sm:leading-[2.75rem] ${
+          className={`min-h-[12rem] break-words rounded-xl px-3 py-4 text-left font-abeezee text-xl not-italic leading-9 transition-colors duration-300 motion-safe:animate-[reader-page-in_250ms_ease-out] sm:px-4 ${
             highlighted
               ? 'bg-reader-hl font-medium text-reader-hl-fg'
               : 'text-strong'

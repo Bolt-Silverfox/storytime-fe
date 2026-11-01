@@ -924,7 +924,11 @@ const StoryReader = ({
               <PageView
                 pages={pages}
                 page={reader.page}
-                highlighted={useAudioParagraphs && reader.page === narratedPage}
+                highlighted={
+                  isPlaying &&
+                  useAudioParagraphs &&
+                  reader.page === narratedPage
+                }
                 onNext={() => turnPage('next')}
                 onPrev={() => turnPage('prev')}
                 pageStatus={

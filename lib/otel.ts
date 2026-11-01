@@ -55,6 +55,7 @@ function parseOtlpHeaderString(raw: string): Record<string, string> {
       headers[key] = decodeURIComponent(rawValue);
     } catch {
       // console.warn for the same reason as above: diag is set to ERROR.
+      // biome-ignore lint/suspicious/noConsole: bootstrap diagnostics must not depend on the logger/Sentry
       console.warn(
         `[OpenTelemetry] OTEL_EXPORTER_OTLP_HEADERS entry "${key}" has malformed percent-encoding and was ignored`
       );
@@ -89,6 +90,7 @@ function buildOtlpHeaders(): Record<string, string> {
     // DiagLogLevel.ERROR, which filters warn entirely. A configuration mistake
     // the operator needs to see must not be routed through a logger tuned to
     // suppress it.
+    // biome-ignore lint/suspicious/noConsole: bootstrap diagnostics must not depend on the logger/Sentry
     console.warn(
       '[OpenTelemetry] OTEL_EXPORTER_OTLP_HEADERS is set but no "key=value" pair could be parsed from it; falling back to GRAFANA_CLOUD_* credentials'
     );
@@ -296,6 +298,7 @@ export function registerTelemetry(): void {
   // at most the 2s batch window, but longer if exports are slow or failing,
   // since the queue holds up to 2048 spans and an in-flight export has 30s to
   // time out before the timer resumes.
+  // biome-ignore lint/suspicious/noConsole: operational startup line must stay visible in production (logger silences info)
   console.info(
     `[OpenTelemetry] tracing configured; exporting to ${redactEndpoint(
       endpoint

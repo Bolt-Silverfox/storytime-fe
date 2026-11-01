@@ -7,6 +7,7 @@ import BackButton from '@/components/back-button';
 import Header from '@/components/header';
 import { Button } from '@/components/ui/button';
 import VoiceCard from '@/components/voice-card';
+import { isExpectedFailure, logger } from '@/lib/logger';
 import {
   getAvailableVoicesService,
   getPreferredVoiceService,
@@ -59,7 +60,9 @@ const AiVoicePage = () => {
           setSelectedId(preferred.id);
         }
       } catch (error) {
-        console.error('Failed to load voices:', error);
+        logger.error('Failed to load voices', error, {
+          expected: isExpectedFailure(error),
+        });
       } finally {
         if (active) {
           setLoading(false);
@@ -97,7 +100,9 @@ const AiVoicePage = () => {
     audio.src = voice.previewUrl;
     audioRef.current = audio;
     audio.play().catch((error) => {
-      console.error('Failed to play voice preview:', error);
+      logger.error('Failed to play voice preview', error, {
+        expected: isExpectedFailure(error),
+      });
     });
   };
 

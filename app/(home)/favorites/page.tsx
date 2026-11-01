@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import BackButton from '@/components/back-button';
 import Header from '@/components/header';
 import StoryStatusBadge from '@/components/story-status-badge';
+import { isExpectedFailure, logger } from '@/lib/logger';
 import {
   type FavoriteStory,
   isUserLoggedIn,
@@ -40,7 +41,9 @@ const FavoritesPage = () => {
       await removeFavoriteService(storyId);
       setFavorites((prev) => prev.filter((f) => f.storyId !== storyId));
     } catch (error) {
-      console.error('Failed to remove favorite:', error);
+      logger.error('Failed to remove favorite', error, {
+        expected: isExpectedFailure(error),
+      });
     } finally {
       setRemoving(null);
     }

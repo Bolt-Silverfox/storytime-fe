@@ -1,6 +1,7 @@
 import { AxiosError } from 'axios';
 import Cookies from 'js-cookie';
 import api from '@/lib/axios';
+import { logger } from '@/lib/logger';
 
 interface RegisterPayload {
   email: string;
@@ -860,7 +861,7 @@ export const getUserFromStorage = (): User | null => {
       typeof window !== 'undefined' ? localStorage.getItem('user') : null;
     return userData ? JSON.parse(userData) : null;
   } catch (error) {
-    console.error('Error parsing user data from localStorage:', error);
+    logger.error('Error parsing user data from localStorage', error);
     return null;
   }
 };
@@ -1358,7 +1359,7 @@ export const getSelectedModeFromStorage = (): string | null => {
       ? localStorage.getItem('selectedMode')
       : null;
   } catch (error) {
-    console.error('Error getting selected mode from localStorage:', error);
+    logger.error('Error getting selected mode from localStorage', error);
     return null;
   }
 };
@@ -1367,7 +1368,7 @@ export const setSelectedModeToStorage = (mode: string) => {
   try {
     localStorage.setItem('selectedMode', mode);
   } catch (error) {
-    console.error('Error setting selected mode to localStorage:', error);
+    logger.error('Error setting selected mode to localStorage', error);
   }
 };
 
@@ -1375,7 +1376,7 @@ export const clearSelectedModeFromStorage = () => {
   try {
     localStorage.removeItem('selectedMode');
   } catch (error) {
-    console.error('Error clearing selected mode from localStorage:', error);
+    logger.error('Error clearing selected mode from localStorage', error);
   }
 };
 

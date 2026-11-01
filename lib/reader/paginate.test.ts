@@ -139,6 +139,22 @@ describe('resolvePages', () => {
     );
   });
 
+  it('rejects a list with the last page dropped (tail check, even when under the length tolerance)', () => {
+    // ~400 pages: one page is ~0.25% of the text, below the 0.5% tolerance
+    const huge = Array.from({ length: 10000 }, (_, i) => `Sentence ${i} here.`).join(' ');
+    const hugePages = splitStoryIntoPages(huge);
+    expect(resolvePages(hugePages, huge)).toEqual(hugePages);
+    const dropped = hugePages.slice(0, -1);
+    const out = resolvePages(dropped, huge);
+    expect(out).toEqual(hugePages);
+    expect(out.length).toBe(dropped.length + 1);
+  });
+
+  it('rejects pages with an empty entry', () => {
+    const api = splitStoryIntoPages(text);
+    expect(resolvePages([...api, ' '], text)).toEqual(api);
+  });
+
   it('accepts API pages that differ only in whitespace', () => {
     const api = splitStoryIntoPages(text);
     const spaced = `${words(20, 'a')}.\n\n${words(20, 'b')}.  ${words(5, 'c')}.`;

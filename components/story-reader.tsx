@@ -112,6 +112,10 @@ const StoryReader = ({
   // True only while the initial batch request is in flight (before any clip is
   // playable). Once the first paragraph has audio, playback is enabled.
   const [audioLoading, setAudioLoading] = useState(false);
+  // True only while the <audio> element is actually producing sound (driven by
+  // its own events, not the Play button), so the synth image never animates
+  // over silence (buffering, paused, ended, errored, switching clips).
+  const [audioSounding, setAudioSounding] = useState(false);
   // True while more paragraphs are still generating in the background (pending,
   // none failed). Drives a calm "Preparing audio…" indicator, never an error.
   const [audioGenerating, setAudioGenerating] = useState(false);
@@ -778,6 +782,7 @@ const StoryReader = ({
   }
 
   const currentQuestion = story?.questions?.[currentQuestionIndex];
+  const synthMoving = audioSounding && !audioLoading && !audioGenerating;
 
   return (
     <div>
@@ -787,7 +792,16 @@ const StoryReader = ({
           ref={audioRef}
           src={audioUrl}
           preload='metadata'
-          onError={() => setAudioError('Failed to load audio')}
+          onPlay={() => setAudioSounding(true)}
+          onPlaying={() => setAudioSounding(true)}
+          onPause={() => setAudioSounding(false)}
+          onWaiting={() => setAudioSounding(false)}
+          onEmptied={() => setAudioSounding(false)}
+          onEnded={() => setAudioSounding(false)}
+          onError={() => {
+            setAudioSounding(false);
+            setAudioError('Failed to load audio');
+          }}
         >
           <track kind='captions' />
         </audio>
@@ -819,11 +833,13 @@ const StoryReader = ({
       <div className='flex flex-col items-center'>
         {!isChecked ? (
           <div className='flex flex-col items-center'>
-            <Image
-              src={movement}
-              alt=''
-              className='h-[9rem] max-w-full rounded-[3xl] mb-4 object-cover'
-            />
+            <div className='synth-wave mb-4' data-playing={synthMoving}>
+              <Image
+                src={movement}
+                alt=''
+                className='h-[9rem] max-w-full rounded-[3xl] object-cover'
+              />
+            </div>
             <div className='bg-surface flex justify-center items-center gap-3 shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] px-6 py-2.5 rounded-[3.125rem] border-[0.5px] border-solid border-hairline-warm'>
               <h5 className='text-strong text-right text-xl not-italic font-bold leading-6'>
                 {voice}
@@ -850,7 +866,9 @@ const StoryReader = ({
         ) : (
           <div className='flex flex-wrap items-center gap-4 justify-between w-full'>
             <div className='flex items-center gap-4'>
-              <Image src={movementSmall} alt='' className='' />
+              <div className='synth-wave' data-playing={synthMoving}>
+                <Image src={movementSmall} alt='' className='' />
+              </div>
               <small className='text-body text-base not-italic font-normal leading-5 font-abeezee mt-2'>
                 {audioLoading || audioGenerating
                   ? 'Preparing audio…'

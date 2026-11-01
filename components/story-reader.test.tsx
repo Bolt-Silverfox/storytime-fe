@@ -236,3 +236,71 @@ describe('pages past the narrated clips', () => {
     expect(played).toEqual([]);
   });
 });
+
+describe('synth wave animation', () => {
+  const wave = () =>
+    document.querySelector('.synth-wave') as HTMLElement | null;
+  const playing = () => wave()?.getAttribute('data-playing');
+  const ready = async (readAlong: boolean) => {
+    renderReader();
+    await waitFor(() => screen.getByRole('switch'));
+    if (readAlong) {
+      fireEvent.click(screen.getByRole('switch'));
+    }
+    await waitReady();
+  };
+  const cases = [
+    ['single stored file', 0],
+    ['per-page clips', 3],
+  ] as const;
+
+  for (const [label, clips] of cases) {
+    for (const readAlong of [false, true]) {
+      it(`${label}, read-along ${readAlong ? 'on' : 'off'}: moves only while audio plays`, async () => {
+        guest.clips = clips;
+        guest.story = {
+          id: 'story-1',
+          title: 'T',
+          textContent: TEXT,
+          ...(clips ? {} : { audioUrl: 'full.mp3' }),
+        };
+        await ready(readAlong);
+        expect(playing()).toBe('false');
+        await act(async () => {
+          fireEvent.play(audioEl());
+        });
+        expect(playing()).toBe('true');
+        await act(async () => {
+          fireEvent.pause(audioEl());
+        });
+        expect(playing()).toBe('false');
+        await act(async () => {
+          fireEvent.play(audioEl());
+        });
+        await act(async () => {
+          fireEvent.error(audioEl());
+        });
+        expect(playing()).toBe('false');
+        await act(async () => {
+          fireEvent.play(audioEl());
+        });
+        await endAudio();
+        expect(playing()).toBe('false');
+      });
+    }
+  }
+
+  it('is still while the next clip is loading (buffering)', async () => {
+    guest.clips = 3;
+    guest.story = { id: 'story-1', title: 'T', textContent: TEXT };
+    await ready(false);
+    await act(async () => {
+      fireEvent.play(audioEl());
+    });
+    expect(playing()).toBe('true');
+    await act(async () => {
+      fireEvent.waiting(audioEl());
+    });
+    expect(playing()).toBe('false');
+  });
+});

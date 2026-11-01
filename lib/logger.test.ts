@@ -490,3 +490,12 @@ describe('console breadcrumb de-duplication', () => {
     expect(isLoggerConsoleEmit()).toBe(false);
   });
 });
+
+describe('error breadcrumbs', () => {
+  it('logger.error leaves its own error-level breadcrumb', () => {
+    logger.error('kaboom', new Error('e'));
+    expect(sentry.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({ level: 'error', message: 'kaboom' })
+    );
+  });
+});

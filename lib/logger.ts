@@ -632,6 +632,7 @@ export function createLogger(scope?: string): Logger {
           ...(error === undefined ? [] : [redact(error)]),
           ...(options.context ? [redact(options.context)] : []),
         ]);
+        sendBreadcrumb('error', scope, safeMessage, []);
         safely(() => report(scope, safeMessage, error, options));
       }),
   };

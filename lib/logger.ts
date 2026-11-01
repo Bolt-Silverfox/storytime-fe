@@ -112,73 +112,106 @@ const AMBIGUOUS_IN_TEXT = new Set([
 
 const normaliseKey = (key: string) => key.toLowerCase().replace(/[\s_.-]/g, '');
 
-function isSensitiveKey(
-  key: string,
-  inText = false,
-  strictSeparator = true
-): boolean {
+/** Object keys: any sensitive stem, or a whole-key sensitive word. */
+function isSensitiveKey(key: string): boolean {
   const k = normaliseKey(key);
-  if (SENSITIVE_STEMS.some((stem) => k.includes(stem))) {
-    return true;
-  }
-  if (!SENSITIVE_EXACT.has(k)) {
-    return false;
-  }
-  return !(inText && AMBIGUOUS_IN_TEXT.has(k) && !strictSeparator);
+  return (
+    SENSITIVE_STEMS.some((stem) => k.includes(stem)) || SENSITIVE_EXACT.has(k)
+  );
 }
 
 const JWT = /eyJ[\w-]{3,}\.[\w-]+\.[\w-]*/g;
 // "Authorization: <scheme> <token>" with any scheme (or none).
 const AUTH_HEADER =
   /(authorization["']?\s*[:=]\s*)(?:"[^"]{0,2000}"|'[^']{0,2000}'|(?:[A-Za-z]{1,20}\s+)?[^\s,;"'&]+)/gi;
-const SCHEME_TOKEN = /\b(Bearer|Basic|Token|Digest)\s+[\w.~+/=-]+/gi;
-// key=value / key: value / "key":"value" pairs. Bounded so it stays linear.
-// Unquoted values stop at whitespace and , & ; # } so a fragment or the next
-// query parameter is its own pair.
-const PAIR =
-  /(["']?)([A-Za-z][\w.-]{0,40})\1(\s{0,3}[:=](?!\/\/)\s{0,3})(?:"([^"]{0,500})"|'([^']{0,500})'|([^\s,&;#}"']{1,500}))/g;
-const FILE_NAME = /\.(?:m?[jt]sx?|map|css|html?)$/i;
-const POSITION_ONLY = /^\d+(?::\d+)*\)?$/;
+// Scheme-prefixed credentials. The value must look like a credential, so
+// "a token of friendship" and "Basic information" stay readable. A
+// capitalised "Bearer" is the scheme name and is masked whatever follows.
+const BEARER = /\bBearer\s+[\w.~+/=-]+/g;
+const SCHEME_LONG = /\b(?:bearer|token|digest|basic)\s+[\w.~+/=-]{16,}/gi;
+// Base64 credentials mix cases/digits; a plain word like "Information" does not.
+const SCHEME_BASIC =
+  /\bBasic\s+(?=[A-Za-z0-9+/][a-z]*[A-Z0-9+/])[A-Za-z0-9+/]{8,}={0,2}/g;
 // Bounded quantifiers keep this linear; the TLD must be letters, so
 // "pkg@1.2.3" is left alone.
 const EMAIL =
   /[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){0,5}\.[A-Za-z]{2,24}/g;
 
+// Independent final pass: find sensitive key NAMES anywhere (after a label, a
+// URL "?", "&", "#", a quote, ...), then mask the value that follows. It does
+// not depend on parsing labels, so "Failed: token: x", "url=https://a?token=x"
+// and "password    ＝ x" are all handled the same way.
+//   group 1: the char before the key (so a key never starts mid-word)
+//   group 2: the key name
+//   group 3: separator: optional closing quote, spaces, = : (or full-width
+//            or percent-encoded forms), spaces
+const KEY_SCAN =
+  /(^|[^\w.-])([A-Za-z][\w.-]{0,40})(["']?\s{0,16}(?:[=:：＝]|%3[DdAa])\s{0,16})/g;
+const FILE_NAME = /\.(?:m?[jt]sx?|map|css|html?)$/i;
+// Unquoted values run to the next delimiter, with NO length cap, so a long
+// token is never cut in the middle and left half-visible.
+const VALUE_RUN = /^(?:(?!%26)[^\s&#;,"'()[\]{}<>])+/;
+const VALUE_QUOTED = /^(["'])[^"']{0,2000}\1/;
+
+// A capitalised single word ("Token", "Secret") before ":" is usually prose.
+// For those, only mask when the value itself looks like a credential.
+const looksLikeCredential = (v: string) =>
+  /\d/.test(v) || v.length >= 12 || /^[A-Z0-9_-]{4,}$/.test(v);
+
+function shouldMask(key: string, sep: string, value: string): boolean {
+  if (FILE_NAME.test(key)) {
+    return false;
+  }
+  const k = normaliseKey(key);
+  const stem = SENSITIVE_STEMS.some((x) => k.includes(x));
+  const exact = SENSITIVE_EXACT.has(k);
+  if (!(stem || exact)) {
+    return false;
+  }
+  const explicit = /[=＝]|%3[Dd]/.test(sep) || /^["']/.test(sep);
+  if (!stem && AMBIGUOUS_IN_TEXT.has(k)) {
+    return explicit; // "code: be kind" is prose; "code=abc" is a parameter
+  }
+  if (explicit) {
+    return true;
+  }
+  return /^[A-Z][a-z]+$/.test(key) ? looksLikeCredential(value) : true;
+}
+
+function redactKeyNames(input: string): string {
+  KEY_SCAN.lastIndex = 0;
+  let out = '';
+  let pos = 0;
+  for (let m = KEY_SCAN.exec(input); m; m = KEY_SCAN.exec(input)) {
+    const [, before, key, sep] = m;
+    const keyEnd = m.index + before.length + key.length;
+    const valueStart = m.index + m[0].length;
+    const rest = input.slice(valueStart);
+    const quoted = VALUE_QUOTED.exec(rest);
+    const run = quoted ? null : VALUE_RUN.exec(rest);
+    const value = quoted ? quoted[0].slice(1, -1) : (run?.[0] ?? '');
+    if (
+      value === '' ||
+      value.startsWith(REDACTED) ||
+      !shouldMask(key, sep, value)
+    ) {
+      // Not a secret: resume right after the key so a nested key
+      // ("Failed: token: x") is still seen.
+      KEY_SCAN.lastIndex = keyEnd;
+      continue;
+    }
+    const q = quoted ? quoted[1] : '';
+    out += `${input.slice(pos, valueStart)}${q}${REDACTED}${q}`;
+    pos = valueStart + (quoted ? quoted[0].length : (run?.[0].length ?? 0));
+    KEY_SCAN.lastIndex = pos;
+  }
+  return out + input.slice(pos);
+}
+
 // Input is cut to this before scanning so a megabyte string cannot stall the
 // logger; the result is cut again to MAX_STRING AFTER redaction, so a secret
 // is never half-cut before it is masked.
 const MAX_SCAN = 64_000;
-
-function redactPairs(input: string, depth = 0): string {
-  return input.replace(
-    PAIR,
-    (
-      match,
-      quote: string,
-      key: string,
-      sep: string,
-      dq: string | undefined,
-      sq: string | undefined,
-      bare: string | undefined
-    ) => {
-      const valueQuote = dq !== undefined ? '"' : sq !== undefined ? "'" : '';
-      const value = dq ?? sq ?? bare ?? '';
-      const head = `${quote}${key}${quote}${sep}`;
-      const strict = quote !== '' || sep.trim() === '=';
-      if (FILE_NAME.test(key) && POSITION_ONLY.test(value)) {
-        return match;
-      }
-      if (isSensitiveKey(key, true, strict)) {
-        return `${head}${valueQuote}${REDACTED}${valueQuote}`;
-      }
-      // A non-secret label ("Failed: password=x", "url=https://a?token=x"):
-      // scan its value on its own so a nested secret is not swallowed.
-      return depth < 4
-        ? `${head}${valueQuote}${redactPairs(value, depth + 1)}${valueQuote}`
-        : match;
-    }
-  );
-}
 
 function redactString(input: string): string {
   let value = input;
@@ -190,11 +223,13 @@ function redactString(input: string): string {
       value = value.slice(0, cut);
     }
   }
-  value = redactPairs(
+  value = redactKeyNames(
     value
       .replace(JWT, REDACTED)
       .replace(AUTH_HEADER, `$1${REDACTED}`)
-      .replace(SCHEME_TOKEN, `$1 ${REDACTED}`)
+      .replace(BEARER, `Bearer ${REDACTED}`)
+      .replace(SCHEME_LONG, REDACTED)
+      .replace(SCHEME_BASIC, `Basic ${REDACTED}`)
   ).replace(EMAIL, REDACTED);
   return value.length > MAX_STRING || input.length > MAX_SCAN
     ? `${value.slice(0, MAX_STRING)}…[truncated]`

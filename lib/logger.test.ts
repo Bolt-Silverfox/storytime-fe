@@ -660,3 +660,138 @@ describe('round 2: isolation', () => {
     expect(copy.stack).not.toContain('stk123');
   });
 });
+
+describe('round 3: key-name scan (table tests)', () => {
+  const labels = [
+    '',
+    'Failed: ',
+    'Request failed: ',
+    'Login error: ',
+    'Error: ',
+    'url=',
+    'note - ',
+  ];
+  const keys = [
+    'token',
+    'password',
+    'refreshToken',
+    'otp',
+    'api_key',
+    'Access-Token',
+    'secret',
+  ];
+  const seps = ['=', ':', ' = ', '  :  ', '：', '＝', '    =    '];
+  const values: [string, string][] = [
+    ['plain', 'sEcr3tValue99'],
+    ['long', `${'A1'.repeat(300)}`],
+  ];
+
+  for (const label of labels) {
+    for (const key of keys) {
+      for (const sep of seps) {
+        for (const [shape, value] of values) {
+          it(`masks ${JSON.stringify(`${label}${key}${sep}<${shape}>`)} in strings, messages and stacks`, () => {
+            const text = `${label}${key}${sep}${value} tail`;
+            expect(redact(text)).not.toContain(value.slice(0, 12));
+            expect(redact(text)).not.toContain(value.slice(-12));
+            sentry.captureException.mockClear();
+            logger.error('x', new Error(text));
+            const copy = sentry.captureException.mock.calls[0][0] as Error;
+            expect(copy.message).not.toContain(value.slice(0, 12));
+            expect(copy.stack).not.toContain(value.slice(0, 12));
+            expect(JSON.stringify(spies.error.mock.calls)).not.toContain(
+              value.slice(0, 12)
+            );
+          });
+        }
+      }
+    }
+  }
+
+  it.each([470, 480, 490, 500, 510])(
+    'masks a token after a %i-char url prefix',
+    (offset) => {
+      const text = `url=https://x/${'a'.repeat(offset)}?token=SECRETVALUE123&page=2`;
+      const out = redact(text) as string;
+      expect(out).not.toMatch(/SECRET|VALUE123|RETVALUE/);
+      expect(out).toContain('page=2');
+    }
+  );
+
+  it('masks quoted values', () => {
+    expect(redact('Failed: password = "hunter two"')).not.toMatch(/hunter/);
+    expect(redact("note: token: 'abc 123' done")).not.toMatch(/abc 123/);
+  });
+
+  it('masks percent-encoded separators', () => {
+    expect(redact('cb?token%3Dabc123%26page%3D2')).not.toContain('abc123');
+    expect(redact('cb?token%3Dabc123%26page%3D2')).toContain('page%3D2');
+  });
+
+  it('masks every line of a stack and nested causes', () => {
+    const inner = new Error('token: abc123');
+    const outer = new Error('Failed: password = hunter2', { cause: inner });
+    outer.stack =
+      'Error: Failed: password = hunter2\n    at a (x.js:1:2)\n    at b (api_key=zzz999)';
+    logger.error('x', outer);
+    const copy = sentry.captureException.mock.calls[0][0] as Error;
+    const all = JSON.stringify([
+      copy.message,
+      copy.stack,
+      (copy.cause as Error).message,
+      (copy.cause as Error).stack,
+    ]);
+    expect(all).not.toMatch(/hunter2|abc123|zzz999/);
+  });
+
+  it('stops values at # and does not let a fragment hide a secret', () => {
+    const out = redact('next=https://a/b#access_token=frag1&x=1') as string;
+    expect(out).not.toContain('frag1');
+    expect(out).toContain('https://a/b#');
+  });
+
+  it('scans at most 64k characters', () => {
+    const out = redact(`${'a '.repeat(40_000)}password=late`) as string;
+    expect(out).not.toContain('password');
+    expect(out.length).toBeLessThan(9_000);
+  });
+
+  it.each([
+    'key to the castle',
+    'code: be kind',
+    'pass the ball',
+    'meet at 12:30',
+    'pkg@1.2.3',
+    'a token of friendship',
+    'Token: a gold coin',
+    'Secret: Ada can whistle.',
+    'the bearer of bad news',
+    'Basic information',
+    'status code: 500',
+  ])('leaves prose readable: %s', (text) => {
+    expect(redact(text)).toBe(text);
+  });
+});
+
+describe('round 3: basic scheme', () => {
+  it('masks base64 Basic credentials but not the word', () => {
+    expect(redact('sent Basic dXNlcjpwYXNz now')).not.toContain('dXNlcjpwYXNz');
+    expect(redact('Basic Information')).toBe('Basic Information');
+  });
+});
+
+describe('round 3: mutants that survived before', () => {
+  it('a value ends at "#" so the fragment stays', () => {
+    const out = redact('token=abc123#section-2') as string;
+    expect(out).not.toContain('abc123');
+    expect(out).toContain('#section-2');
+  });
+
+  it('a multi-megabyte string is bounded by the scan cap, not scanned whole', () => {
+    const huge = 'token=a '.repeat(2_500_000);
+    const t = performance.now();
+    const out = redact(huge) as string;
+    expect(performance.now() - t).toBeLessThan(100);
+    expect(out.length).toBeLessThan(9_000);
+  });
+});

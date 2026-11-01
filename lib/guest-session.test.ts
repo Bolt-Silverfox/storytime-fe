@@ -30,7 +30,7 @@ const sessionCalls = () =>
   post.mock.calls.filter(([url]) => url === 'guest/session');
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
   Cookies.remove('guestSessionId');
 });
 
@@ -145,5 +145,54 @@ describe('guest session before guest reads', () => {
     await startGuestStoryAudioBatchService('s1');
     expect(sessionCalls()).toHaveLength(1);
     expect(post).toHaveBeenCalledTimes(3);
+  });
+
+  it('treats "Invalid session ID format" 400 (corrupt cookie) as stale', async () => {
+    Cookies.set('guestSessionId', 'garbage');
+    get
+      .mockRejectedValueOnce(axiosErr(400, 'Invalid session ID format'))
+      .mockResolvedValueOnce(story);
+    post.mockResolvedValueOnce(session);
+    await expect(getGuestStoryService('s1')).resolves.toEqual(story.data);
+    expect(Cookies.get('guestSessionId')).toBe('new-id');
+  });
+
+  it('does not retry an unrelated 400 or a 500, and keeps the cookie', async () => {
+    Cookies.set('guestSessionId', 'good');
+    get.mockRejectedValueOnce(axiosErr(400, 'Bad story id'));
+    await expect(getGuestStoryService('s1')).rejects.toMatchObject({
+      status: 400,
+    });
+    get.mockRejectedValueOnce(axiosErr(500, 'boom'));
+    await expect(getGuestStoryService('s1')).rejects.toMatchObject({
+      status: 500,
+    });
+    expect(get).toHaveBeenCalledTimes(2);
+    expect(sessionCalls()).toHaveLength(0);
+    expect(Cookies.get('guestSessionId')).toBe('good');
+  });
+
+  it('does not delete a cookie a concurrent retry already replaced', async () => {
+    Cookies.set('guestSessionId', 'stale');
+    get.mockImplementationOnce(async () => {
+      Cookies.set('guestSessionId', 'replaced-by-other');
+      throw axiosErr(401, 'Unauthorized');
+    });
+    get.mockResolvedValueOnce(story);
+    await getGuestStoryService('s1');
+    expect(sessionCalls()).toHaveLength(0);
+    expect(Cookies.get('guestSessionId')).toBe('replaced-by-other');
+  });
+
+  it('exposes a userMessage on thrown errors', async () => {
+    post.mockRejectedValue(axiosErr(429, 'Too many requests'));
+    await expect(getGuestStoryService('s1')).rejects.toMatchObject({
+      userMessage: "We couldn't start a guest session, try again in a minute",
+    });
+    get.mockRejectedValueOnce(axiosErr(500, 'boom'));
+    Cookies.set('guestSessionId', 'good');
+    await expect(getGuestStoryService('s1')).rejects.toMatchObject({
+      userMessage: 'Failed to load story',
+    });
   });
 });

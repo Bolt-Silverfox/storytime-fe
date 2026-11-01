@@ -1,6 +1,7 @@
 import { AxiosError } from 'axios';
 import Cookies from 'js-cookie';
 import api from '@/lib/axios';
+import { isSessionActive } from '@/lib/session-cookies';
 
 interface RegisterPayload {
   email: string;
@@ -871,13 +872,13 @@ export const clearUserFromStorage = () => {
   Cookies.remove('refreshToken');
 };
 
-// Single source of truth for "signed in": a token cookie, exactly as
-// middleware.ts decides. The stored user profile is NOT required (it may be
-// missing or stale); read it lazily with getUserFromStorage() where needed.
-// The access token lasts ~1h but the refresh token 7 days and the axios
-// interceptor refreshes transparently, so either cookie means signed in.
-export const isUserLoggedIn = () =>
-  !!(Cookies.get('accessToken') || Cookies.get('refreshToken'));
+// Single source of truth for "signed in" (lib/session.ts, same rule as
+// middleware.ts): a usable access token or a refresh token. An expired access
+// token with no refresh token is signed out (and cleared). The stored user
+// profile is NOT required (it may be missing or stale); read it lazily with
+// getUserFromStorage() where needed. The access token lasts ~1h but the refresh
+// token 7 days and the axios interceptor refreshes transparently.
+export const isUserLoggedIn = () => isSessionActive();
 
 export const getStoryCategoriesService = async () => {
   try {
@@ -936,6 +937,8 @@ export interface StoryListItem {
 export interface ServiceError {
   message: string;
   status: number | null;
+  // Safe-to-display text; UI should prefer this over its generic fallback.
+  userMessage?: string;
 }
 
 export const createGuestSessionService = async (): Promise<GuestSession> => {
@@ -951,10 +954,12 @@ const GUEST_SESSION_FAILED_MESSAGE =
 // Same { message, status } shape as ServiceError so callers show it as-is.
 export class GuestSessionError extends Error implements ServiceError {
   status: number | null;
+  userMessage: string;
   constructor(status: number | null) {
     super(GUEST_SESSION_FAILED_MESSAGE);
     this.name = 'GuestSessionError';
     this.status = status;
+    this.userMessage = GUEST_SESSION_FAILED_MESSAGE;
   }
 }
 
@@ -999,7 +1004,7 @@ const isStaleGuestSession = (error: unknown): boolean => {
     return true;
   }
   if (status === 400) {
-    return /x-guest-session-id/i.test(message);
+    return /x-guest-session-id|invalid session id/i.test(message);
   }
   if (status === 404) {
     return /session/i.test(message);
@@ -1044,6 +1049,7 @@ export const getGuestStoryService = async (
     if (error instanceof AxiosError) {
       throw {
         message: error.response?.data?.message || 'Failed to load story',
+        userMessage: 'Failed to load story',
         status: error.response?.status ?? null,
       } satisfies ServiceError;
     }

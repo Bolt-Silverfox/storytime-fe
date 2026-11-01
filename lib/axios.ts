@@ -1,6 +1,7 @@
 // lib/axios.ts
 import axios from 'axios';
 import Cookies from 'js-cookie';
+import { isSessionActive } from '@/lib/session-cookies';
 
 let isRefreshing = false;
 let failedQueue: {
@@ -42,8 +43,15 @@ api.interceptors.request.use((config) => {
   if (API_KEY && config.headers) {
     config.headers['X-API-Key'] = API_KEY;
   }
+  // Guest endpoints always identify the caller by guest session, never by a
+  // (possibly expired) user token.
+  const isGuestEndpoint = /^\/?guest\//.test(config.url ?? '');
   const token = Cookies.get('accessToken');
-  if (token && config.headers) {
+  // Send the bearer only for a signed-in session: a still-valid token, or an
+  // expired one that the refresh flow (refreshToken cookie) can renew. A dead
+  // session is cleared and the request goes out as a guest.
+  const authed = !isGuestEndpoint && !!token && isSessionActive();
+  if (authed && token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
   } else if (config.headers) {
     // Guest mode: forward the guest session so quota/history are tracked

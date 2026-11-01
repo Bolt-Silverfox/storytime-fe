@@ -943,15 +943,104 @@ export const createGuestSessionService = async (): Promise<GuestSession> => {
   return response.data;
 };
 
+const GUEST_COOKIE = 'guestSessionId';
+const GUEST_SESSION_FAILED_MESSAGE =
+  "We couldn't start a guest session, try again in a minute";
+
+// Thrown when a guest session can't be created (e.g. rate limited, offline).
+// Same { message, status } shape as ServiceError so callers show it as-is.
+export class GuestSessionError extends Error implements ServiceError {
+  status: number | null;
+  constructor(status: number | null) {
+    super(GUEST_SESSION_FAILED_MESSAGE);
+    this.name = 'GuestSessionError';
+    this.status = status;
+  }
+}
+
+let guestSessionInFlight: Promise<string> | null = null;
+
+// Ensure a guest session exists (creating one if the cookie is missing) and
+// return its id. Concurrent callers share a single creation request; a failed
+// creation is not cached, so the next call tries again.
+export const ensureGuestSession = (): Promise<string> => {
+  const existing = Cookies.get(GUEST_COOKIE);
+  if (existing) {
+    return Promise.resolve(existing);
+  }
+  if (!guestSessionInFlight) {
+    guestSessionInFlight = (async () => {
+      try {
+        const session = await createGuestSessionService();
+        const expiresDays = session.expiresIn ? session.expiresIn / 86400 : 7;
+        Cookies.set(GUEST_COOKIE, session.sessionId, { expires: expiresDays });
+        return session.sessionId;
+      } catch (error: unknown) {
+        throw new GuestSessionError(
+          error instanceof AxiosError ? (error.response?.status ?? null) : null
+        );
+      } finally {
+        guestSessionInFlight = null;
+      }
+    })();
+  }
+  return guestSessionInFlight;
+};
+
+// True when a guest endpoint rejected our session: header missing (400),
+// unauthorized (401), or a 404 that is about the session, not the story.
+const isStaleGuestSession = (error: unknown): boolean => {
+  if (!(error instanceof AxiosError && error.response)) {
+    return false;
+  }
+  const { status, data } = error.response;
+  const message = String(data?.message ?? '');
+  if (status === 401) {
+    return true;
+  }
+  if (status === 400) {
+    return /x-guest-session-id/i.test(message);
+  }
+  if (status === 404) {
+    return /session/i.test(message);
+  }
+  return false;
+};
+
+// Runs a guest request with a valid session: ensures one first, and if the
+// server says the session is stale, drops the cookie, creates a fresh one and
+// retries exactly once.
+const withGuestSession = async <T>(request: () => Promise<T>): Promise<T> => {
+  const sessionId = await ensureGuestSession();
+  try {
+    return await request();
+  } catch (error: unknown) {
+    if (!isStaleGuestSession(error)) {
+      throw error;
+    }
+    // Only drop the cookie if a concurrent retry hasn't already replaced it.
+    if (Cookies.get(GUEST_COOKIE) === sessionId) {
+      Cookies.remove(GUEST_COOKIE);
+    }
+    await ensureGuestSession();
+    return request();
+  }
+};
+
 // Reads a story as a guest. Consumes a quota slot for a new story, free for an
 // already-read one. Throws { message, status } — status 403 means quota reached.
 export const getGuestStoryService = async (
   storyId: string
 ): Promise<GuestStory> => {
   try {
-    const response = await api.get(`guest/stories/${storyId}`);
+    const response = await withGuestSession(() =>
+      api.get(`guest/stories/${storyId}`)
+    );
     return response.data;
   } catch (error: unknown) {
+    if (error instanceof GuestSessionError) {
+      throw error;
+    }
     if (error instanceof AxiosError) {
       throw {
         message: error.response?.data?.message || 'Failed to load story',
@@ -1009,17 +1098,7 @@ export const getStoryQuotaService = async (): Promise<StoryQuota | null> => {
       const { data } = await api.get('stories/user/quota');
       return normalizeQuota(data);
     }
-    // Guest: ensure a session exists so the backend can track/read the quota.
-    let sessionId = Cookies.get('guestSessionId');
-    if (!sessionId) {
-      const session = await createGuestSessionService();
-      const expiresDays = session.expiresIn ? session.expiresIn / 86400 : 7;
-      Cookies.set('guestSessionId', session.sessionId, {
-        expires: expiresDays,
-      });
-      sessionId = session.sessionId;
-    }
-    const { data } = await api.get('guest/quota');
+    const { data } = await withGuestSession(() => api.get('guest/quota'));
     return normalizeQuota(data);
   } catch {
     return null;
@@ -1516,9 +1595,14 @@ export const startGuestStoryAudioBatchService = async (
   storyId: string
 ): Promise<StoryAudioBatch> => {
   try {
-    const response = await api.post(`guest/stories/${storyId}/audio`, {});
+    const response = await withGuestSession(() =>
+      api.post(`guest/stories/${storyId}/audio`, {})
+    );
     return normalizeAudioBatch(response.data);
   } catch (error: unknown) {
+    if (error instanceof GuestSessionError) {
+      throw error;
+    }
     if (error instanceof AxiosError && error.response) {
       throw {
         message: error.response.data?.message || 'Failed to start story audio',
@@ -1539,11 +1623,14 @@ export const getGuestStoryAudioBatchStatusService = async (
   batchJobId: string
 ): Promise<StoryAudioBatch> => {
   try {
-    const response = await api.get(
-      `guest/stories/${storyId}/audio/${batchJobId}`
+    const response = await withGuestSession(() =>
+      api.get(`guest/stories/${storyId}/audio/${batchJobId}`)
     );
     return normalizeAudioBatch(response.data);
   } catch (error: unknown) {
+    if (error instanceof GuestSessionError) {
+      throw error;
+    }
     if (error instanceof AxiosError && error.response) {
       throw {
         message: error.response.data?.message || 'Failed to fetch audio status',

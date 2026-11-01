@@ -1,9 +1,11 @@
 import * as Sentry from '@sentry/nextjs';
+import { AxiosError, AxiosHeaders } from 'axios';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   configureLogger,
   createLogger,
   isExpectedFailure,
+  isLoggerConsoleEmit,
   logger,
   redact,
 } from './logger';
@@ -203,5 +205,288 @@ describe('robustness', () => {
     logger.error('e', new Error('e'));
     expect(spies.warn).not.toHaveBeenCalled();
     expect(spies.error).not.toHaveBeenCalled();
+  });
+});
+
+const dump = (v: unknown) => JSON.stringify(redact(v));
+
+describe('redaction coverage', () => {
+  it.each([
+    [
+      'https://s3.x/f?X-Amz-Signature=abc123&X-Amz-Credential=AKIAZZ/2026',
+      ['abc123', 'AKIAZZ'],
+    ],
+    ['https://app/cb#access_token=eyJabc&x=1', ['eyJabc']],
+    ['https://app/r?password=hunter2', ['hunter2']],
+    ['https://app/r?otp=123456', ['123456']],
+    ['https://app/r?api_key=kkk111', ['kkk111']],
+    ['https://app/r?id_token=ttt222', ['ttt222']],
+    ['Authorization: Token abc123', ['abc123']],
+    ['authorization=Digest zzz999', ['zzz999']],
+    ['body was {"pin":"999111","ok":"fine"}', ['999111']],
+    ["body was {'cvv': '321'}", ['321']],
+    ['https://app/r?code=oauthcode9&state=s', ['oauthcode9']],
+  ])('masks secrets inside strings: %s', (input, secrets) => {
+    const out = redact(input) as string;
+    for (const secret of secrets) {
+      expect(out).not.toContain(secret);
+    }
+    expect(out).toContain('[REDACTED]');
+  });
+
+  it('keeps the non-secret parts of those strings', () => {
+    expect(redact('https://app/r?password=hunter2&page=3')).toContain('page=3');
+    expect(redact('{"pin":"1","ok":"fine"}')).toContain('"ok":"fine"');
+  });
+
+  it.each([
+    'pass',
+    'pwd',
+    'code',
+    'card',
+    'cvv',
+    'session',
+    'auth',
+    'key',
+    'sig',
+    'x-api-key',
+    'accessToken',
+    'Set-Cookie',
+    'X_Auth_Token',
+  ])('masks the object key %s', (key) => {
+    expect(dump({ [key]: 'sensitive-value' })).not.toContain('sensitive-value');
+  });
+
+  it('does not over-redact ordinary keys and text', () => {
+    expect(dump({ statusCode: 500, keyboard: 'k', shipping: 's' })).toContain(
+      '500'
+    );
+    expect(redact('status code: 500 on pkg@1.2.3')).toBe(
+      'status code: 500 on pkg@1.2.3'
+    );
+  });
+
+  it('still masks real emails', () => {
+    expect(redact('mail kid.one@example.com now')).not.toContain('kid.one');
+  });
+
+  it('stays fast on pathological input and truncates long strings', () => {
+    for (const input of [
+      'a'.repeat(40_000),
+      'a.'.repeat(20_000),
+      'a@'.repeat(20_000),
+      `"${'a'.repeat(40_000)}`,
+    ]) {
+      const t = performance.now();
+      const out = redact(input) as string;
+      expect(performance.now() - t).toBeLessThan(150);
+      expect(out.length).toBeLessThan(9_000);
+      expect(out).toContain('[truncated]');
+    }
+  });
+
+  it('marks circular references instead of returning them raw', () => {
+    const a: Record<string, unknown> = { name: 'x' };
+    a.self = a;
+    expect(dump(a)).toContain('[Circular]');
+  });
+
+  it('caps depth', () => {
+    let deep: Record<string, unknown> = { leaf: 'v' };
+    for (let i = 0; i < 20; i++) {
+      deep = { n: deep };
+    }
+    expect(dump(deep)).toContain('[Truncated]');
+    expect(dump(deep)).not.toContain('"leaf"');
+  });
+
+  it('returns a placeholder for unserialisable values', () => {
+    const { proxy, revoke } = Proxy.revocable({}, {});
+    revoke();
+    expect(redact(proxy)).toBe('[Unserializable]');
+  });
+});
+
+const makeAxiosError = (
+  status: number,
+  url = '/stories/9f1c2d3e-aaaa-bbbb-cccc-1234567890ab/audio?token=qsecret'
+) =>
+  new AxiosError(
+    `Request failed with status code ${status}`,
+    'ERR_BAD_RESPONSE',
+    {
+      url,
+      method: 'get',
+      baseURL: 'https://api.example.com',
+      headers: new AxiosHeaders({ Authorization: 'Bearer hdrsecret' }),
+      data: JSON.stringify({ password: 'bodysecret' }),
+    } as never,
+    {},
+    {
+      status,
+      statusText: 'x',
+      headers: {},
+      config: {} as never,
+      data: { email: 'leak@example.com' },
+    }
+  );
+
+describe('axios errors reach Sentry with context', () => {
+  it('captures a copy keeping stack/cause, with tags, contexts and fingerprint', () => {
+    const err = makeAxiosError(500);
+    logger.error('Failed to fetch audio', err);
+    expect(sentry.captureException).toHaveBeenCalledOnce();
+    const [captured, hint] = sentry.captureException.mock.calls[0] as [
+      Error,
+      {
+        tags: Record<string, string>;
+        contexts: Record<string, Record<string, unknown>>;
+        fingerprint: string[];
+      },
+    ];
+    expect(captured.stack).toBeTruthy();
+    expect(captured.name).toBe('AxiosError');
+    expect((captured as unknown as { status?: number }).status).toBe(500);
+    expect(hint.tags).toMatchObject({
+      'http.status': '500',
+      'http.method': 'GET',
+      'http.path': '/stories/:id/audio',
+    });
+    expect(hint.contexts.http_error).toMatchObject({
+      status: 500,
+      method: 'GET',
+      path: '/stories/:id/audio',
+    });
+    expect(hint.fingerprint).toEqual(
+      expect.arrayContaining(['GET', '/stories/:id/audio', '500'])
+    );
+    const sent =
+      JSON.stringify(sentry.captureException.mock.calls[0]) + captured.stack;
+    expect(sent).not.toMatch(
+      /qsecret|hdrsecret|bodysecret|leak@example|9f1c2d3e/
+    );
+  });
+
+  it('different endpoints get different fingerprints', () => {
+    logger.error('a', makeAxiosError(500, '/kids/1'));
+    logger.error('b', makeAxiosError(500, '/stories/2'));
+    const fp = sentry.captureException.mock.calls.map((c) =>
+      (c[1] as { fingerprint: string[] }).fingerprint.join('|')
+    );
+    expect(fp[0]).not.toBe(fp[1]);
+  });
+
+  it('keeps cause and AggregateError members, redacted', () => {
+    const inner = new Error('inner Bearer abc.def.ghi');
+    const outer = new Error('outer', { cause: inner });
+    const agg = new AggregateError([new Error('one me@x.io')], 'many');
+    logger.error('x', outer);
+    logger.error('y', agg);
+    const a = sentry.captureException.mock.calls[0][0] as Error;
+    const b = sentry.captureException.mock.calls[1][0] as AggregateError;
+    expect((a.cause as Error).message).not.toContain('abc.def.ghi');
+    expect((a.cause as Error).message).toContain('inner');
+    expect(b.errors).toHaveLength(1);
+    expect((b.errors[0] as Error).message).not.toContain('me@x.io');
+  });
+
+  it('redacts the message string itself', () => {
+    logger.error('x', new Error('boom for me@x.io token=abc123'));
+    const captured = sentry.captureException.mock.calls[0][0] as Error;
+    expect(captured.message).not.toMatch(/me@x\.io|abc123/);
+  });
+});
+
+describe('captured messages and console are redacted', () => {
+  it('captureMessage never receives the raw message', () => {
+    logger.error('fail Bearer abc.def.ghi for me@x.io');
+    const [msg] = sentry.captureMessage.mock.calls[0];
+    expect(msg).not.toMatch(/abc\.def\.ghi|me@x\.io/);
+  });
+
+  it('console output is redacted', () => {
+    logger.warn('x ?password=hunter2', { token: 'tok123', email: 'a@b.io' });
+    logger.error('y', new Error('Bearer abc.def.ghi'), {
+      context: { cookie: 'sess=zzz' },
+    });
+    const out = JSON.stringify([spies.warn.mock.calls, spies.error.mock.calls]);
+    expect(out).not.toMatch(/hunter2|tok123|a@b\.io|abc\.def\.ghi|sess=zzz/);
+  });
+
+  it('breadcrumb data is redacted', () => {
+    logger.warn('w', { password: 'pw1' });
+    expect(JSON.stringify(sentry.addBreadcrumb.mock.calls)).not.toContain(
+      'pw1'
+    );
+  });
+});
+
+describe('never throws', () => {
+  it('survives a revoked proxy as error and as context', () => {
+    const { proxy, revoke } = Proxy.revocable({}, {});
+    revoke();
+    expect(() => logger.error('x', proxy)).not.toThrow();
+    expect(() =>
+      logger.error('x', new Error('e'), { context: proxy as never })
+    ).not.toThrow();
+    expect(() => logger.warn('x', proxy)).not.toThrow();
+    const hint = sentry.captureException.mock.calls.at(-1)?.[1] as {
+      extra: Record<string, unknown>;
+    };
+    expect(Object.keys(hint.extra)).not.toContain('0');
+  });
+});
+
+describe('expected failures stay visible when they signal an outage', () => {
+  const network = () =>
+    new AxiosError('Network Error', 'ERR_NETWORK', {
+      url: '/kids/7',
+      method: 'get',
+      headers: new AxiosHeaders(),
+    } as never);
+
+  it('sends one rate-limited warning event for ERR_NETWORK', () => {
+    vi.useFakeTimers();
+    logger.error('kids', network(), { expected: true });
+    logger.error('kids', network(), { expected: true });
+    expect(sentry.captureException).not.toHaveBeenCalled();
+    expect(sentry.captureMessage).toHaveBeenCalledOnce();
+    expect(sentry.captureMessage.mock.calls[0][1]).toMatchObject({
+      level: 'warning',
+    });
+    vi.advanceTimersByTime(61_000);
+    logger.error('kids', network(), { expected: true });
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
+
+  it('does so for 401 on non-auth endpoints only', () => {
+    logger.error('kids', makeAxiosError(401, '/kids/7'), { expected: true });
+    expect(sentry.captureMessage).toHaveBeenCalledOnce();
+    logger.error('login', makeAxiosError(401, '/auth/login'), {
+      expected: true,
+    });
+    expect(sentry.captureMessage).toHaveBeenCalledOnce();
+  });
+
+  it('not for 429, aborts, or when the browser is offline', () => {
+    logger.error('x', makeAxiosError(429, '/kids/7'), { expected: true });
+    logger.error('x', new DOMException('a', 'AbortError'), { expected: true });
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    logger.error('x', network(), { expected: true });
+    expect(sentry.captureMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe('console breadcrumb de-duplication', () => {
+  it('flags logger-originated console writes so beforeBreadcrumb can drop them', () => {
+    let during: boolean | undefined;
+    spies.warn.mockImplementation(() => {
+      during = isLoggerConsoleEmit();
+    });
+    expect(isLoggerConsoleEmit()).toBe(false);
+    logger.warn('w');
+    expect(during).toBe(true);
+    expect(isLoggerConsoleEmit()).toBe(false);
   });
 });

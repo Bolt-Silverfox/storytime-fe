@@ -132,20 +132,36 @@ describe('swipeDirection', () => {
 });
 
 describe('alignClip (what Play / a page turn does to the narration)', () => {
-  const base = { currentClip: 0, clipTotal: 4, readyCount: 4, singleFile: false };
+  const base = {
+    currentClip: 0,
+    clipTotal: 4,
+    readyCount: 4,
+    singleFile: false,
+  };
   it('single stored narration file: never maps pages to clips (a)', () => {
     for (const page of [0, 2, 5]) {
       expect(
-        alignClip({ ...base, page, clipTotal: 0, readyCount: 1, singleFile: true }).kind
+        alignClip({
+          ...base,
+          page,
+          clipTotal: 0,
+          readyCount: 1,
+          singleFile: true,
+        }).kind
       ).toBe('ok');
     }
   });
   it('maps page N to clip N', () => {
-    expect(alignClip({ ...base, page: 2 })).toEqual({ kind: 'switch', target: 2 });
+    expect(alignClip({ ...base, page: 2 })).toEqual({
+      kind: 'switch',
+      target: 2,
+    });
     expect(alignClip({ ...base, page: 0 })).toEqual({ kind: 'ok', target: 0 });
   });
   it('unavailable when the clip is not ready, none past the clips', () => {
-    expect(alignClip({ ...base, page: 3, readyCount: 2 }).kind).toBe('unavailable');
+    expect(alignClip({ ...base, page: 3, readyCount: 2 }).kind).toBe(
+      'unavailable'
+    );
     expect(alignClip({ ...base, page: 4 }).kind).toBe('none');
   });
 });
@@ -165,11 +181,20 @@ describe('clipEndAction (what happens when a clip ends)', () => {
   });
   it('waits for a clip still generating, flags a failed one', () => {
     expect(clipEndAction({ ...base, readyCount: 1 })).toBe('wait');
-    expect(clipEndAction({ ...base, readyCount: 1, nextFailed: true })).toBe('failed');
+    expect(clipEndAction({ ...base, readyCount: 1, nextFailed: true })).toBe(
+      'failed'
+    );
   });
   it('single file: finishes the story when the file ends, even with many pages (b)', () => {
     expect(
-      clipEndAction({ ...base, current: 0, readyCount: 1, clipTotal: 0, pageCount: 9, singleFile: true })
+      clipEndAction({
+        ...base,
+        current: 0,
+        readyCount: 1,
+        clipTotal: 0,
+        pageCount: 9,
+        singleFile: true,
+      })
     ).toBe('finish');
   });
   it('finishes after the last clip when every page was narrated', () => {
@@ -179,6 +204,8 @@ describe('clipEndAction (what happens when a clip ends)', () => {
     expect(clipEndAction({ ...base, current: 3, pageCount: 6 })).toBe('stop');
   });
   it('more pages than clips with the text hidden: finishes (nothing to continue)', () => {
-    expect(clipEndAction({ ...base, current: 3, pageCount: 6, textVisible: false })).toBe('finish');
+    expect(
+      clipEndAction({ ...base, current: 3, pageCount: 6, textVisible: false })
+    ).toBe('finish');
   });
 });

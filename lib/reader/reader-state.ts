@@ -31,6 +31,70 @@ export const pageForClip = (clip: number, pageCount: number): number =>
 export const clipForPage = (page: number, clipCount: number): number | null =>
   Number.isInteger(page) && page >= 0 && page < clipCount ? page : null;
 
+export type AlignKind = 'ok' | 'switch' | 'unavailable' | 'none';
+
+// What Play (or a page turn) should do to the narration for `page`.
+// A single stored narration file is one clip for the whole story: pages are
+// not mapped to it. Otherwise clip N is page N; pages past the clips have no
+// narration ('none'); a clip not generated yet is 'unavailable'.
+export const alignClip = (a: {
+  page: number;
+  currentClip: number;
+  clipTotal: number;
+  readyCount: number;
+  singleFile: boolean;
+}): { kind: AlignKind; target: number } => {
+  if (a.singleFile) {
+    return { kind: 'ok', target: a.currentClip };
+  }
+  const target = clipForPage(a.page, a.clipTotal || a.readyCount);
+  if (target === null) {
+    return { kind: 'none', target: a.currentClip };
+  }
+  if (target === a.currentClip) {
+    return { kind: 'ok', target };
+  }
+  if (target >= a.readyCount) {
+    return { kind: 'unavailable', target };
+  }
+  return { kind: 'switch', target };
+};
+
+export type ClipEnd = 'advance' | 'wait' | 'failed' | 'stop' | 'finish';
+
+// What to do when the clip `current` finishes playing.
+export const clipEndAction = (a: {
+  current: number;
+  readyCount: number;
+  clipTotal: number;
+  nextFailed: boolean;
+  pageCount: number;
+  textVisible: boolean;
+  singleFile: boolean;
+}): ClipEnd => {
+  // The one stored file ending is the end of the story.
+  if (a.singleFile) {
+    return 'finish';
+  }
+  const next = a.current + 1;
+  if (next < a.readyCount) {
+    return 'advance';
+  }
+  if (next < a.clipTotal && !a.nextFailed) {
+    return 'wait';
+  }
+  if (a.nextFailed) {
+    return 'failed';
+  }
+  // Out of clips. Long stories narrate only their first pages: with the text
+  // on screen, stop on the next page and let the reader carry on; with the
+  // text hidden there is nothing to carry on to, so the narration is done.
+  if (a.pageCount > next && a.textVisible) {
+    return 'stop';
+  }
+  return 'finish';
+};
+
 export const readerReducer = (
   state: ReaderState,
   action: ReaderAction

@@ -158,10 +158,12 @@ const POSITIONS_KEY = 'readerPositions';
 
 type PositionMap = Record<
   string,
-  { page: number; count: number; sig?: string }
+  { page: number; count: number; sig?: string; at?: number }
 >;
 
-const jwtSubject = (token: string | undefined): string | null => {
+const MAX_POSITIONS = 200;
+
+const tokenUserId = (token: string | undefined): string | null => {
   try {
     const payload = token?.split('.')[1];
     if (!payload) {
@@ -170,20 +172,39 @@ const jwtSubject = (token: string | undefined): string | null => {
     const json = JSON.parse(
       atob(payload.replace(/-/g, '+').replace(/_/g, '/'))
     );
-    return typeof json?.sub === 'string' ? json.sub : null;
+    const id = json?.userId ?? json?.id;
+    return typeof id === 'string' && id ? id : null;
   } catch {
     return null;
   }
 };
 
-const readerScope = (): string => {
+const storedUserId = (): string | null => {
+  try {
+    const id = JSON.parse(window.localStorage.getItem('user') ?? 'null')?.id;
+    return typeof id === 'string' && id ? id : null;
+  } catch {
+    return null;
+  }
+};
+
+// Who is reading: the signed-in user (backend access token carries `userId`;
+// the stored user object covers a refresh-only session) or the guest session.
+// A signed-in reader we can't identify returns null: nothing is persisted
+// rather than sharing one key between accounts. (A guest's position is not
+// carried over to their account on login; the account starts from page one.)
+const readerScope = (): string | null => {
   if (isUserLoggedIn()) {
-    return `u:${jwtSubject(Cookies.get('accessToken') ?? Cookies.get('refreshToken')) ?? ''}`;
+    const id = tokenUserId(Cookies.get('accessToken')) ?? storedUserId();
+    return id ? `u:${id}` : null;
   }
   return `g:${Cookies.get('guestSessionId') ?? ''}`;
 };
 
-const positionKey = (storyId: string) => `${readerScope()}|${storyId}`;
+const positionKey = (storyId: string): string | null => {
+  const scope = readerScope();
+  return scope ? `${scope}|${storyId}` : null;
+};
 
 const readPositions = (): PositionMap => {
   if (typeof window === 'undefined') {
@@ -217,7 +238,8 @@ export const getReadingPosition = (
   pageCount: number,
   sig?: string
 ): number | null => {
-  const entry = readPositions()[positionKey(storyId)];
+  const key = positionKey(storyId);
+  const entry = key ? readPositions()[key] : undefined;
   if (
     !entry ||
     entry.count !== pageCount ||
@@ -237,22 +259,31 @@ export const saveReadingPosition = (
   pageCount: number,
   sig?: string
 ) => {
-  if (pageCount <= 0) {
+  const key = positionKey(storyId);
+  if (pageCount <= 0 || !key) {
     return;
   }
   const map = readPositions();
-  map[positionKey(storyId)] = {
+  // Strictly increasing so recency order survives same-millisecond saves.
+  const latest = Math.max(0, ...Object.values(map).map((e) => e?.at ?? 0));
+  map[key] = {
     page: Math.min(Math.max(Math.trunc(page) || 0, 0), pageCount - 1),
     count: pageCount,
     sig,
+    at: Math.max(Date.now(), latest + 1),
   };
-  writePositions(map);
+  // Drop legacy bare-id keys and keep only the most recent entries.
+  const kept = Object.entries(map)
+    .filter(([k]) => k.includes('|'))
+    .sort(([, a], [, b]) => (b.at ?? 0) - (a.at ?? 0))
+    .slice(0, MAX_POSITIONS);
+  writePositions(Object.fromEntries(kept));
 };
 
 export const clearReadingPosition = (storyId: string) => {
   const map = readPositions();
   const key = positionKey(storyId);
-  if (key in map) {
+  if (key && key in map) {
     delete map[key];
     writePositions(map);
   }

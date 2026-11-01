@@ -56,12 +56,18 @@ export const splitStoryIntoPages = (
 
 const normalise = (t: string): string => t.replace(/\s+/g, ' ').trim();
 
-// API pages must still describe this text (a stale or truncated page list would
-// show the wrong story). Whitespace differences are fine; allow 2% drift.
+// API pages must still describe this text: same length within 0.5% and the
+// same ending (so a list with the last page dropped is rejected). Whitespace
+// differences are ignored.
+const TAIL_CHARS = 40;
 const matchesText = (pages: string[], text: string): boolean => {
-  const a = normalise(pages.join(' ')).length;
-  const b = normalise(text).length;
-  return Math.abs(a - b) <= Math.max(a, b) * 0.02;
+  const joined = normalise(pages.join(' '));
+  const full = normalise(text);
+  if (Math.abs(joined.length - full.length) > full.length * 0.005) {
+    return false;
+  }
+  const n = Math.min(TAIL_CHARS, joined.length, full.length);
+  return joined.slice(-n) === full.slice(-n);
 };
 
 // Pages sent by the API (backend >= v1.7.0) win; older backends send none, so

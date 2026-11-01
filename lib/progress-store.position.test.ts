@@ -73,7 +73,10 @@ describe('reading position persistence', () => {
   });
 
   const b64 = (o: object) =>
-    btoa(JSON.stringify(o)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    btoa(JSON.stringify(o))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
   // Same shape as the backend's access token (no `sub`).
   const beToken = (userId: string) =>
     `${b64({ alg: 'HS256' })}.${b64({ id: userId, userId, email: `${userId}@x.test`, userRole: 'parent', expiry: 1, authSessionId: 's' })}.sig`;
@@ -153,7 +156,9 @@ describe('reading position persistence', () => {
     for (let i = 0; i < 210; i += 1) {
       saveReadingPosition(`s${i}`, 1, 5, 'sig');
     }
-    const map = JSON.parse(window.localStorage.getItem('readerPositions') ?? '{}');
+    const map = JSON.parse(
+      window.localStorage.getItem('readerPositions') ?? '{}'
+    );
     expect(Object.keys(map).length).toBe(200);
     expect('old-bare-id' in map).toBe(false);
     expect(getReadingPosition('s0', 5, 'sig')).toBeNull();

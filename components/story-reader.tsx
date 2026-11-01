@@ -13,6 +13,8 @@ import {
 } from '@/lib/progress-store';
 import { pagesSignature, resolvePages } from '@/lib/reader/paginate';
 import {
+  alignClip,
+  clipEndAction,
   clipForPage,
   initialReaderState,
   readerReducer,
@@ -159,6 +161,10 @@ const StoryReader = ({
   // narration) while read-along is on.
   const isCheckedRef = useRef(false);
   isCheckedRef.current = isChecked;
+  // A guest story with one stored narration file: a single clip for the whole
+  // story, so pages are not mapped to clips and the file ending ends the story.
+  const singleFileRef = useRef(false);
+  singleFileRef.current = isGuest && !!guestAudioUrl;
 
   // Resume where the reader left off once the pages are known.
   useEffect(() => {
@@ -494,52 +500,56 @@ const StoryReader = ({
     // At clip end, advance to the next paragraph; wait if it isn't ready yet;
     // stop (and reset) once the whole story has been read through.
     const handleEnded = () => {
-      const next = clipIndexRef.current + 1;
-      if (next < playlistRef.current.length) {
+      const current = clipIndexRef.current;
+      const next = current + 1;
+      const action = clipEndAction({
+        current,
+        readyCount: playlistRef.current.length,
+        clipTotal: totalCountRef.current,
+        nextFailed: failedIndicesRef.current.has(next),
+        pageCount: readerRef.current.count,
+        textVisible: isCheckedRef.current,
+        singleFile: singleFileRef.current,
+      });
+      if (action === 'advance') {
         clipIndexRef.current = next;
         setCurrentClip(next);
         setAudioUrl(playlistRef.current[next]);
         // Turn the page with the narration (only if the reader is on it).
         if (isCheckedRef.current) {
-          dispatch({ type: 'clip', clip: next, from: next - 1 });
+          dispatch({ type: 'clip', clip: next, from: current });
         }
         return;
       }
-      // The next clip isn't in the playlist yet. If that paragraph is still
-      // generating (not failed), hold and resume when polling delivers it —
-      // don't error and don't mark the story finished (bug 3).
-      if (next < totalCountRef.current && !failedIndicesRef.current.has(next)) {
+      // The next clip is still generating: hold and resume when polling
+      // delivers it — don't error and don't mark the story finished.
+      if (action === 'wait') {
         waitingForNextRef.current = true;
         setAudioGenerating(true);
         return;
       }
       // The next paragraph failed — surface a retry rather than a silent finish.
-      if (failedIndicesRef.current.has(next)) {
+      if (action === 'failed') {
         setIsPlaying(false);
         waitingForNextRef.current = false;
         setAudioError('Some of the audio couldn’t be prepared.');
         return;
       }
-      // Reached the end of the narration.
       setIsPlaying(false);
-      const last = clipIndexRef.current;
-      // Clips cover only the first N pages of a long story. Past them there is
-      // no narration: stop on the next page (if the reader is on the last
-      // narrated page) rather than calling the story finished.
-      if (readerRef.current.count > next) {
-        if (isCheckedRef.current) {
-          dispatch({ type: 'clip', clip: next, from: last });
-        }
+      // Clips cover only the first pages of a long story: stop on the next
+      // page, the story isn't finished.
+      if (action === 'stop') {
+        dispatch({ type: 'clip', clip: next, from: current });
         return;
       }
-      // The whole story has been read through. Rewind the narration and the
-      // page together so a replay starts from page one.
+      // The narration has played through: finish the story and rewind the
+      // narration (and the page, if it was following) so a replay starts over.
       setStoryFinished(true);
       clipIndexRef.current = 0;
       setCurrentClip(0);
       setAudioUrl(playlistRef.current[0] ?? null);
-      if (isCheckedRef.current) {
-        dispatch({ type: 'clip', clip: 0, from: last });
+      if (isCheckedRef.current && !singleFileRef.current) {
+        dispatch({ type: 'clip', clip: 0, from: current });
       }
     };
 
@@ -644,15 +654,15 @@ const StoryReader = ({
     page: number
   ): 'switched' | 'ok' | 'unavailable' | 'none' => {
     const list = playlistRef.current;
-    const target = clipForPage(page, totalCountRef.current || list.length);
-    if (target === null) {
-      return 'none';
-    }
-    if (target === clipIndexRef.current) {
-      return 'ok';
-    }
-    if (target >= list.length) {
-      return 'unavailable';
+    const { kind, target } = alignClip({
+      page,
+      currentClip: clipIndexRef.current,
+      clipTotal: totalCountRef.current,
+      readyCount: list.length,
+      singleFile: singleFileRef.current,
+    });
+    if (kind !== 'switch') {
+      return kind;
     }
     clipIndexRef.current = target;
     waitingForNextRef.current = false;
@@ -727,11 +737,7 @@ const StoryReader = ({
   const narratedPage = currentClip;
   const pageClip = clipForPage(reader.page, clipCount);
   // Long stories only narrate their first clips; later pages have no audio.
-  const pageNoAudio =
-    useAudioParagraphs &&
-    pageClip === null &&
-    !audioLoading &&
-    !audioGenerating;
+  const pageNoAudio = useAudioParagraphs && pageClip === null && !audioLoading;
 
   const playBlocked = isChecked && pageNoAudio && !isPlaying;
 

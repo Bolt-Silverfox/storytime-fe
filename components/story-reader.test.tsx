@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   act,
   cleanup,
@@ -7,7 +9,6 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const words = (n: number, p: string) =>
@@ -104,7 +105,9 @@ beforeEach(() => {
     played.push(this.getAttribute('src') ?? '');
     return Promise.resolve();
   });
-  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => undefined);
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(
+    () => undefined
+  );
 });
 afterEach(() => {
   cleanup();
@@ -120,7 +123,12 @@ const turnTo = async (n: number) => {
 describe('guest with a single stored narration file', () => {
   beforeEach(() => {
     guest.clips = 0;
-    guest.story = { id: 'story-1', title: 'T', textContent: TEXT, audioUrl: 'full.mp3' };
+    guest.story = {
+      id: 'story-1',
+      title: 'T',
+      textContent: TEXT,
+      audioUrl: 'full.mp3',
+    };
   });
 
   it('(a) Play on page 3 plays the file', async () => {

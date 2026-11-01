@@ -141,7 +141,10 @@ describe('resolvePages', () => {
 
   it('rejects a list with the last page dropped (tail check, even when under the length tolerance)', () => {
     // ~400 pages: one page is ~0.25% of the text, below the 0.5% tolerance
-    const huge = Array.from({ length: 10000 }, (_, i) => `Sentence ${i} here.`).join(' ');
+    const huge = Array.from(
+      { length: 10000 },
+      (_, i) => `Sentence ${i} here.`
+    ).join(' ');
     const hugePages = splitStoryIntoPages(huge);
     expect(resolvePages(hugePages, huge)).toEqual(hugePages);
     const dropped = hugePages.slice(0, -1);

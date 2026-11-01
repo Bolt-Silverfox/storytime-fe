@@ -97,8 +97,29 @@ describe('owner reproduction: expired accessToken + guestSessionId, no refresh',
     expect(config.headers.get('Authorization')).toBeFalsy();
   });
 
-  it('a non-guest-endpoint request also sends the guest header', async () => {
-    const config = await send('guest/quota');
+  it('a non-guest endpoint sends the guest header and NO bearer', async () => {
+    const config = await send('stories/x');
+    expect(config.headers.get('X-Guest-Session-Id')).toBe('guest-1');
+    expect(config.headers.get('Authorization')).toBeFalsy();
+  });
+
+  it('guest URLs strip an Authorization header set earlier (refresh retry)', async () => {
+    seen = undefined;
+    api.defaults.adapter = async (config) => {
+      seen = config;
+      return {
+        data: { success: true, data: {} },
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config,
+      };
+    };
+    await api.get('guest/stories/s1', {
+      headers: { Authorization: 'Bearer stale' },
+    });
+    const config = seen as unknown as InternalAxiosRequestConfig;
+    expect(config.headers.get('Authorization')).toBeFalsy();
     expect(config.headers.get('X-Guest-Session-Id')).toBe('guest-1');
   });
 });

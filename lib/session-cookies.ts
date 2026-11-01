@@ -7,6 +7,10 @@ import { hasUsableSession } from '@/lib/session';
 //
 // A dead session (access token present but expired/unreadable, no refresh
 // token) is cleared as a side effect: cookie and stored user. Idempotent.
+//
+// Caveat: cookies are shared per host, not per port, so other local apps on
+// localhost (another dev server on a different port) share this cookie jar;
+// an expired accessToken left by one of them is cleared here as well.
 export const isSessionActive = (): boolean => {
   const accessToken = Cookies.get('accessToken');
   const refreshToken = Cookies.get('refreshToken');

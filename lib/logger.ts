@@ -89,7 +89,11 @@ const SENSITIVE_STEMS = [
 // Unambiguous short credential words: matched as a whole key OR as one word
 // (segment) of a longer key (db_pwd, user_otp), never as a substring
 // ("classname" must not match "ssn").
-const SENSITIVE_WORDS = new Set(['otp', 'pwd', 'ssn', 'iban', 'sid']);
+const SENSITIVE_WORDS = new Set(['otp', 'pwd', 'ssn', 'iban']);
+// A sensitive word only counts when it ends the key ("db_pwd", "user_otp") or
+// is followed only by these ("iban_number"); "otp_sent", "pwd_changed_at" and
+// "ssn_last4_hint" describe the credential rather than hold it.
+const TAIL_WORDS = new Set(['code', 'token', 'value', 'number', 'no']);
 // Short words match only as the whole key (substring would hit "keyboard",
 // "shipping", "statusCode", ...).
 const SENSITIVE_EXACT = new Set([
@@ -128,6 +132,13 @@ const keyWords = (key: string) =>
     .toLowerCase()
     .split(/[\s_.\-[\]]+/);
 
+const hasCredentialWord = (words: string[]) =>
+  words.some(
+    (w, i) =>
+      SENSITIVE_WORDS.has(w) &&
+      words.slice(i + 1).every((t) => TAIL_WORDS.has(t))
+  );
+
 const hasStem = (key: string) => {
   const k = normaliseKey(key);
   return SENSITIVE_STEMS.some((stem) => k.includes(stem));
@@ -138,7 +149,8 @@ function isSensitiveKey(key: string): boolean {
   return (
     hasStem(key) ||
     SENSITIVE_EXACT.has(normaliseKey(key)) ||
-    keyWords(key).some((w) => SENSITIVE_WORDS.has(w))
+    hasCredentialWord(keyWords(key)) ||
+    keyWords(key).at(-1) === 'sid'
   );
 }
 
@@ -188,12 +200,12 @@ const EMAIL =
 //            \"password\":, data[password]=, password[]=), spaces, = : (or
 //            full-width / percent-encoded forms), spaces
 const KEY_SCAN =
-  /(^|[^\w.-])([A-Za-z][\w.-]{0,254})((?:\\*["']|\]|\[[\w.-]{0,20}\])*\s{0,16}(?:[=:：＝]|%3[DdAa])\s{0,16})/g;
+  /(^|[^\w.-])([A-Za-z][\w.-]*)((?:\\*["'`]|\]|\[[\w.-]{0,20}\]){0,4}\s{0,16}(?:[=:：＝]|%3[DdAa])\s{0,16})/g;
 const FILE_NAME = /\.(?:m?[jt]sx?|map|css|html?)$/i;
 // Unquoted values run to the next delimiter, with NO length cap, so a long
 // token is never cut in the middle and left half-visible.
-const VALUE_RUN = /(?:(?!%26)[^\s&#;,"'()[\]{}<>])+/y;
-const VALUE_OPEN_QUOTE = /(\\*)(["'])/y;
+const VALUE_RUN = /(?:(?!%26)[^\s&#;,"'`()[\]{}<>])+/y;
+const VALUE_OPEN_QUOTE = /(\\*)(["'`])/y;
 
 // Only the story-ish capitalised word "Token:" is treated as prose unless the
 // value looks like a credential. Real credential keys (password, secret,
@@ -206,15 +218,15 @@ function shouldMask(key: string, sep: string, peek: () => string): boolean {
     return false;
   }
   const k = normaliseKey(key);
-  const credential =
-    hasStem(key) || keyWords(key).some((w) => SENSITIVE_WORDS.has(w));
-  const exact = SENSITIVE_EXACT.has(k);
-  if (!(credential || exact)) {
+  const words = keyWords(key);
+  const credential = hasStem(key) || hasCredentialWord(words);
+  const sid = words.at(-1) === 'sid';
+  if (!(credential || sid || SENSITIVE_EXACT.has(k))) {
     return false;
   }
-  const explicit = /[=＝]|%3[Dd]/.test(sep) || /^[\\"'\]]/.test(sep);
-  if (!credential && AMBIGUOUS_IN_TEXT.has(k)) {
-    return explicit; // "code: be kind" is prose; "code=abc" is a parameter
+  const explicit = /[=＝]|%3[Dd]/.test(sep) || /^[\\"'`\]]/.test(sep);
+  if (!credential && (sid || AMBIGUOUS_IN_TEXT.has(k))) {
+    return explicit; // "code: be kind" / "sid: main" are prose; "code=abc" is a parameter
   }
   if (explicit) {
     return true;
@@ -260,7 +272,7 @@ function redactKeyNames(input: string): string {
     const valueStart = m.index + m[0].length;
     const peek = () => {
       const o = input.slice(valueStart, valueStart + 200);
-      return o.replace(/^\\*["']/, '').split(/[\s&#;,"']/)[0];
+      return o.replace(/^\\*["'`]/, '').split(/[\s&#;,"'`]/)[0];
     };
     const span = shouldMask(key, sep, peek)
       ? valueSpan(input, valueStart)
@@ -283,14 +295,21 @@ function redactKeyNames(input: string): string {
 // the logger; the result is cut again to MAX_STRING AFTER redaction, so a
 // secret is never half-cut before it is masked.
 const MAX_SCAN = 64_000;
+const SMALL_STRING = 512;
 
 function redactString(input: string): string {
   const budget = activeBudget ?? { left: MAX_CALL_SCAN };
-  const allowed = Math.min(input.length, MAX_SCAN, budget.left);
-  if (allowed <= 0) {
+  // Short strings (ids, names, short messages) are always scanned: they are
+  // cheap, and must never degrade to "[truncated]" because a huge blob was
+  // logged beside them.
+  const small = input.length <= SMALL_STRING;
+  const allowed = small
+    ? input.length
+    : Math.min(input.length, MAX_SCAN, budget.left);
+  if (allowed <= 0 && !small) {
     return '[truncated]';
   }
-  budget.left -= allowed;
+  budget.left = Math.max(0, budget.left - allowed);
   let value = input;
   const cutInput = input.length > allowed;
   if (cutInput) {
@@ -674,16 +693,24 @@ function asRecord(value: unknown): Record<string, unknown> {
     : {};
 }
 
+/**
+ * Sends the already-redacted pieces to Sentry. Nothing is redacted here: the
+ * caller redacts the exception, message and context once and shares the
+ * result with the console, so the scan budget is spent once per call.
+ */
 function report(
   scope: string | undefined,
-  message: string,
-  error: unknown,
+  safeMessage: string,
+  copy: Error | undefined,
+  details: unknown,
+  safeContext: unknown,
+  rawError: unknown,
   options: LogOptions
 ): void {
   if (!sentryClientAvailable()) {
     return;
   }
-  const http = httpSummary(error);
+  const http = httpSummary(rawError);
   const tags: Record<string, string> = {
     ...options.tags,
     ...(scope ? { scope } : {}),
@@ -694,17 +721,12 @@ function report(
     ...(http?.path ? { 'http.path': http.path } : {}),
   };
   const extra: Record<string, unknown> = {
-    ...asRecord(redact(options.context)),
-    logMessage: message,
-    ...(error !== undefined && !(error instanceof Error)
-      ? { details: redact(error) }
-      : {}),
+    ...asRecord(safeContext),
+    logMessage: safeMessage,
+    ...(details === undefined ? {} : { details }),
   };
-  const isError = error instanceof Error;
-  if (isError) {
-    // A copy keeps stack/cause/status but never request headers or bodies.
+  if (copy) {
     // Without a fingerprint every endpoint's 500 would merge into one issue.
-    const copy = safeErrorCopy(error);
     Sentry.captureException(copy, {
       tags,
       extra,
@@ -722,9 +744,16 @@ function report(
         : {}),
     });
   } else {
-    Sentry.captureMessage(message, { level: 'error', tags, extra });
+    Sentry.captureMessage(safeMessage, { level: 'error', tags, extra });
   }
 }
+
+const errorSummary = (e: Error): Record<string, unknown> => ({
+  name: e.name,
+  message: e.message,
+  stack: e.stack,
+  cause: e.cause instanceof Error ? errorSummary(e.cause) : e.cause,
+});
 
 // Expected failures are warn-only, which would hide a real outage (every call
 // failing with ERR_NETWORK / CORS) or a misrouted bearer (401 on a normal
@@ -828,13 +857,12 @@ export function createLogger(scope?: string): Logger {
           data.map(redact)
         )
       );
+  const emitWarn = (safeMessage: string, safeData: unknown[]) => {
+    safely(() => writeConsole('warn', scope, safeMessage, safeData));
+    sendBreadcrumb('warning', scope, safeMessage, safeData);
+  };
   const warn = (message: string, ...data: unknown[]) =>
-    safely(() => {
-      const safeMessage = redactString(String(message));
-      const safeData = data.map(redact);
-      safely(() => writeConsole('warn', scope, safeMessage, safeData));
-      sendBreadcrumb('warning', scope, safeMessage, safeData);
-    });
+    safely(() => emitWarn(redactString(String(message)), data.map(redact)));
   return {
     debug: plain('debug'),
     info: plain('info'),
@@ -842,30 +870,36 @@ export function createLogger(scope?: string): Logger {
     error: (message, error, options = {}) =>
       safely(() => {
         if (options.expected) {
-          warn(
-            message,
-            ...(error === undefined ? [] : [error]),
-            ...(options.context ? [options.context] : [])
-          );
-          safely(() =>
-            maybeReportExpectedOutage(
-              scope,
-              redactString(String(message)),
-              error
-            )
-          );
+          const safeMessage = redactString(String(message));
+          emitWarn(safeMessage, [
+            ...(error === undefined ? [] : [redact(error)]),
+            ...(options.context ? [redact(options.context)] : []),
+          ]);
+          safely(() => maybeReportExpectedOutage(scope, safeMessage, error));
           return;
         }
+        // Redact each input exactly once, in priority order (exception, then
+        // log message, then context), and reuse the result for the console
+        // and Sentry so the per-call scan budget is spent once.
+        const copy = error instanceof Error ? safeErrorCopy(error) : undefined;
         const safeMessage = redactString(String(message));
+        const details =
+          error !== undefined && !copy ? redact(error) : undefined;
+        const safeContext = options.context
+          ? redact(options.context)
+          : undefined;
         // Each step is isolated: a throwing console must not stop reporting.
         safely(() =>
           writeConsole('error', scope, safeMessage, [
-            ...(error === undefined ? [] : [redact(error)]),
-            ...(options.context ? [redact(options.context)] : []),
+            ...(copy ? [errorSummary(copy)] : []),
+            ...(details === undefined ? [] : [details]),
+            ...(safeContext === undefined ? [] : [safeContext]),
           ])
         );
         safely(() => sendBreadcrumb('error', scope, safeMessage, []));
-        safely(() => report(scope, safeMessage, error, options));
+        safely(() =>
+          report(scope, safeMessage, copy, details, safeContext, error, options)
+        );
       }),
   };
 }

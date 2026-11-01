@@ -787,7 +787,7 @@ describe('round 3: mutants that survived before', () => {
   });
 });
 
-const best = (fn: () => void, runs = 5) => {
+const best = (fn: () => void, runs = 7) => {
   let min = Number.POSITIVE_INFINITY;
   for (let i = 0; i < runs; i++) {
     const t = performance.now();
@@ -798,24 +798,32 @@ const best = (fn: () => void, runs = 5) => {
 };
 
 describe('round 4: linear time', () => {
-  const shapes: [string, (n: number) => string][] = [
-    ['a=', (n) => 'a='.repeat(n)],
-    ['a:', (n) => 'a:'.repeat(n)],
-    ['a.b=', (n) => 'a.b='.repeat(n)],
-    ['eyJ', (n) => 'eyJ'.repeat(n)],
-    ['password="', (n) => 'password="a '.repeat(n)],
+  const shapes: [string, string][] = [
+    ['a=', 'a='],
+    ['a:', 'a:'],
+    ['a.b=', 'a.b='],
+    ['eyJ', 'eyJ'],
+    ['password="', 'password="a '],
+    ['x[a]', '[a]'],
+    ['["k"]', '["k"]'],
+    ['[0]', '[0]'],
+    ['[a][b]', '[a][b]'],
+    [']]]', ']]]'],
+    ['password=password=', 'password='],
+    ['backtick', 'password=`a '],
   ];
-  it.each(shapes)(
-    'doubling the input (%s) does not quadruple the time',
-    (_name, make) => {
-      const small = make(8_000);
-      const large = make(16_000);
-      redact(small);
-      const t1 = best(() => redact(small));
-      const t2 = best(() => redact(large));
-      expect(t2).toBeLessThan(3 * t1 + 8);
-    }
-  );
+  // 8k vs 64k characters: linear is ~8x, quadratic ~64x, so < 20x separates
+  // them with room for scheduler noise.
+  it.each(shapes)('64k chars of %s is not quadratic', (_name, piece) => {
+    const make = (chars: number) =>
+      `x${piece.repeat(Math.ceil(chars / piece.length))}`;
+    const small = make(8_000);
+    const large = make(64_000);
+    redact(small);
+    const t1 = best(() => redact(small));
+    const t2 = best(() => redact(large));
+    expect(t2).toBeLessThan(20 * t1 + 25);
+  });
 
   it('a whole logger call has a total scan budget', () => {
     const s = 'a='.repeat(32_000);
@@ -924,5 +932,105 @@ describe('round 4: credential keys are masked whatever the value looks like', ()
     expect(redact('sent digest abcdefghij1234567890 ok')).not.toContain(
       'abcdefghij1234567890'
     );
+  });
+});
+
+describe('round 5: one redaction per call, priority budget', () => {
+  it('keeps the exception intact and small fields readable beside huge blobs', () => {
+    const err = new Error('real failure');
+    err.stack =
+      'Error: real failure\n    at doThing (app/file.js:10:5)\n    at run (app/main.js:2:1)';
+    const big = 'x'.repeat(200_000);
+    logger.error('m', err, {
+      context: { blob1: big, blob2: big, blob3: big, userId: 'u1' },
+    });
+    const [copy, hint] = sentry.captureException.mock.calls[0] as [
+      Error,
+      { extra: Record<string, string> },
+    ];
+    expect(copy.message).toBe('real failure');
+    expect(copy.stack).toContain('at doThing (app/file.js:10:5)');
+    expect(hint.extra.userId).toBe('u1');
+    expect(hint.extra.blob1.endsWith('[truncated]')).toBe(true);
+    expect(hint.extra.blob3).toBe('[truncated]');
+  });
+
+  it('a 200k message plus a 200k error message still reports the exception', () => {
+    const big = 'y'.repeat(200_000);
+    const t = performance.now();
+    logger.error(big, new Error(big));
+    expect(performance.now() - t).toBeLessThan(500);
+    const copy = sentry.captureException.mock.calls[0][0] as Error;
+    expect(copy.message.startsWith('yyyy')).toBe(true);
+    expect(copy.stack).toContain('yyyy');
+  });
+
+  it('redacts each input once (context is not scanned for console and Sentry separately)', () => {
+    const big = 'z'.repeat(60_000);
+    logger.error('m', new Error('e'), { context: { a: big, b: big } });
+    const hint = sentry.captureException.mock.calls[0][1] as {
+      extra: Record<string, string>;
+    };
+    // 2 x 60k fits the 128k budget only if scanned once.
+    expect(hint.extra.b).not.toBe('[truncated]');
+  });
+});
+
+describe('round 5: more leaks and over-matches', () => {
+  it('treats a backtick as a quote kind', () => {
+    expect(redact('password=`a b SECRETVALUE`')).not.toMatch(/SECRETVALUE|a b/);
+  });
+
+  it('matches the sensitive word even in very long keys', () => {
+    expect(redact(`${'a'.repeat(250)}_password=SECRETVALUE`)).not.toContain(
+      'SECRETVALUE'
+    );
+    expect(redact(`${'a'.repeat(5_000)}_password=SECRETVALUE`)).not.toContain(
+      'SECRETVALUE'
+    );
+  });
+
+  it.each([
+    'user_sid_count=5',
+    'iban_country=NG',
+    'ssn_last4_hint=x',
+    'otp_sent=true',
+    'pwd_changed_at=2026-01-01',
+    'sid: main',
+    'sidebar=open',
+  ])('does not over-match %s', (text) => {
+    expect(redact(text)).toBe(text);
+  });
+
+  it.each([
+    'otp=123456',
+    'user_otp=123456',
+    'db_pwd=abc',
+    'otp_code=123456',
+    'verification_code=123456',
+    'pin_code=1234',
+    'connect.sid=abc123',
+    'iban=GB82WEST12345698765432',
+    'ssn: 123-45-6789',
+  ])('still masks %s', (text) => {
+    const out = redact(text) as string;
+    expect(out).toContain('[REDACTED]');
+    expect(out).not.toMatch(/123456|abc|1234|GB82|123-45/);
+  });
+
+  it('object keys use whole-word matching for otp/pwd/ssn/iban/sid', () => {
+    const out = JSON.stringify(
+      redact({
+        classname: 'c1',
+        sidebar: 's1',
+        hotpot: 'h1',
+        Sibanda: 'b1',
+        otp: 'SECRET1',
+        db_pwd: 'SECRET2',
+        user_ssn: 'SECRET3',
+      })
+    );
+    expect(out).toMatch(/c1.*s1.*h1.*b1/);
+    expect(out).not.toMatch(/SECRET/);
   });
 });

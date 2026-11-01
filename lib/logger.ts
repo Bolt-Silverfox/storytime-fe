@@ -79,7 +79,17 @@ const SENSITIVE_STEMS = [
   'bearer',
   'cvv',
   'cardnumber',
+  'passphrase',
+  'csrf',
+  'xsrf',
+  'otpcode',
+  'verificationcode',
+  'pincode',
 ];
+// Unambiguous short credential words: matched as a whole key OR as one word
+// (segment) of a longer key (db_pwd, user_otp), never as a substring
+// ("classname" must not match "ssn").
+const SENSITIVE_WORDS = new Set(['otp', 'pwd', 'ssn', 'iban', 'sid']);
 // Short words match only as the whole key (substring would hit "keyboard",
 // "shipping", "statusCode", ...).
 const SENSITIVE_EXACT = new Set([
@@ -112,15 +122,46 @@ const AMBIGUOUS_IN_TEXT = new Set([
 
 const normaliseKey = (key: string) => key.toLowerCase().replace(/[\s_.-]/g, '');
 
-/** Object keys: any sensitive stem, or a whole-key sensitive word. */
-function isSensitiveKey(key: string): boolean {
+const keyWords = (key: string) =>
+  key
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .toLowerCase()
+    .split(/[\s_.\-[\]]+/);
+
+const hasStem = (key: string) => {
   const k = normaliseKey(key);
+  return SENSITIVE_STEMS.some((stem) => k.includes(stem));
+};
+
+/** Object keys: any sensitive stem, a sensitive word, or a whole-key sensitive word. */
+function isSensitiveKey(key: string): boolean {
   return (
-    SENSITIVE_STEMS.some((stem) => k.includes(stem)) || SENSITIVE_EXACT.has(k)
+    hasStem(key) ||
+    SENSITIVE_EXACT.has(normaliseKey(key)) ||
+    keyWords(key).some((w) => SENSITIVE_WORDS.has(w))
   );
 }
 
-const JWT = /eyJ[\w-]{3,}\.[\w-]+\.[\w-]*/g;
+// Every logger call shares one scan budget across message + error + context,
+// so the total work is bounded however many large strings are passed.
+const MAX_CALL_SCAN = 128_000;
+let activeBudget: { left: number } | null = null;
+
+function withBudget<T>(fn: () => T): T {
+  if (activeBudget) {
+    return fn();
+  }
+  activeBudget = { left: MAX_CALL_SCAN };
+  try {
+    return fn();
+  } finally {
+    activeBudget = null;
+  }
+}
+
+// Header and payload are length-bounded so a run of "eyJ" cannot make the
+// match quadratic.
+const JWT = /eyJ[\w-]{3,200}\.[\w-]{1,20000}\.[\w-]{0,2000}/g;
 // "Authorization: <scheme> <token>" with any scheme (or none).
 const AUTH_HEADER =
   /(authorization["']?\s*[:=]\s*)(?:"[^"]{0,2000}"|'[^']{0,2000}'|(?:[A-Za-z]{1,20}\s+)?[^\s,;"'&]+)/gi;
@@ -143,39 +184,70 @@ const EMAIL =
 // and "password    ＝ x" are all handled the same way.
 //   group 1: the char before the key (so a key never starts mid-word)
 //   group 2: the key name
-//   group 3: separator: optional closing quote, spaces, = : (or full-width
-//            or percent-encoded forms), spaces
+//   group 3: separator: closing/escaped quotes or brackets ("password":,
+//            \"password\":, data[password]=, password[]=), spaces, = : (or
+//            full-width / percent-encoded forms), spaces
 const KEY_SCAN =
-  /(^|[^\w.-])([A-Za-z][\w.-]{0,40})(["']?\s{0,16}(?:[=:：＝]|%3[DdAa])\s{0,16})/g;
+  /(^|[^\w.-])([A-Za-z][\w.-]{0,254})((?:\\*["']|\]|\[[\w.-]{0,20}\])*\s{0,16}(?:[=:：＝]|%3[DdAa])\s{0,16})/g;
 const FILE_NAME = /\.(?:m?[jt]sx?|map|css|html?)$/i;
 // Unquoted values run to the next delimiter, with NO length cap, so a long
 // token is never cut in the middle and left half-visible.
-const VALUE_RUN = /^(?:(?!%26)[^\s&#;,"'()[\]{}<>])+/;
-const VALUE_QUOTED = /^(["'])[^"']{0,2000}\1/;
+const VALUE_RUN = /(?:(?!%26)[^\s&#;,"'()[\]{}<>])+/y;
+const VALUE_OPEN_QUOTE = /(\\*)(["'])/y;
 
-// A capitalised single word ("Token", "Secret") before ":" is usually prose.
-// For those, only mask when the value itself looks like a credential.
+// Only the story-ish capitalised word "Token:" is treated as prose unless the
+// value looks like a credential. Real credential keys (password, secret,
+// apiKey, ...) are always masked: 'Password: hunter' must not leak.
 const looksLikeCredential = (v: string) =>
   /\d/.test(v) || v.length >= 12 || /^[A-Z0-9_-]{4,}$/.test(v);
 
-function shouldMask(key: string, sep: string, value: string): boolean {
+function shouldMask(key: string, sep: string, peek: () => string): boolean {
   if (FILE_NAME.test(key)) {
     return false;
   }
   const k = normaliseKey(key);
-  const stem = SENSITIVE_STEMS.some((x) => k.includes(x));
+  const credential =
+    hasStem(key) || keyWords(key).some((w) => SENSITIVE_WORDS.has(w));
   const exact = SENSITIVE_EXACT.has(k);
-  if (!(stem || exact)) {
+  if (!(credential || exact)) {
     return false;
   }
-  const explicit = /[=＝]|%3[Dd]/.test(sep) || /^["']/.test(sep);
-  if (!stem && AMBIGUOUS_IN_TEXT.has(k)) {
+  const explicit = /[=＝]|%3[Dd]/.test(sep) || /^[\\"'\]]/.test(sep);
+  if (!credential && AMBIGUOUS_IN_TEXT.has(k)) {
     return explicit; // "code: be kind" is prose; "code=abc" is a parameter
   }
   if (explicit) {
     return true;
   }
-  return /^[A-Z][a-z]+$/.test(key) ? looksLikeCredential(value) : true;
+  return key === 'Token' ? looksLikeCredential(peek()) : true;
+}
+
+/** [start, end) of the value after `from`, or null. Linear: scans each char once. */
+function valueSpan(
+  input: string,
+  from: number
+): { start: number; end: number; quote: string } | null {
+  VALUE_OPEN_QUOTE.lastIndex = from;
+  const open = VALUE_OPEN_QUOTE.exec(input);
+  if (open) {
+    const q = open[2];
+    const escaped = open[1].length > 0;
+    const start = from + open[0].length;
+    let i = input.indexOf(q, start);
+    // Skip quotes escaped inside a plain string; for an escaped-JSON opener
+    // (\") the closer is the next backslash-escaped quote.
+    while (i !== -1 && (input[i - 1] === '\\') !== escaped) {
+      i = input.indexOf(q, i + 1);
+    }
+    let end = i === -1 ? input.length : i;
+    while (escaped && i !== -1 && end > start && input[end - 1] === '\\') {
+      end--;
+    }
+    return end > start ? { start, end, quote: q } : null;
+  }
+  VALUE_RUN.lastIndex = from;
+  const run = VALUE_RUN.exec(input);
+  return run ? { start: from, end: from + run[0].length, quote: '' } : null;
 }
 
 function redactKeyNames(input: string): string {
@@ -186,40 +258,46 @@ function redactKeyNames(input: string): string {
     const [, before, key, sep] = m;
     const keyEnd = m.index + before.length + key.length;
     const valueStart = m.index + m[0].length;
-    const rest = input.slice(valueStart);
-    const quoted = VALUE_QUOTED.exec(rest);
-    const run = quoted ? null : VALUE_RUN.exec(rest);
-    const value = quoted ? quoted[0].slice(1, -1) : (run?.[0] ?? '');
-    if (
-      value === '' ||
-      value.startsWith(REDACTED) ||
-      !shouldMask(key, sep, value)
-    ) {
-      // Not a secret: resume right after the key so a nested key
-      // ("Failed: token: x") is still seen.
+    const peek = () => {
+      const o = input.slice(valueStart, valueStart + 200);
+      return o.replace(/^\\*["']/, '').split(/[\s&#;,"']/)[0];
+    };
+    const span = shouldMask(key, sep, peek)
+      ? valueSpan(input, valueStart)
+      : null;
+    if (!span || input.startsWith(REDACTED, span.start)) {
+      // Not a secret: resume right after the key (not after its value) so a
+      // nested key ("Failed: token: x") is still seen, without re-scanning
+      // the value for every key.
       KEY_SCAN.lastIndex = keyEnd;
       continue;
     }
-    const q = quoted ? quoted[1] : '';
-    out += `${input.slice(pos, valueStart)}${q}${REDACTED}${q}`;
-    pos = valueStart + (quoted ? quoted[0].length : (run?.[0].length ?? 0));
+    out += `${input.slice(pos, span.start)}${REDACTED}`;
+    pos = span.end;
     KEY_SCAN.lastIndex = pos;
   }
   return out + input.slice(pos);
 }
 
-// Input is cut to this before scanning so a megabyte string cannot stall the
-// logger; the result is cut again to MAX_STRING AFTER redaction, so a secret
-// is never half-cut before it is masked.
+// Per-string cap, applied BEFORE scanning so a megabyte string cannot stall
+// the logger; the result is cut again to MAX_STRING AFTER redaction, so a
+// secret is never half-cut before it is masked.
 const MAX_SCAN = 64_000;
 
 function redactString(input: string): string {
+  const budget = activeBudget ?? { left: MAX_CALL_SCAN };
+  const allowed = Math.min(input.length, MAX_SCAN, budget.left);
+  if (allowed <= 0) {
+    return '[truncated]';
+  }
+  budget.left -= allowed;
   let value = input;
-  if (value.length > MAX_SCAN) {
-    value = value.slice(0, MAX_SCAN);
+  const cutInput = input.length > allowed;
+  if (cutInput) {
+    value = value.slice(0, allowed);
     // Don't leave a half-cut token at the boundary.
     const cut = value.search(/[\s,&;"'][^\s,&;"']*$/);
-    if (cut > MAX_SCAN - 1024) {
+    if (cut > allowed - 1024) {
       value = value.slice(0, cut);
     }
   }
@@ -231,7 +309,7 @@ function redactString(input: string): string {
       .replace(SCHEME_LONG, REDACTED)
       .replace(SCHEME_BASIC, `Basic ${REDACTED}`)
   ).replace(EMAIL, REDACTED);
-  return value.length > MAX_STRING || input.length > MAX_SCAN
+  return value.length > MAX_STRING || cutInput
     ? `${value.slice(0, MAX_STRING)}…[truncated]`
     : value;
 }
@@ -397,7 +475,9 @@ function redactInner(
 /** Deep-copy `value` with secrets (tokens, auth headers, cookies, emails, passwords, session ids) masked. */
 export function redact(value: unknown): unknown {
   try {
-    return redactInner(value, 0, new WeakSet(), { left: MAX_TOTAL });
+    return withBudget(() =>
+      redactInner(value, 0, new WeakSet(), { left: MAX_TOTAL })
+    );
   } catch {
     return '[Unserializable]';
   }
@@ -730,7 +810,7 @@ export interface Logger {
 
 const safely = (fn: () => void) => {
   try {
-    fn();
+    withBudget(fn);
   } catch {
     // Logging must never throw.
   }

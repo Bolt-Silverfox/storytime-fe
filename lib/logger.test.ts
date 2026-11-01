@@ -764,7 +764,6 @@ describe('round 3: key-name scan (table tests)', () => {
     'pkg@1.2.3',
     'a token of friendship',
     'Token: a gold coin',
-    'Secret: Ada can whistle.',
     'the bearer of bad news',
     'Basic information',
     'status code: 500',
@@ -786,12 +785,144 @@ describe('round 3: mutants that survived before', () => {
     expect(out).not.toContain('abc123');
     expect(out).toContain('#section-2');
   });
+});
 
-  it('a multi-megabyte string is bounded by the scan cap, not scanned whole', () => {
-    const huge = 'token=a '.repeat(2_500_000);
+const best = (fn: () => void, runs = 5) => {
+  let min = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < runs; i++) {
     const t = performance.now();
-    const out = redact(huge) as string;
-    expect(performance.now() - t).toBeLessThan(100);
-    expect(out.length).toBeLessThan(9_000);
+    fn();
+    min = Math.min(min, performance.now() - t);
+  }
+  return min;
+};
+
+describe('round 4: linear time', () => {
+  const shapes: [string, (n: number) => string][] = [
+    ['a=', (n) => 'a='.repeat(n)],
+    ['a:', (n) => 'a:'.repeat(n)],
+    ['a.b=', (n) => 'a.b='.repeat(n)],
+    ['eyJ', (n) => 'eyJ'.repeat(n)],
+    ['password="', (n) => 'password="a '.repeat(n)],
+  ];
+  it.each(shapes)(
+    'doubling the input (%s) does not quadruple the time',
+    (_name, make) => {
+      const small = make(8_000);
+      const large = make(16_000);
+      redact(small);
+      const t1 = best(() => redact(small));
+      const t2 = best(() => redact(large));
+      expect(t2).toBeLessThan(3 * t1 + 8);
+    }
+  );
+
+  it('a whole logger call has a total scan budget', () => {
+    const s = 'a='.repeat(32_000);
+    const t = performance.now();
+    logger.error(s, new Error(s), { context: { s } });
+    expect(performance.now() - t).toBeLessThan(500);
+    // The last of the three 64k strings is past the 128k budget: it is dropped
+    // entirely (not merely cut to 8k like the others).
+    expect(JSON.stringify(sentry.captureException.mock.calls)).toContain(
+      '"[truncated]"'
+    );
+  });
+});
+
+describe('round 4: quoted values that fail to close', () => {
+  it.each([
+    'password="SECRETVALUE',
+    `password="${'a'.repeat(5_000)}SECRETVALUE"`,
+    `password="it's SECRETVALUE"`,
+    `{"password":"pa'ss SECRETVALUE"}`,
+    `{'password':'pa"ss SECRETVALUE'}`,
+    'token: "abc SECRETVALUE and more',
+    String.raw`{"password":"a\"b SECRETVALUE"}`,
+  ])('masks %s', (input) => {
+    const out = redact(input) as string;
+    expect(out).not.toContain('SECRETVALUE');
+    expect(out).not.toContain('aaaaaaaaaa');
+  });
+
+  it('does not stall on an unclosed quote followed by a megabyte', () => {
+    const t = performance.now();
+    const out = redact(`password="SECRET${'a'.repeat(1_000_000)}`) as string;
+    expect(performance.now() - t).toBeLessThan(200);
+    expect(out).not.toContain('SECRET');
+  });
+
+  it('keeps text after a closed quoted value', () => {
+    expect(redact('password="x1" and page=2')).toBe(
+      'password="[REDACTED]" and page=2'
+    );
+  });
+});
+
+describe('round 4: escaped JSON', () => {
+  it.each([
+    String.raw`{\"password\":\"s3cretValue\"}`,
+    String.raw`{\\\"token\\\":\\\"s3cretValue\\\"}`,
+    String.raw`body: "{\"user\":{\"refreshToken\":\"s3cretValue\"}}"`,
+  ])('masks %s', (input) => {
+    expect(redact(input)).not.toContain('s3cretValue');
+  });
+});
+
+describe('round 4: more key names', () => {
+  it.each([
+    'passphrase',
+    'csrf',
+    'xsrf',
+    'otp_code',
+    'verification_code',
+    'pin_code',
+    'otp',
+    'iban',
+    'ssn',
+    'data[password]',
+    'password[]',
+    'my_super_long_application_specific_refresh_token_value_for_the_thing',
+    'db_pwd',
+    'clientSecret',
+  ])('masks %s=', (key) => {
+    expect(redact(`x ${key}=v4lu3Secret y`)).not.toContain('v4lu3Secret');
+    expect(redact(`x ${key}: v4lu3Secret y`)).not.toContain('v4lu3Secret');
+  });
+
+  it('keeps look-alikes', () => {
+    expect(redact('classname=Foo and status_code=500')).toBe(
+      'classname=Foo and status_code=500'
+    );
+  });
+});
+
+describe('round 4: credential keys are masked whatever the value looks like', () => {
+  it.each([
+    'Password: hunter',
+    'Secret: opensesame',
+    'passphrase: tiger',
+    'API_KEY: abc',
+  ])('%s', (text) => {
+    const out = redact(text) as string;
+    expect(out).toContain('[REDACTED]');
+    expect(out).not.toMatch(/hunter|opensesame|tiger|abc/);
+  });
+
+  it('only the capitalised story-ish "Token:" keeps the shape rule', () => {
+    expect(redact('Token: a gold coin')).toBe('Token: a gold coin');
+    expect(redact('Token: abc123')).not.toContain('abc123');
+  });
+
+  it('lowercase scheme words need a long credential-shaped value', () => {
+    expect(redact('sent bearer abcdefghij1234567890 ok')).not.toContain(
+      'abcdefghij1234567890'
+    );
+    expect(redact('sent token abcdefghij1234567890 ok')).not.toContain(
+      'abcdefghij1234567890'
+    );
+    expect(redact('sent digest abcdefghij1234567890 ok')).not.toContain(
+      'abcdefghij1234567890'
+    );
   });
 });

@@ -189,7 +189,8 @@ const StoryReader = ({
   // Revealing the text while narration is playing shows the narrated page.
   // biome-ignore lint/correctness/useExhaustiveDependencies: only react to the read-along switch; the rest is read via refs.
   useEffect(() => {
-    if (isChecked && isPlayingRef.current) {
+    // A single stored file has no per-page clips: nothing to follow.
+    if (isChecked && isPlayingRef.current && !singleFileRef.current) {
       dispatch({ type: 'go', page: clipIndexRef.current });
     }
   }, [isChecked]);

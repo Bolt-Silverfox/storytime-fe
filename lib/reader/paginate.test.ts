@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  pagesSignature,
   resolvePages,
   STORY_WORDS_PER_PAGE,
   splitStoryIntoPages,
@@ -128,5 +129,32 @@ describe('resolvePages', () => {
   it('returns [] when there is nothing at all', () => {
     expect(resolvePages(undefined, '')).toEqual([]);
     expect(resolvePages(undefined, undefined)).toEqual([]);
+  });
+
+  it('falls back when the API pages do not match the story text', () => {
+    const expected = splitStoryIntoPages(text);
+    expect(resolvePages(['Totally different story.'], text)).toEqual(expected);
+    // truncated pages
+    expect(resolvePages(splitStoryIntoPages(text).slice(0, 1), text)).toEqual(
+      expected
+    );
+  });
+
+  it('accepts API pages that differ only in whitespace', () => {
+    const api = splitStoryIntoPages(text);
+    const spaced = `${words(20, 'a')}.\n\n${words(20, 'b')}.  ${words(5, 'c')}.`;
+    expect(resolvePages(api, spaced)).toEqual(api);
+  });
+
+  it('trusts API pages when there is no text to compare', () => {
+    expect(resolvePages(['A.', 'B.'], undefined)).toEqual(['A.', 'B.']);
+  });
+});
+
+describe('pagesSignature', () => {
+  it('is stable and changes with the text', () => {
+    expect(pagesSignature(['a', 'b'])).toBe(pagesSignature(['a', 'b']));
+    expect(pagesSignature(['a', 'b'])).not.toBe(pagesSignature(['a', 'c']));
+    expect(pagesSignature(['ab'])).not.toBe(pagesSignature(['a', 'b']));
   });
 });

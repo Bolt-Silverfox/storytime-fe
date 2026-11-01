@@ -56,35 +56,53 @@ describe('readerReducer', () => {
     expect(readerReducer(last, { type: 'next' })).toBe(last);
   });
 
-  it('advances with the narration (clip -> page)', () => {
-    const s = readerReducer(at(0, 10), {
-      type: 'clip',
-      clip: 4,
-      clipCount: 10,
-    });
+  it('advances with the narration when the page was following it', () => {
+    const s = readerReducer(at(3, 10), { type: 'clip', clip: 4, from: 3 });
     expect(s.page).toBe(4);
+  });
+
+  it('never yanks the reader back when they read ahead of the audio (M2)', () => {
+    // audio on clip 4, clip 5 not generated yet; reader taps Next up to page 8
+    let s = at(4, 60);
+    for (let i = 0; i < 4; i++) {
+      s = readerReducer(s, { type: 'next' });
+    }
+    expect(s.page).toBe(8);
+    // clip 4 ends, narration moves to clip 5: the page must stay at 8
+    const after = readerReducer(s, { type: 'clip', clip: 5, from: 4 });
+    expect(after.page).toBe(8);
+    expect(after).toBe(s);
+  });
+
+  it('ignores narration events when the reader turned back', () => {
+    const s = readerReducer(at(2, 60), { type: 'clip', clip: 6, from: 5 });
+    expect(s.page).toBe(2);
+  });
+
+  it('follows a clip that lands past the last page by clamping', () => {
+    expect(readerReducer(at(9, 10), { type: 'clip', clip: 10, from: 9 }).page).toBe(9);
   });
 });
 
 describe('page and clip mapping', () => {
-  it('is 1:1 when the counts match (backend pages == TTS paragraphs)', () => {
-    expect(pageForClip(3, 10, 10)).toBe(3);
-    expect(clipForPage(3, 10, 10)).toBe(3);
+  it('clip N is page N (clips are the first N pages of the split)', () => {
+    expect(pageForClip(3, 60)).toBe(3);
+    expect(pageForClip(10, 60)).toBe(10);
+    expect(pageForClip(49, 60)).toBe(49);
+    expect(clipForPage(12, 50)).toBe(12);
+    expect(clipForPage(49, 50)).toBe(49);
   });
 
-  it('scales and clamps when the counts differ', () => {
-    expect(pageForClip(5, 10, 5)).toBe(2);
-    expect(pageForClip(9, 10, 5)).toBe(4);
-    expect(pageForClip(50, 10, 10)).toBe(9);
-    expect(clipForPage(2, 5, 10)).toBe(4);
-    expect(clipForPage(4, 5, 10)).toBe(8);
+  it('pages beyond the narrated clips have no audio (60 pages, 50 clips)', () => {
+    expect(clipForPage(50, 50)).toBeNull();
+    expect(clipForPage(59, 50)).toBeNull();
   });
 
-  it('handles zero counts', () => {
-    expect(pageForClip(2, 0, 0)).toBe(0);
-    expect(pageForClip(2, 5, 0)).toBe(0);
-    expect(clipForPage(2, 0, 5)).toBe(0);
-    expect(clipForPage(2, 5, 0)).toBe(0);
+  it('handles zero counts and bad input', () => {
+    expect(pageForClip(2, 0)).toBe(0);
+    expect(pageForClip(99, 10)).toBe(9);
+    expect(clipForPage(2, 0)).toBeNull();
+    expect(clipForPage(-1, 5)).toBeNull();
   });
 });
 

@@ -29,7 +29,7 @@ describe('PageView', () => {
     setup();
     expect(screen.getByText('Second page.')).toBeTruthy();
     expect(screen.queryByText('First page.')).toBeNull();
-    expect(screen.getByText('Page 2 of 3')).toBeTruthy();
+    expect(screen.getAllByText('Page 2 of 3').length).toBeGreaterThan(0);
     const bar = screen.getByRole('progressbar');
     expect(bar.getAttribute('aria-valuenow')).toBe('67');
     expect(bar.getAttribute('aria-valuetext')).toBe('Page 2 of 3');
@@ -101,10 +101,27 @@ describe('PageView', () => {
     expect(onPrev).toHaveBeenCalledTimes(1);
   });
 
-  it('announces page changes politely', () => {
-    setup();
-    const live = screen.getByTestId('reader-page-text');
+  it('announces page changes via one persistent live region, not the page text', () => {
+    const { rerender, onNext, onPrev } = setup();
+    const live = screen.getByRole('status');
     expect(live.getAttribute('aria-live')).toBe('polite');
+    expect(live.textContent).toBe('Page 2 of 3');
+    rerender(
+      <PageView
+        pages={pages}
+        page={2}
+        highlighted={false}
+        onNext={onNext}
+        onPrev={onPrev}
+      />
+    );
+    // same DOM node, updated text (not re-created each turn)
+    expect(screen.getByRole('status')).toBe(live);
+    expect(live.textContent).toBe('Page 3 of 3');
+    // the story text is not a live region (it would be read over the TTS)
+    expect(
+      screen.getByTestId('reader-page-text').closest('[aria-live]')
+    ).toBeNull();
   });
 
   it('shows the end-of-story actions only on the last page', () => {

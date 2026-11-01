@@ -21,6 +21,15 @@ updates:
         versions: ['>=0.300.0']
       - dependency-name: '@opentelemetry/sdk-logs'
         versions: ['>=0.300.0']
+      # @vercel/otel 2.1.x also peers these at <3.0.0.
+      - dependency-name: '@opentelemetry/resources'
+        versions: ['>=3.0.0']
+      - dependency-name: '@opentelemetry/sdk-metrics'
+        versions: ['>=3.0.0']
+      - dependency-name: '@opentelemetry/sdk-trace-base'
+        versions: ['>=3.0.0']
+      # NOTE: ignore rules also apply to Dependabot SECURITY updates. An advisory
+      # fixed only in an ignored range gets no PR; handle those manually.
     groups:
       # Batch low-risk updates into a single PR to cut noise.
       minor-and-patch:

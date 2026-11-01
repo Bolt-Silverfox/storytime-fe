@@ -131,7 +131,7 @@
   },
   "overrides": [
     {
-      "includes": ["components/ui/calendar.tsx", "lib/use-auth-state.test.ts"],
+      "includes": ["lib/use-auth-state.test.ts"],
       "linter": {
         "rules": {
           "correctness": {

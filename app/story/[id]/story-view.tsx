@@ -60,6 +60,12 @@ export default function StoryView({ storyId }: { storyId: string }) {
     null
   );
   const [defaultVoiceName, setDefaultVoiceName] = useState<string | null>(null);
+  // Which voice to label when none was picked; resolved off the critical path
+  // in an effect so a slow voices list never delays opening the reader.
+  const [labelFor, setLabelFor] = useState<{
+    guest: boolean;
+    key: string | null;
+  } | null>(null);
   const [storyDetail, setStoryDetail] = useState<StoryDetail | null>(null);
 
   // Guests / free users: surface remaining quota and block opening a new story
@@ -88,6 +94,26 @@ export default function StoryView({ storyId }: { storyId: string }) {
       active = false;
     };
   }, [storyId]);
+
+  useEffect(() => {
+    setDefaultVoiceName(null);
+    if (!labelFor) {
+      return;
+    }
+    let active = true;
+    (async () => {
+      const key = labelFor.guest
+        ? (await getVoiceAccessService()).defaultVoice
+        : labelFor.key;
+      const name = await resolveVoiceName(key);
+      if (active) {
+        setDefaultVoiceName(name);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [labelFor]);
 
   const toggleFavorite = async () => {
     setFavoriteBusy(true);
@@ -121,10 +147,7 @@ export default function StoryView({ storyId }: { storyId: string }) {
         // endpoint omits, so it's hidden.
         setShowInteractive(false);
         setSelectedVoice(null);
-        setDefaultVoiceName(null);
-        getVoiceAccessService()
-          .then((a) => resolveVoiceName(a.defaultVoice))
-          .then(setDefaultVoiceName);
+        setLabelFor({ guest: true, key: null });
         setStoryDetail(null);
         setStep(1);
         setModalOpen(true);
@@ -145,7 +168,7 @@ export default function StoryView({ storyId }: { storyId: string }) {
 
       // A preferred voice was explicitly chosen (onboarding or Settings). When
       // there's none, the account may still have a locked/default voice —
-      // StoryReader falls back to it when voiceId is null. Either way the voice
+      // the backend resolves a null voiceId to it. Either way the voice
       // is settled and we skip the per-story voice picker (removing the
       // repetitive "pick a voice every time" friction). Only when there's
       // genuinely no voice anywhere do we prompt.
@@ -156,12 +179,13 @@ export default function StoryView({ storyId }: { storyId: string }) {
           id: preferred.id,
           name: preferred.name,
         });
-        setDefaultVoiceName(null);
+        setLabelFor(null);
       } else {
         setSelectedVoice(null);
-        setDefaultVoiceName(
-          await resolveVoiceName(access.lockedVoiceId ?? access.defaultVoice)
-        );
+        setLabelFor({
+          guest: false,
+          key: access.lockedVoiceId ?? access.defaultVoice,
+        });
       }
 
       if (!(preferred?.id || hasAccountDefault)) {

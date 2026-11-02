@@ -42,9 +42,10 @@ export default function StoryView({ storyId }: { storyId: string }) {
   );
   const [storyDetail, setStoryDetail] = useState<StoryDetail | null>(null);
 
-  // Guests / free users: surface remaining quota and block opening a new story
-  // once it's exhausted (the backend 403s anyway, but gating here means they
-  // aren't sent into a reader that immediately walls them).
+  // Guests / free users: surface remaining quota. Never block opening a story
+  // on quota alone: re-reading an already-read story is always free, and the
+  // client can't tell which stories were read. The backend 403s a genuinely new
+  // story and the reader shows the wall then.
   const { quota } = useStoryQuota();
   const outOfQuota = !!quota && !quota.unlimited && quota.remaining <= 0;
 
@@ -169,20 +170,18 @@ export default function StoryView({ storyId }: { storyId: string }) {
 
   return (
     <div className='flex flex-col items-center gap-3'>
+      <button
+        type='button'
+        onClick={handleStart}
+        disabled={preparing}
+        className='rounded-2xl bg-brand px-8 py-4 text-base font-semibold text-white transition hover:opacity-90 disabled:opacity-60'
+      >
+        {preparing ? 'Opening…' : 'Read this story'}
+      </button>
       {outOfQuota ? (
         <QuotaIndicator variant='banner' className='w-full max-w-md' />
       ) : (
-        <>
-          <button
-            type='button'
-            onClick={handleStart}
-            disabled={preparing}
-            className='rounded-2xl bg-brand px-8 py-4 text-base font-semibold text-white transition hover:opacity-90 disabled:opacity-60'
-          >
-            {preparing ? 'Opening…' : 'Read this story'}
-          </button>
-          <QuotaIndicator variant='compact' />
-        </>
+        <QuotaIndicator variant='compact' />
       )}
       {canFavorite && (
         <button

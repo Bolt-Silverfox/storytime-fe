@@ -654,14 +654,19 @@ const StoryReader = ({
           You've enjoyed your free stories!
         </h3>
         <p className='text-body text-base not-italic font-normal leading-5 font-abeezee mb-6 max-w-md'>
-          Sign up to keep reading unlimited stories with audio narration.
+          {isGuest
+            ? 'Sign up to keep reading unlimited stories with audio narration.'
+            : 'Upgrade to premium in the Storytime app for unlimited stories.'}{' '}
+          Stories you&apos;ve already read are still free.
         </p>
-        <Link
-          href='/register'
-          className='rounded-[3.125rem] bg-brand px-8 py-4 text-base font-semibold text-white transition hover:opacity-90'
-        >
-          Sign up to read more
-        </Link>
+        {isGuest ? (
+          <Link
+            href='/register'
+            className='rounded-[3.125rem] bg-brand px-8 py-4 text-base font-semibold text-white transition hover:opacity-90'
+          >
+            Sign up to read more
+          </Link>
+        ) : null}
       </div>
     );
   }

@@ -167,8 +167,9 @@ export default function StoryView({ storyId }: { storyId: string }) {
       setShowInteractive(interactive);
 
       // A preferred voice was explicitly chosen (onboarding or Settings). When
-      // there's none, the account may still have a locked/default voice —
-      // the backend resolves a null voiceId to it. Either way the voice
+      // there's none, the account may still have a locked/default voice
+      // (shown as the label only; the backend resolves a null voiceId to
+      // DEFAULT_VOICE, i.e. NIMBUS, not a free user's locked voice). Either way the voice
       // is settled and we skip the per-story voice picker (removing the
       // repetitive "pick a voice every time" friction). Only when there's
       // genuinely no voice anywhere do we prompt.

@@ -220,11 +220,16 @@ describe('StoryView reader voice label', () => {
       defaultVoice: 'NIMBUS',
     });
     svc.getAvailableVoicesService.mockRejectedValue(new Error('boom'));
+    const unhandled = vi.fn();
+    process.on('unhandledRejection', unhandled);
     await open();
     await waitFor(() =>
       expect(screen.getByTestId('reader').textContent).toBe('Default voice')
     );
     expect(svc.getAvailableVoicesService).toHaveBeenCalled();
+    await new Promise((r) => setTimeout(r, 20));
+    process.off('unhandledRejection', unhandled);
+    expect(unhandled).not.toHaveBeenCalled();
   });
 
   it('a hung voices lookup does not delay opening; label updates when it resolves', async () => {
@@ -251,28 +256,116 @@ describe('StoryView reader voice label', () => {
     );
   });
 
-  it('a lookup resolving after unmount does not update state', async () => {
-    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
-    svc.getPreferredVoiceService.mockResolvedValue(null);
-    svc.getVoiceAccessService.mockResolvedValue({
-      isPremium: false,
-      lockedVoiceId: null,
-      defaultVoice: 'NIMBUS',
+  const deferred = () => {
+    let resolve: (v: unknown) => void = () => {};
+    const promise = new Promise((r) => {
+      resolve = r;
     });
-    let release: (v: unknown) => void = () => {};
-    svc.getAvailableVoicesService.mockReturnValue(
-      new Promise((r) => {
-        release = r;
+    return { promise, resolve };
+  };
+  const MILO = { id: 'MILO', name: 'milo', displayName: 'Milo' };
+
+  it('stale lookup from an earlier open cannot overwrite the latest label', async () => {
+    svc.getPreferredVoiceService.mockResolvedValue(null);
+    svc.getVoiceAccessService
+      .mockResolvedValueOnce({
+        isPremium: false,
+        lockedVoiceId: 'MILO',
+        defaultVoice: 'NIMBUS',
       })
-    );
+      .mockResolvedValueOnce({
+        isPremium: false,
+        lockedVoiceId: null,
+        defaultVoice: 'NIMBUS',
+      });
+    const a = deferred();
+    const b = deferred();
+    svc.getAvailableVoicesService
+      .mockReturnValueOnce(a.promise)
+      .mockReturnValueOnce(b.promise);
     await open();
     await waitFor(() =>
-      expect(svc.getAvailableVoicesService).toHaveBeenCalled()
+      expect(svc.getAvailableVoicesService).toHaveBeenCalledTimes(1)
     );
-    cleanup();
-    release(VOICES);
+    fireEvent.click(screen.getByText('Read this story'));
+    await waitFor(() =>
+      expect(svc.getAvailableVoicesService).toHaveBeenCalledTimes(2)
+    );
+    b.resolve([...VOICES, MILO]);
+    await waitFor(() =>
+      expect(screen.getByTestId('reader').textContent).toBe('Nimbus')
+    );
+    a.resolve([...VOICES, MILO]);
     await new Promise((r) => setTimeout(r, 20));
-    expect(err).not.toHaveBeenCalled();
-    err.mockRestore();
+    expect(screen.getByTestId('reader').textContent).toBe('Nimbus');
+  });
+
+  it('guest lookup still in flight cannot overwrite a later member label', async () => {
+    svc.getPreferredVoiceService.mockResolvedValue(null);
+    svc.getVoiceAccessService
+      .mockResolvedValueOnce({
+        isPremium: false,
+        lockedVoiceId: null,
+        defaultVoice: 'NIMBUS',
+      })
+      .mockResolvedValueOnce({
+        isPremium: false,
+        lockedVoiceId: 'MILO',
+        defaultVoice: 'NIMBUS',
+      });
+    const a = deferred();
+    const b = deferred();
+    svc.getAvailableVoicesService
+      .mockReturnValueOnce(a.promise)
+      .mockReturnValueOnce(b.promise);
+    svc.isUserLoggedIn.mockReturnValue(false);
+    await open();
+    await waitFor(() =>
+      expect(svc.getAvailableVoicesService).toHaveBeenCalledTimes(1)
+    );
+    svc.isUserLoggedIn.mockReturnValue(true);
+    fireEvent.click(screen.getByText('Read this story'));
+    await waitFor(() =>
+      expect(svc.getAvailableVoicesService).toHaveBeenCalledTimes(2)
+    );
+    b.resolve([...VOICES, MILO]);
+    await waitFor(() =>
+      expect(screen.getByTestId('reader').textContent).toBe('Milo')
+    );
+    a.resolve([...VOICES, MILO]);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.getByTestId('reader').textContent).toBe('Milo');
+  });
+
+  it('reopening with a different account voice resets the label first', async () => {
+    svc.getPreferredVoiceService.mockResolvedValue(null);
+    svc.getVoiceAccessService
+      .mockResolvedValueOnce({
+        isPremium: false,
+        lockedVoiceId: 'MILO',
+        defaultVoice: 'NIMBUS',
+      })
+      .mockResolvedValueOnce({
+        isPremium: false,
+        lockedVoiceId: null,
+        defaultVoice: 'NIMBUS',
+      });
+    const b = deferred();
+    svc.getAvailableVoicesService
+      .mockResolvedValueOnce([...VOICES, MILO])
+      .mockReturnValueOnce(b.promise);
+    await open();
+    await waitFor(() =>
+      expect(screen.getByTestId('reader').textContent).toBe('Milo')
+    );
+    fireEvent.click(screen.getByText('Read this story'));
+    await waitFor(() =>
+      expect(svc.getAvailableVoicesService).toHaveBeenCalledTimes(2)
+    );
+    expect(screen.getByTestId('reader').textContent).toBe('Default voice');
+    b.resolve([...VOICES, MILO]);
+    await waitFor(() =>
+      expect(screen.getByTestId('reader').textContent).toBe('Nimbus')
+    );
   });
 });

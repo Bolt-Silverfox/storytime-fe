@@ -247,6 +247,40 @@ describe('PageView', () => {
     vi.restoreAllMocks();
   });
 
+  it('gives the active sentence bottom scroll margin and an underline readable in both themes', () => {
+    setup({ pages: ['One two. Three four!'], page: 0, activeSentence: 0 });
+    const cls = document.querySelector('[data-active]')?.className ?? '';
+    expect(cls).toContain('scroll-mb-32');
+    expect(cls).toContain('dark:decoration-reader-hl-fg');
+  });
+
+  it('also backs off when the page scrolls on its own accord, but not for our own scroll', () => {
+    const scroll = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scroll;
+    let now = 5_000_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    const props = {
+      pages: ['One. Two. Three. Four.'],
+      page: 0,
+      onNext: () => undefined,
+      onPrev: () => undefined,
+    };
+    const { rerender } = setup({ ...props, activeSentence: 0 });
+    // scroll events right after our own scrollIntoView are ours
+    now += 300;
+    fireEvent.scroll(window);
+    now += 300;
+    rerender(<PageView {...props} activeSentence={1} />);
+    expect(scroll).toHaveBeenCalledTimes(2);
+    // a later scroll (keyboard, scrollbar) is the user's
+    now += 5000;
+    fireEvent.scroll(window);
+    now += 1000;
+    rerender(<PageView {...props} activeSentence={2} />);
+    expect(scroll).toHaveBeenCalledTimes(2);
+    vi.restoreAllMocks();
+  });
+
   it('adds an underline second cue to the active sentence', () => {
     setup({ pages: ['One two. Three four!'], page: 0, activeSentence: 0 });
     expect(document.querySelector('[data-active]')?.className).toContain(

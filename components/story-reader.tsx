@@ -71,6 +71,8 @@ const StoryReader = ({
   storyId,
   voiceId,
   isGuest = false,
+  readAlong,
+  onReadAlongChange,
 }: {
   img: string;
   title: string;
@@ -85,9 +87,19 @@ const StoryReader = ({
   // When true, read via the guest endpoint (quota-limited) instead of the
   // authenticated one.
   isGuest?: boolean;
+  // The read-along switch can be owned by the parent so it survives this
+  // component unmounting (modal closed, "Change voice"). Uncontrolled when
+  // omitted.
+  readAlong?: boolean;
+  onReadAlongChange?: (on: boolean) => void;
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isChecked, setIsChecked] = useState(false);
+  const [localChecked, setLocalChecked] = useState(false);
+  const isChecked = readAlong ?? localChecked;
+  const setIsChecked = (on: boolean) => {
+    setLocalChecked(on);
+    onReadAlongChange?.(on);
+  };
   const [story, setStory] = useState<Story | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -554,6 +566,9 @@ const StoryReader = ({
       // Clips cover only the first pages of a long story: stop on the next
       // page, the story isn't finished.
       if (action === 'stop') {
+        // The ended clip's playhead must not outlive the narration: going back
+        // a page would otherwise light that clip's last sentence again.
+        resetClock();
         dispatch({ type: 'clip', clip: next, from: current });
         return;
       }
@@ -1099,7 +1114,7 @@ const StoryReader = ({
           disabled={!audioUrl || audioLoading || playBlocked}
           aria-label={isPlaying ? 'Pause' : 'Play'}
           aria-pressed={isPlaying}
-          className={`sticky bottom-3 z-10 mt-12 rounded-full shadow-lg transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 ${
+          className={`sticky bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-10 mt-12 rounded-full shadow-lg transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 ${
             !audioUrl || audioLoading || playBlocked
               ? 'opacity-50 cursor-not-allowed'
               : 'cursor-pointer'

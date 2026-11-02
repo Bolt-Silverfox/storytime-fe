@@ -31,6 +31,8 @@ export default function StoryView({ storyId }: { storyId: string }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [expand, setExpand] = useState(false);
   const [step, setStep] = useState(1);
+  // Lives here so the read-along switch survives the reader unmounting.
+  const [readAlong, setReadAlong] = useState(false);
   const [preparing, setPreparing] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
 
@@ -235,6 +237,8 @@ export default function StoryView({ storyId }: { storyId: string }) {
             setStep={setStep}
             mode={selectedMode}
             storyId={storyId}
+            readAlong={readAlong}
+            onReadAlongChange={setReadAlong}
           />
         )}
       </Modal>

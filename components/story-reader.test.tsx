@@ -9,7 +9,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
-import { Profiler } from 'react';
+import { Profiler, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const words = (n: number, p: string) =>
@@ -385,6 +385,19 @@ describe('sentence read-along highlight', () => {
     );
   };
 
+  // Active sentence index seen in every committed render while tracking.
+  const seen: (string | undefined)[] = [];
+  let tracking = false;
+  const record = () => {
+    if (tracking) {
+      seen.push(
+        document
+          .querySelector('[data-active="true"]')
+          ?.getAttribute('data-sentence') ?? undefined
+      );
+    }
+  };
+
   it('follows timeupdate through the sentences of the narrated page', async () => {
     await start();
     await setClock(1);
@@ -412,7 +425,7 @@ describe('sentence read-along highlight', () => {
   });
 
   it('hides the highlight once the story has finished and rewound', async () => {
-    await start();
+    await start(2, record);
     await setClock(29);
     await endAudio();
     await setClock(29);
@@ -421,7 +434,13 @@ describe('sentence read-along highlight', () => {
       value: 0,
       configurable: true,
     });
+    seen.length = 0;
+    tracking = true;
     await endAudio();
+    tracking = false;
+    // not even for one commit: the old playhead is gone with the clip
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every((i) => i === undefined)).toBe(true);
     await waitFor(() =>
       expect(playButton().getAttribute('aria-pressed')).toBe('false')
     );
@@ -451,19 +470,6 @@ describe('sentence read-along highlight', () => {
     expect(screen.queryByText('00:00 / 00:03')).toBeNull();
     expect(screen.getByText('--:-- / --:--')).toBeTruthy();
   });
-
-  // Active sentence index seen in every committed render while tracking.
-  const seen: (string | undefined)[] = [];
-  let tracking = false;
-  const record = () => {
-    if (tracking) {
-      seen.push(
-        document
-          .querySelector('[data-active="true"]')
-          ?.getAttribute('data-sentence') ?? undefined
-      );
-    }
-  };
 
   it('hands over to the next page without ever highlighting a stale sentence', async () => {
     await start(2, record);
@@ -538,5 +544,96 @@ describe('sentence read-along highlight', () => {
     fireEvent.click(playButton());
     await setClock(15);
     expect(active()).toEqual([]);
+  });
+
+  it('clears the highlight when the narration stops at the clip cap and the reader goes back', async () => {
+    guest.clips = 2;
+    guest.pending = 0;
+    guest.gate = null;
+    guest.story = {
+      id: 'story-1',
+      title: 'T',
+      textContent: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l']
+        .map(S)
+        .join(' '),
+    };
+    renderReader();
+    await waitFor(() => screen.getByRole('switch'));
+    fireEvent.click(screen.getByRole('switch'));
+    await waitReady();
+    fireEvent.click(playButton());
+    await setClock(29);
+    await endAudio(); // clip 0 -> 1
+    await setClock(29);
+    await endAudio(); // clip 1 is the last one: stop on page 3
+    await waitFor(() =>
+      expect(playButton().getAttribute('aria-pressed')).toBe('false')
+    );
+    await turnTo(0);
+    fireEvent.keyDown(document, { key: 'ArrowLeft' });
+    expect(screen.getAllByText('Page 2 of 4').length).toBeGreaterThan(0);
+    expect(active()).toEqual([]);
+    expect(screen.getByText('00:00 / 00:00')).toBeTruthy();
+  });
+
+  it('keeps the spoken sentence clear of the sticky Play button', async () => {
+    await start();
+    await setClock(15);
+    const span = document.querySelector('[data-active="true"]');
+    expect(span?.className).toContain('scroll-mb-32');
+    expect(playButton().className).toContain('sticky');
+    expect(playButton().className).toContain('safe-area-inset-bottom');
+  });
+
+  it('keeps read-along on when the reader unmounts and comes back (Change voice, modal)', async () => {
+    guest.clips = 2;
+    guest.story = { id: 'story-1', title: 'T', textContent: MULTI };
+    const Host = ({ show }: { show: boolean }) => {
+      const [on, setOn] = useState(false);
+      const [client] = useState(() => new QueryClient());
+      return show ? (
+        <QueryClientProvider client={client}>
+          <StoryReader
+            img=''
+            title='T'
+            description='D'
+            voice='V'
+            setStep={() => undefined}
+            mode='plain'
+            storyId='story-1'
+            isGuest
+            readAlong={on}
+            onReadAlongChange={setOn}
+          />
+        </QueryClientProvider>
+      ) : null;
+    };
+    // The state lives above the reader, like story-view.
+    const Parent = () => {
+      const [show, setShow] = useState(true);
+      return (
+        <>
+          <button type='button' onClick={() => setShow((v) => !v)}>
+            toggle-reader
+          </button>
+          <Host show={show} />
+        </>
+      );
+    };
+    render(<Parent />);
+    await waitFor(() => screen.getByRole('switch'));
+    fireEvent.click(screen.getByRole('switch'));
+    await waitFor(() =>
+      expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe(
+        'true'
+      )
+    );
+    fireEvent.click(screen.getByText('toggle-reader'));
+    expect(screen.queryByRole('switch')).toBeNull();
+    fireEvent.click(screen.getByText('toggle-reader'));
+    await waitFor(() => screen.getByRole('switch'));
+    expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe(
+      'true'
+    );
   });
 });

@@ -15,6 +15,8 @@ export interface SentenceRange {
 // punctuation is simply one sentence.
 const BREAK = /[.!?…]+["'”’)\]]*(?=\s)/g;
 const ENDS_SENTENCE = /[.!?…]["'”’)\]]*$/;
+// Deliberately simple: 'Dr.' / 'St.' at a genuine sentence end are merged with
+// the next sentence. The estimate tolerates that; don't grow this into a parser.
 const ABBREVIATIONS = new Set([
   'mr',
   'mrs',

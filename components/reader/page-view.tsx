@@ -42,10 +42,16 @@ interface PageViewProps {
 // find at a glance, the brand underline gives the second, stronger cue (and no
 // reflow, unlike a heavier font weight).
 const ACTIVE_SENTENCE =
-  'rounded-sm bg-reader-hl text-reader-hl-fg underline decoration-brand-text decoration-2 underline-offset-4 [box-decoration-break:clone]';
+  'rounded-sm bg-reader-hl text-reader-hl-fg scroll-mb-32 underline decoration-brand-text decoration-2 dark:decoration-reader-hl-fg underline-offset-4 [box-decoration-break:clone]';
+
+// scroll-mb-32 keeps the sentence clear of the sticky Play button when
+// scrollIntoView aligns it to the panel bottom. In dark mode the brand colour
+// is too dim against the tint (2.6:1), so the underline takes the text colour.
 
 // Follow-scroll backs off this long after the user scrolls by hand.
 const USER_SCROLL_PAUSE_MS = 4000;
+// A smooth scroll of our own keeps emitting scroll events for about this long.
+const OWN_SCROLL_SETTLE_MS = 1000;
 
 const renderSentences = (
   text: string,
@@ -124,6 +130,7 @@ const PageView = ({
   const sentences = useMemo(() => sentencesOf(text), [text]);
   const activeRef = useRef<HTMLSpanElement | null>(null);
   const lastUserScroll = useRef(Number.NEGATIVE_INFINITY);
+  const lastOwnScroll = useRef(Number.NEGATIVE_INFINITY);
 
   // Wheel and touch-drag come only from the user (scrollIntoView fires
   // neither), so they mark manual scrolling without catching our own.
@@ -131,11 +138,23 @@ const PageView = ({
     const mark = () => {
       lastUserScroll.current = Date.now();
     };
+    // Scrolls with no wheel/touch (keyboard, scrollbar) only show up as scroll
+    // events; ours also do, so ignore those shortly after our own call.
+    const onScroll = () => {
+      if (Date.now() - lastOwnScroll.current > OWN_SCROLL_SETTLE_MS) {
+        mark();
+      }
+    };
     window.addEventListener('wheel', mark, { passive: true });
     window.addEventListener('touchmove', mark, { passive: true });
+    window.addEventListener('scroll', onScroll, {
+      capture: true,
+      passive: true,
+    });
     return () => {
       window.removeEventListener('wheel', mark);
       window.removeEventListener('touchmove', mark);
+      window.removeEventListener('scroll', onScroll, { capture: true });
     };
   }, []);
 
@@ -155,6 +174,7 @@ const PageView = ({
     const reduce =
       typeof window.matchMedia === 'function' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    lastOwnScroll.current = Date.now();
     el.scrollIntoView({
       block: 'nearest',
       behavior: reduce ? 'auto' : 'smooth',

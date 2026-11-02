@@ -223,7 +223,7 @@ const PageView = ({
 
       <div
         data-testid='reader-swipe-area'
-        className='touch-pan-y rounded-2xl border-[0.5px] border-solid border-line-mid bg-cream p-3 sm:p-6'
+        className='touch-pan-y'
         onTouchStart={(e) => {
           const t = e.touches[0];
           touchStart.current = t ? { x: t.clientX, y: t.clientY } : null;
@@ -249,7 +249,7 @@ const PageView = ({
           key={page}
           data-testid='reader-page-text'
           id={`reading-page-${page}`}
-          className={`min-h-[12rem] break-words rounded-xl px-3 py-4 text-left font-abeezee text-xl not-italic leading-9 motion-safe:animate-[reader-page-in_250ms_ease-out] sm:px-4 text-strong`}
+          className={`min-h-[12rem] break-words py-2 text-left font-abeezee text-xl not-italic leading-9 motion-safe:animate-[reader-page-in_250ms_ease-out] text-strong`}
         >
           {/* One continuous text flow: the spans add no whitespace of their own,
               so selecting and copying yields the page text unchanged. */}

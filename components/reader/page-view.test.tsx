@@ -12,7 +12,7 @@ const setup = (over: Partial<Parameters<typeof PageView>[0]> = {}) => {
     <PageView
       pages={pages}
       page={1}
-      highlighted={false}
+      activeSentence={null}
       onNext={onNext}
       onPrev={onPrev}
       endActions={<button type='button'>Finish story</button>}
@@ -110,7 +110,7 @@ describe('PageView', () => {
       <PageView
         pages={pages}
         page={2}
-        highlighted={false}
+        activeSentence={null}
         onNext={onNext}
         onPrev={onPrev}
       />
@@ -132,16 +132,77 @@ describe('PageView', () => {
     expect(screen.getByText('Finish story')).toBeTruthy();
   });
 
-  it('marks the page being narrated with the reader highlight tokens', () => {
-    setup({ highlighted: true });
-    expect(screen.getByTestId('reader-page-text').className).toContain(
-      'bg-reader-hl'
+  it('highlights only the active sentence, not the whole page', () => {
+    setup({
+      pages: ['One two. Three four! Five six?'],
+      page: 0,
+      activeSentence: 1,
+    });
+    const text = screen.getByTestId('reader-page-text');
+    expect(text.className).not.toContain('bg-reader-hl');
+    const active = text.querySelectorAll('[data-active="true"]');
+    expect(active).toHaveLength(1);
+    expect(active[0]?.textContent).toBe('Three four!');
+    expect(active[0]?.className).toContain('bg-reader-hl');
+  });
+
+  it('shows no highlight when activeSentence is null', () => {
+    setup({ pages: ['One two. Three four!'], page: 0 });
+    expect(document.querySelector('[data-active]')).toBeNull();
+  });
+
+  it('keeps the text content identical so copy works', () => {
+    const t = 'One two.  Three four!\nFive six?';
+    setup({ pages: [t], page: 0, activeSentence: 2 });
+    expect(screen.getByTestId('reader-page-text').textContent).toBe(t);
+  });
+
+  it('adds no live region or role to the highlight; only the page is announced', () => {
+    setup({ pages: ['One two. Three four!'], page: 0, activeSentence: 0 });
+    const status = screen.getByRole('status');
+    expect(status.textContent).toBe('Page 1 of 1');
+    const span = document.querySelector('[data-active]') as HTMLElement;
+    expect(span.getAttribute('role')).toBeNull();
+    expect(span.hasAttribute('aria-live')).toBe(false);
+    expect(document.querySelectorAll('[aria-live]')).toHaveLength(1);
+  });
+
+  it('scrolls only the active span into view, nearest, smooth unless reduced motion', () => {
+    const scroll = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scroll;
+    const mm = vi.fn(() => ({ matches: false }));
+    window.matchMedia = mm as unknown as typeof window.matchMedia;
+    const { rerender } = setup({
+      pages: ['One two. Three four!'],
+      page: 0,
+      activeSentence: 0,
+    });
+    expect(scroll).toHaveBeenCalledWith({
+      block: 'nearest',
+      behavior: 'smooth',
+    });
+    mm.mockReturnValue({ matches: true });
+    rerender(
+      <PageView
+        pages={['One two. Three four!']}
+        page={0}
+        activeSentence={1}
+        onNext={() => undefined}
+        onPrev={() => undefined}
+      />
     );
-    cleanup();
-    setup({ highlighted: false });
-    expect(screen.getByTestId('reader-page-text').className).not.toContain(
-      'bg-reader-hl'
-    );
+    expect(scroll).toHaveBeenLastCalledWith({
+      block: 'nearest',
+      behavior: 'auto',
+    });
+    expect(scroll).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not scroll when nothing is highlighted', () => {
+    const scroll = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scroll;
+    setup({ pages: ['One two.'], page: 0 });
+    expect(scroll).not.toHaveBeenCalled();
   });
 
   it('respects reduced motion (animation is opt-in via motion-safe)', () => {

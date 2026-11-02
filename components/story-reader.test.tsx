@@ -342,3 +342,110 @@ describe('synth wave animation', () => {
     expect(playing()).toBe('false');
   });
 });
+
+describe('sentence read-along highlight', () => {
+  // 10-word sentences, three per page (30 words), two pages.
+  const S = (p: string) => `${words(9, p)}.`;
+  const MULTI = ['a', 'b', 'c', 'd', 'e', 'f'].map(S).join(' ');
+  const active = () =>
+    Array.from(document.querySelectorAll('[data-active="true"]')).map((e) =>
+      e.textContent?.slice(0, 2)
+    );
+  const setClock = async (time: number, duration = 30) => {
+    const el = audioEl();
+    Object.defineProperty(el, 'duration', {
+      value: duration,
+      configurable: true,
+    });
+    Object.defineProperty(el, 'currentTime', {
+      value: time,
+      configurable: true,
+      writable: true,
+    });
+    await act(async () => {
+      fireEvent.loadedMetadata(el);
+      fireEvent.timeUpdate(el);
+    });
+  };
+  const start = async (clips = 2) => {
+    guest.clips = clips;
+    guest.pending = 0;
+    guest.gate = null;
+    guest.story = { id: 'story-1', title: 'T', textContent: MULTI };
+    renderReader();
+    await waitFor(() => screen.getByRole('switch'));
+    fireEvent.click(screen.getByRole('switch'));
+    await waitReady();
+    fireEvent.click(playButton());
+    await waitFor(() =>
+      expect(playButton().getAttribute('aria-pressed')).toBe('true')
+    );
+  };
+
+  it('follows timeupdate through the sentences of the narrated page', async () => {
+    await start();
+    await setClock(1);
+    expect(active()).toEqual(['a0']);
+    await setClock(15);
+    expect(active()).toEqual(['b0']);
+    await setClock(29);
+    expect(active()).toEqual(['c0']);
+    // seeking back moves it back
+    await setClock(2);
+    expect(active()).toEqual(['a0']);
+  });
+
+  it('clears on pause and returns on play', async () => {
+    await start();
+    await setClock(15);
+    expect(active()).toEqual(['b0']);
+    fireEvent.click(playButton());
+    await waitFor(() => expect(active()).toEqual([]));
+    fireEvent.click(playButton());
+    await waitFor(() => expect(active()).toEqual(['b0']));
+  });
+
+  it('moves to the next page with the clip and does not keep the old highlight', async () => {
+    await start();
+    await setClock(29);
+    expect(active()).toEqual(['c0']);
+    await endAudio();
+    await waitFor(() => expect(active()).not.toContain('c0'));
+    await setClock(1);
+    expect(active()).toEqual(['d0']);
+  });
+
+  it('shows nothing on a page that has no narration', async () => {
+    await start(1);
+    await setClock(15);
+    expect(active()).toEqual(['b0']);
+    await turnTo(1);
+    expect(active()).toEqual([]);
+  });
+
+  it('does not touch the page turn: the page follows the clip end', async () => {
+    await start();
+    await setClock(29);
+    await endAudio();
+    await waitFor(() =>
+      expect(screen.getAllByText('Page 2 of 2').length).toBeGreaterThan(0)
+    );
+  });
+
+  it('single stored file gets no sentence highlight', async () => {
+    guest.clips = 0;
+    guest.story = {
+      id: 'story-1',
+      title: 'T',
+      textContent: MULTI,
+      audioUrl: 'full.mp3',
+    };
+    renderReader();
+    await waitFor(() => screen.getByRole('switch'));
+    fireEvent.click(screen.getByRole('switch'));
+    await waitReady();
+    fireEvent.click(playButton());
+    await setClock(15);
+    expect(active()).toEqual([]);
+  });
+});

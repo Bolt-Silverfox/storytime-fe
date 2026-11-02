@@ -1,6 +1,13 @@
 'use client';
 
-import { type ReactNode, useEffect, useRef } from 'react';
+import {
+  type ReactNode,
+  type RefObject,
+  useEffect,
+  useMemo,
+  useRef,
+} from 'react';
+import { type SentenceRange, sentencesOf } from '@/lib/reader/read-along';
 import { progressPercent, swipeDirection } from '@/lib/reader/reader-state';
 
 const NAV_BUTTON =
@@ -20,8 +27,9 @@ const isEditable = (target: EventTarget | null): boolean => {
 interface PageViewProps {
   pages: string[];
   page: number;
-  // True while this page is the one being narrated.
-  highlighted: boolean;
+  // Index of the sentence being narrated on this page (estimated), or null for
+  // no highlight.
+  activeSentence: number | null;
   onNext: () => void;
   onPrev: () => void;
   // Rendered under the last page only (finish / quiz actions).
@@ -30,10 +38,45 @@ interface PageViewProps {
   pageStatus?: ReactNode;
 }
 
+const ACTIVE_SENTENCE =
+  'rounded-sm bg-reader-hl text-reader-hl-fg [box-decoration-break:clone]';
+
+const renderSentences = (
+  text: string,
+  sentences: SentenceRange[],
+  active: number | null,
+  activeRef: RefObject<HTMLSpanElement | null>
+): ReactNode[] => {
+  const out: ReactNode[] = [];
+  let at = 0;
+  sentences.forEach((s, i) => {
+    if (s.start > at) {
+      out.push(text.slice(at, s.start));
+    }
+    const isActive = i === active;
+    out.push(
+      <span
+        key={s.start}
+        ref={isActive ? activeRef : undefined}
+        data-sentence={i}
+        data-active={isActive ? 'true' : undefined}
+        className={isActive ? ACTIVE_SENTENCE : undefined}
+      >
+        {text.slice(s.start, s.end)}
+      </span>
+    );
+    at = s.end;
+  });
+  if (at < text.length) {
+    out.push(text.slice(at));
+  }
+  return out;
+};
+
 const PageView = ({
   pages,
   page,
-  highlighted,
+  activeSentence,
   onNext,
   onPrev,
   endActions,
@@ -70,6 +113,29 @@ const PageView = ({
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, []);
+
+  const text = pages[page] ?? '';
+  const sentences = useMemo(() => sentencesOf(text), [text]);
+  const activeRef = useRef<HTMLSpanElement | null>(null);
+
+  // Keep the spoken sentence in view on long pages / small screens. Only that
+  // span scrolls into view ('nearest' = no movement when already visible).
+  useEffect(() => {
+    if (activeSentence === null) {
+      return;
+    }
+    const el = activeRef.current;
+    if (!el || typeof el.scrollIntoView !== 'function') {
+      return;
+    }
+    const reduce =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({
+      block: 'nearest',
+      behavior: reduce ? 'auto' : 'smooth',
+    });
+  }, [activeSentence]);
 
   if (count === 0) {
     return (
@@ -139,13 +205,11 @@ const PageView = ({
           key={page}
           data-testid='reader-page-text'
           id={`reading-page-${page}`}
-          className={`min-h-[12rem] break-words rounded-xl px-3 py-4 text-left font-abeezee text-xl not-italic leading-9 transition-colors duration-300 motion-safe:animate-[reader-page-in_250ms_ease-out] sm:px-4 ${
-            highlighted
-              ? 'bg-reader-hl font-medium text-reader-hl-fg'
-              : 'text-strong'
-          }`}
+          className={`min-h-[12rem] break-words rounded-xl px-3 py-4 text-left font-abeezee text-xl not-italic leading-9 motion-safe:animate-[reader-page-in_250ms_ease-out] sm:px-4 text-strong`}
         >
-          {pages[page]}
+          {/* One continuous text flow: the spans add no whitespace of their own,
+              so selecting and copying yields the page text unchanged. */}
+          {renderSentences(text, sentences, activeSentence, activeRef)}
         </div>
         {pageStatus}
       </div>

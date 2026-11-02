@@ -12,6 +12,7 @@ import {
   saveReadingPosition,
 } from '@/lib/progress-store';
 import { pagesSignature, resolvePages } from '@/lib/reader/paginate';
+import { activeSentence, sentencesOf } from '@/lib/reader/read-along';
 import {
   alignClip,
   clipEndAction,
@@ -754,6 +755,16 @@ const StoryReader = ({
 
   const playBlocked = isChecked && pageNoAudio && !isPlaying;
 
+  // Estimated sentence being spoken: how far through the clip we are, spread
+  // over the page's sentences by length. Single-file guests have no per-page
+  // clips, so no highlight.
+  const narratedText = pages[narratedPage] ?? '';
+  const narratedSentence = activeSentence(
+    narratedText,
+    sentencesOf(narratedText),
+    duration > 0 ? currentTime / duration : Number.NaN
+  );
+
   if (loading) {
     return (
       <div className='flex items-center justify-center h-64'>
@@ -1000,10 +1011,12 @@ const StoryReader = ({
               <PageView
                 pages={pages}
                 page={reader.page}
-                highlighted={
+                activeSentence={
                   isPlaying &&
                   useAudioParagraphs &&
                   reader.page === narratedPage
+                    ? narratedSentence
+                    : null
                 }
                 onNext={() => turnPage('next')}
                 onPrev={() => turnPage('prev')}

@@ -30,7 +30,7 @@ vi.mock('@/components/voice-selector', () => ({
     onVoiceSelected,
   }: {
     setStep: (n: number) => void;
-    onVoiceSelected: (v: null) => void;
+    onVoiceSelected: (v: { id: string; name: string } | null) => void;
   }) => (
     <>
       <button

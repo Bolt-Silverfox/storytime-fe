@@ -155,11 +155,12 @@ export default function StoryView({ storyId }: { storyId: string }) {
       }
       setModalOpen(true);
     } catch (err) {
-      const { status, code } = (err ?? {}) as {
+      // getStoryByIdService rethrows { status, data } (data = response body).
+      const { status, data } = (err ?? {}) as {
         status?: number | null;
-        code?: string;
+        data?: { code?: string };
       };
-      if (status === 403 || code === 'STORY_LIMIT_EXCEEDED') {
+      if (status === 403 || data?.code === 'STORY_LIMIT_EXCEEDED') {
         setQuotaWalled(true);
         return;
       }

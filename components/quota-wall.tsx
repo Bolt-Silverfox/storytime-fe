@@ -11,7 +11,7 @@ export default function QuotaWall({ isGuest }: { isGuest: boolean }) {
       </h3>
       <p className='text-body text-base not-italic font-normal leading-5 font-abeezee mb-6 max-w-md'>
         {isGuest
-          ? 'Sign up to keep reading unlimited stories with audio narration.'
+          ? 'Sign up to read more stories with audio narration.'
           : 'Upgrade to premium in the Storytime app for unlimited stories.'}{' '}
         Stories you&apos;ve already read are still free.
       </p>

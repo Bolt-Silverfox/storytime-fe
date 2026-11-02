@@ -13,10 +13,11 @@ const quotaState = vi.hoisted(() => ({
 
 const svc = vi.hoisted(() => ({
   loggedIn: false,
-  error: Object.assign(new Error('limit'), {
+  error: {
+    message: 'limit',
     status: 403,
-    code: 'STORY_LIMIT_EXCEEDED',
-  }) as unknown,
+    data: { code: 'STORY_LIMIT_EXCEEDED' },
+  } as unknown,
 }));
 
 vi.mock('@/lib/hooks/use-story-quota', () => ({
@@ -67,6 +68,16 @@ describe('StoryView quota', () => {
     expect(await screen.findByText(/enjoyed your free stories/)).toBeTruthy();
     expect(screen.getByText(/Upgrade to premium/)).toBeTruthy();
     expect(screen.queryByText(/couldn.t open this story/)).toBeNull();
+    svc.loggedIn = false;
+  });
+
+  it('recognises the limit by data.code even without a status', async () => {
+    svc.loggedIn = true;
+    svc.error = { message: 'limit', data: { code: 'STORY_LIMIT_EXCEEDED' } };
+    quotaState.quota = { remaining: 0, totalAllowed: 3, unlimited: false };
+    render(<StoryView storyId='s1' />);
+    fireEvent.click(screen.getByRole('button', { name: 'Read this story' }));
+    expect(await screen.findByText(/enjoyed your free stories/)).toBeTruthy();
     svc.loggedIn = false;
   });
 

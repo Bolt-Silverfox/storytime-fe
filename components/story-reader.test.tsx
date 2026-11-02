@@ -9,6 +9,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
+import { Profiler } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const words = (n: number, p: string) =>
@@ -69,19 +70,21 @@ vi.mock('@/lib/services', () => {
 
 import StoryReader from './story-reader';
 
-const renderReader = () =>
+const renderReader = (onCommit?: () => void) =>
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <StoryReader
-        img=''
-        title='T'
-        description='D'
-        voice='Storyteller'
-        setStep={() => undefined}
-        mode='plain'
-        storyId='story-1'
-        isGuest
-      />
+      <Profiler id='reader' onRender={() => onCommit?.()}>
+        <StoryReader
+          img=''
+          title='T'
+          description='D'
+          voice='Storyteller'
+          setStep={() => undefined}
+          mode='plain'
+          storyId='story-1'
+          isGuest
+        />
+      </Profiler>
     </QueryClientProvider>
   );
 
@@ -367,12 +370,12 @@ describe('sentence read-along highlight', () => {
       fireEvent.timeUpdate(el);
     });
   };
-  const start = async (clips = 2) => {
+  const start = async (clips = 2, onCommit?: () => void) => {
     guest.clips = clips;
     guest.pending = 0;
     guest.gate = null;
     guest.story = { id: 'story-1', title: 'T', textContent: MULTI };
-    renderReader();
+    renderReader(onCommit);
     await waitFor(() => screen.getByRole('switch'));
     fireEvent.click(screen.getByRole('switch'));
     await waitReady();
@@ -405,14 +408,58 @@ describe('sentence read-along highlight', () => {
     await waitFor(() => expect(active()).toEqual(['b0']));
   });
 
-  it('moves to the next page with the clip and does not keep the old highlight', async () => {
-    await start();
+  // Active sentence index seen in every committed render while tracking.
+  const seen: (string | undefined)[] = [];
+  let tracking = false;
+  const record = () => {
+    if (tracking) {
+      seen.push(
+        document
+          .querySelector('[data-active="true"]')
+          ?.getAttribute('data-sentence') ?? undefined
+      );
+    }
+  };
+
+  it('hands over to the next page without ever highlighting a stale sentence', async () => {
+    await start(2, record);
     await setClock(29);
     expect(active()).toEqual(['c0']);
+    // A new clip starts from zero with unknown duration, as in a browser.
+    const el = audioEl();
+    Object.defineProperty(el, 'currentTime', { value: 0, configurable: true });
+    Object.defineProperty(el, 'duration', {
+      value: Number.NaN,
+      configurable: true,
+    });
+    seen.length = 0;
+    tracking = true;
     await endAudio();
-    await waitFor(() => expect(active()).not.toContain('c0'));
+    tracking = false;
+    // Page 2 shows (d/e/f); at no commit may its last sentence be lit.
+    expect(screen.getAllByText('Page 2 of 2').length).toBeGreaterThan(0);
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every((i) => i === undefined || i === '0')).toBe(true);
+    expect(active().every((a) => a === 'd0')).toBe(true);
     await setClock(1);
     expect(active()).toEqual(['d0']);
+  });
+
+  it('a manual page turn mid-clip does not flash a stale sentence', async () => {
+    await start(2, record);
+    await setClock(29);
+    const el = audioEl();
+    Object.defineProperty(el, 'currentTime', { value: 0, configurable: true });
+    Object.defineProperty(el, 'duration', {
+      value: Number.NaN,
+      configurable: true,
+    });
+    seen.length = 0;
+    tracking = true;
+    await turnTo(1);
+    tracking = false;
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every((i) => i === undefined || i === '0')).toBe(true);
   });
 
   it('shows nothing on a page that has no narration', async () => {

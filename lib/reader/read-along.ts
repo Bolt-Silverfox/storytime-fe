@@ -8,11 +8,36 @@ export interface SentenceRange {
   end: number;
 }
 
-// Same boundary as paginate.ts (splitByWordCountPreservingSentences), so a page
-// is cut into the sentences the backend cut it from. A hard-split chunk with no
+// The page itself is cut by paginate.ts at /(?<=[.!?])\s+/ and must stay that
+// way (it mirrors the backend). For the highlight only, a little more care:
+// a terminal . ! ? or … (with any closing quote/bracket) followed by space ends
+// a sentence, except after a common abbreviation. A hard-split chunk without
 // punctuation is simply one sentence.
-const SENTENCE_BREAK = /(?<=[.!?])\s+/g;
-const ENDS_SENTENCE = /[.!?]$/;
+const BREAK = /[.!?…]+["'”’)\]]*(?=\s)/g;
+const ENDS_SENTENCE = /[.!?…]["'”’)\]]*$/;
+const ABBREVIATIONS = new Set([
+  'mr',
+  'mrs',
+  'ms',
+  'dr',
+  'st',
+  'e.g',
+  'i.e',
+  'vs',
+  'prof',
+]);
+
+const isAbbreviation = (text: string, dotAt: number): boolean => {
+  let from = dotAt;
+  while (from > 0 && !/\s/.test(text.charAt(from - 1))) {
+    from -= 1;
+  }
+  const word = text
+    .slice(from, dotAt)
+    .toLowerCase()
+    .replace(/^[("'“‘[]+/, '');
+  return ABBREVIATIONS.has(word);
+};
 
 // Narration runs at roughly 15 characters a second, so the ~0.25 s pause a
 // voice leaves after a full stop is worth about this many characters.
@@ -34,9 +59,14 @@ export const sentencesOf = (pageText: string): SentenceRange[] => {
     }
   };
   let from = 0;
-  for (const m of pageText.matchAll(SENTENCE_BREAK)) {
-    push(from, m.index);
-    from = m.index + m[0].length;
+  for (const m of pageText.matchAll(BREAK)) {
+    const end = m.index + m[0].length;
+    // A lone full stop right after an abbreviation is not a sentence end.
+    if (m[0] === '.' && isAbbreviation(pageText, m.index)) {
+      continue;
+    }
+    push(from, end);
+    from = end;
   }
   push(from, pageText.length);
   return ranges;

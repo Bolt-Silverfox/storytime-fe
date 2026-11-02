@@ -198,6 +198,62 @@ describe('PageView', () => {
     expect(scroll).toHaveBeenCalledTimes(2);
   });
 
+  it('does not scroll again on a re-render with the same sentence', () => {
+    const scroll = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scroll;
+    const props = {
+      pages: ['One two. Three four!'],
+      page: 0,
+      activeSentence: 1,
+      onPrev: () => undefined,
+    };
+    const { rerender } = setup(props);
+    expect(scroll).toHaveBeenCalledTimes(1);
+    rerender(<PageView {...props} onNext={() => undefined} />);
+    rerender(<PageView {...props} onNext={() => undefined} />);
+    expect(scroll).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps leading and trailing whitespace in the text content', () => {
+    const t = '  One two. Three four!  ';
+    setup({ pages: [t], page: 0, activeSentence: 0 });
+    expect(screen.getByTestId('reader-page-text').textContent).toBe(t);
+  });
+
+  it('backs off the follow-scroll for 4 s after the user scrolls', () => {
+    const scroll = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scroll;
+    let now = 1_000_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    const props = {
+      pages: ['One. Two. Three. Four.'],
+      page: 0,
+      onNext: () => undefined,
+      onPrev: () => undefined,
+    };
+    const { rerender } = setup({ ...props, activeSentence: 0 });
+    expect(scroll).toHaveBeenCalledTimes(1);
+    fireEvent.wheel(window);
+    now += 1000;
+    rerender(<PageView {...props} activeSentence={1} />);
+    expect(scroll).toHaveBeenCalledTimes(1);
+    fireEvent.touchMove(window);
+    now += 3000;
+    rerender(<PageView {...props} activeSentence={2} />);
+    expect(scroll).toHaveBeenCalledTimes(1);
+    now += 4100;
+    rerender(<PageView {...props} activeSentence={3} />);
+    expect(scroll).toHaveBeenCalledTimes(2);
+    vi.restoreAllMocks();
+  });
+
+  it('adds an underline second cue to the active sentence', () => {
+    setup({ pages: ['One two. Three four!'], page: 0, activeSentence: 0 });
+    expect(document.querySelector('[data-active]')?.className).toContain(
+      'underline'
+    );
+  });
+
   it('does not scroll when nothing is highlighted', () => {
     const scroll = vi.fn();
     HTMLElement.prototype.scrollIntoView = scroll;

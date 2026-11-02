@@ -130,6 +130,13 @@ const StoryReader = ({
   const [audioRetry, setAudioRetry] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  // A new clip starts from zero with an unknown length. Reset the clock in the
+  // same batch as the clip change so the new page never renders against the
+  // old clip's playhead (which would flash its last sentence).
+  const resetClock = () => {
+    setCurrentTime(0);
+    setDuration(0);
+  };
   const audioRef = useRef<HTMLAudioElement | null>(null);
   // Story audio is generated per-paragraph; we play the clips in sequence.
   const playlistRef = useRef<string[]>([]);
@@ -522,6 +529,7 @@ const StoryReader = ({
         clipIndexRef.current = next;
         setCurrentClip(next);
         setAudioUrl(playlistRef.current[next]);
+        resetClock();
         // Turn the page with the narration (only if the reader is on it).
         if (isCheckedRef.current) {
           dispatch({ type: 'clip', clip: next, from: current });
@@ -555,6 +563,7 @@ const StoryReader = ({
       clipIndexRef.current = 0;
       setCurrentClip(0);
       setAudioUrl(playlistRef.current[0] ?? null);
+      resetClock();
       if (isCheckedRef.current && !singleFileRef.current) {
         dispatch({ type: 'clip', clip: 0, from: current });
       }
@@ -682,6 +691,7 @@ const StoryReader = ({
     waitingForNextRef.current = false;
     setCurrentClip(target);
     setAudioUrl(list[target]);
+    resetClock();
     return 'switched';
   };
 
@@ -759,9 +769,13 @@ const StoryReader = ({
   // over the page's sentences by length. Single-file guests have no per-page
   // clips, so no highlight.
   const narratedText = pages[narratedPage] ?? '';
+  const narratedSentences = useMemo(
+    () => sentencesOf(narratedText),
+    [narratedText]
+  );
   const narratedSentence = activeSentence(
     narratedText,
-    sentencesOf(narratedText),
+    narratedSentences,
     duration > 0 ? currentTime / duration : Number.NaN
   );
 

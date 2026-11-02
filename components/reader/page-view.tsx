@@ -38,8 +38,14 @@ interface PageViewProps {
   pageStatus?: ReactNode;
 }
 
+// Tint plus an underline: the tint alone is too close to the page colour to
+// find at a glance, the brand underline gives the second, stronger cue (and no
+// reflow, unlike a heavier font weight).
 const ACTIVE_SENTENCE =
-  'rounded-sm bg-reader-hl text-reader-hl-fg [box-decoration-break:clone]';
+  'rounded-sm bg-reader-hl text-reader-hl-fg underline decoration-brand-text decoration-2 underline-offset-4 [box-decoration-break:clone]';
+
+// Follow-scroll backs off this long after the user scrolls by hand.
+const USER_SCROLL_PAUSE_MS = 4000;
 
 const renderSentences = (
   text: string,
@@ -117,11 +123,29 @@ const PageView = ({
   const text = pages[page] ?? '';
   const sentences = useMemo(() => sentencesOf(text), [text]);
   const activeRef = useRef<HTMLSpanElement | null>(null);
+  const lastUserScroll = useRef(Number.NEGATIVE_INFINITY);
+
+  // Wheel and touch-drag come only from the user (scrollIntoView fires
+  // neither), so they mark manual scrolling without catching our own.
+  useEffect(() => {
+    const mark = () => {
+      lastUserScroll.current = Date.now();
+    };
+    window.addEventListener('wheel', mark, { passive: true });
+    window.addEventListener('touchmove', mark, { passive: true });
+    return () => {
+      window.removeEventListener('wheel', mark);
+      window.removeEventListener('touchmove', mark);
+    };
+  }, []);
 
   // Keep the spoken sentence in view on long pages / small screens. Only that
   // span scrolls into view ('nearest' = no movement when already visible).
   useEffect(() => {
-    if (activeSentence === null) {
+    if (
+      activeSentence === null ||
+      Date.now() - lastUserScroll.current < USER_SCROLL_PAUSE_MS
+    ) {
       return;
     }
     const el = activeRef.current;

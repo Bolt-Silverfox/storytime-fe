@@ -45,6 +45,57 @@ describe('sentencesOf', () => {
   });
 });
 
+describe('sentencesOf boundaries for the highlight', () => {
+  it('does not end a sentence at common abbreviations', () => {
+    expect(slice('Mr. Fox met Dr. Owl at St. Paul. They talked.')).toEqual([
+      'Mr. Fox met Dr. Owl at St. Paul.',
+      'They talked.',
+    ]);
+    expect(slice('Cats vs. dogs, e.g. in tales, i.e. old ones. Done.')).toEqual(
+      ['Cats vs. dogs, e.g. in tales, i.e. old ones.', 'Done.']
+    );
+    expect(slice('Mrs. Hen and Ms. Duck left.')).toEqual([
+      'Mrs. Hen and Ms. Duck left.',
+    ]);
+  });
+
+  it('still ends a sentence at an ordinary word that merely ends in an abbreviation', () => {
+    expect(slice('He saw the Fox. Then left.')).toEqual([
+      'He saw the Fox.',
+      'Then left.',
+    ]);
+  });
+
+  it('treats the ellipsis character and three dots as a boundary', () => {
+    expect(slice('Well… maybe so. Hmm... ok.')).toEqual([
+      'Well…',
+      'maybe so.',
+      'Hmm...',
+      'ok.',
+    ]);
+  });
+
+  it('keeps closing quotes and brackets with the sentence they close', () => {
+    expect(slice('She said “Go.” He went. (Really!) Yes.')).toEqual([
+      'She said “Go.”',
+      'He went.',
+      '(Really!)',
+      'Yes.',
+    ]);
+  });
+
+  it('gives the pause bonus to a sentence ending in a closing quote', () => {
+    const t = 'abcd.” abcdefghi';
+    const s = sentencesOf(t);
+    expect(activeSentence(t, s, 0.45)).toBe(0);
+  });
+
+  it('trims leading whitespace and keeps the final sentence', () => {
+    const t = '   Hi there.';
+    expect(sentencesOf(t)).toEqual([{ start: 3, end: 12 }]);
+  });
+});
+
 describe('activeSentence', () => {
   // Equal lengths so weights are only distinguished by pause bonus.
   const text = 'Aaaa aaaa. Bbbb bbbb. Cccc cccc.';

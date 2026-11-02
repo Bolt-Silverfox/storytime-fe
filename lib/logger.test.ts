@@ -1134,3 +1134,109 @@ describe('round 6: error getters', () => {
     expect(reads).toBe(1);
   });
 });
+
+describe('round 7: subscript chains fail closed', () => {
+  const tail =
+    ' password = SECRETX "password":"SECRETY" password[x]=SECRETZ token: abcSECRET password=plainSECRET';
+  const chains: [string, string][] = [
+    ['[token]', '[token]'],
+    ['%5Btoken%5D', '%5Btoken%5D'],
+    ['password[token]', 'password[token]'],
+    ['mixed', '[token]%5Bpassword%5D[a b]x[password]'],
+    ['[password][x]', '[password][x]'],
+  ];
+  it.each(chains)(
+    'chain of %s never lets later secrets through',
+    (_n, piece) => {
+      for (const n of [25, 80, 400, 3_000]) {
+        const out = redact(`${piece.repeat(n)}${tail}`) as string;
+        expect(out).not.toMatch(/SECRET/);
+      }
+    }
+  );
+
+  it('masks a secret at the end of a very long chain', () => {
+    const out = redact(`${'[token]'.repeat(5_000)}=SECRETVALUE`) as string;
+    expect(out).not.toContain('SECRETVALUE');
+  });
+
+  it.each([
+    'password[%5D=SECRETVALUE',
+    'password[[a]]=SECRETVALUE',
+    'password[[[a]]]=SECRETVALUE',
+  ])('masks nested/odd brackets: %s', (text) => {
+    expect(redact(text)).not.toContain('SECRETVALUE');
+  });
+
+  it('masks values after many spaces', () => {
+    expect(
+      redact(`password${' '.repeat(40)}=${' '.repeat(40)}SECRETVALUE`)
+    ).not.toContain('SECRETVALUE');
+  });
+
+  it.each(['%26', '%3F', '%23', '%20', '%2C', '%2F', '%5B'])(
+    'finds a key after the encoded boundary %s',
+    (b) => {
+      expect(redact(`a=1${b}token=SECRETVALUE`)).not.toContain('SECRETVALUE');
+    }
+  );
+});
+
+describe('round 7: hostile errors', () => {
+  const hostile = () => {
+    const err = new Error('real');
+    err.stack = 'Error: real\n    at fn (a.js:1:1)';
+    Object.defineProperty(err, 'extra', {
+      enumerable: true,
+      get() {
+        throw new Error('getter exploded');
+      },
+    });
+    return err;
+  };
+
+  it('a throwing enumerable getter does not stop console, breadcrumb or Sentry', () => {
+    logger.error('m', hostile());
+    expect(spies.error).toHaveBeenCalled();
+    expect(sentry.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({ level: 'error' })
+    );
+    expect(sentry.captureException).toHaveBeenCalledOnce();
+    const copy = sentry.captureException.mock.calls[0][0] as Error;
+    expect(copy.message).toBe('real');
+  });
+
+  it('a throwing message/stack/cause getter falls back to [unreadable]', () => {
+    const err = new Error('x');
+    for (const prop of ['message', 'stack', 'cause', 'name']) {
+      Object.defineProperty(err, prop, {
+        get() {
+          throw new Error('nope');
+        },
+      });
+    }
+    expect(() => logger.error('m', err)).not.toThrow();
+    expect(sentry.captureException).toHaveBeenCalledOnce();
+    const copy = sentry.captureException.mock.calls[0][0] as Error;
+    expect(copy.message).toBe('[unreadable]');
+    expect(spies.error).toHaveBeenCalled();
+  });
+});
+
+describe('round 7: hostile error proxies', () => {
+  it('a throwing ownKeys trap still reports the exception', () => {
+    const err = new Error('real');
+    err.stack = 'Error: real\n    at fn (a.js:1:1)';
+    const proxy = new Proxy(err, {
+      ownKeys() {
+        throw new Error('ownKeys exploded');
+      },
+    });
+    logger.error('m', proxy);
+    expect(sentry.captureException).toHaveBeenCalledOnce();
+    expect((sentry.captureException.mock.calls[0][0] as Error).message).toBe(
+      'real'
+    );
+    expect(spies.error).toHaveBeenCalled();
+  });
+});

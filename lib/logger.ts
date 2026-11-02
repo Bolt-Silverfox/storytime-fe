@@ -215,17 +215,32 @@ const KEY_SCAN =
 const SUBSCRIPT = /\[[^[\]]*\]|%5[Bb](?:(?!%5[BbDd])[\s\S])*%5[Dd]/y;
 // Closing/escaped quotes ("password":, \"password\":, `password`:), stray
 // closing brackets and spaces between the key and its separator.
-const SEP_FILLER = /\\*["'`]|\]|%5[Dd]|\s{1,16}/y;
+// Fillers are single characters (or one quote run) so every walk lands on the
+// same token boundaries and can share the memo below. A lone "[" is a filler
+// too, so "password[[a]]=x" and "password[%5D=x" still reach their "=".
+const SEP_FILLER = /\\*["'`]|[\][]|%5[Dd]|\s/y;
 const SEP_CHAR = /[=:：＝]|%3[DdAa]/y;
-const TRAIL_SPACE = /\s{0,16}/y;
+const TRAIL_SPACE = /\s*/y;
 
 /**
- * End of the separator that follows a key at `from`, or -1. `budget` bounds the
- * characters skipped over a whole string so adversarial input stays linear.
+ * End of the separator that follows a key at `from`, or -1.
+ *
+ * Linear by construction and never gives up early: `memo` maps every token
+ * boundary already walked to where its walk ended, so a later key found inside
+ * a subscript chain stops at the first boundary an earlier walk reached
+ * instead of re-parsing the chain. Each boundary is tokenised at most once per
+ * string; there is no work budget that could run out and skip masking.
  */
-function parseSep(input: string, from: number, budget: { left: number }) {
+function parseSep(input: string, from: number, memo: Map<number, number>) {
   let i = from;
+  const visited: number[] = [];
   for (;;) {
+    const known = memo.get(i);
+    if (known !== undefined) {
+      i = known;
+      break;
+    }
+    visited.push(i);
     SUBSCRIPT.lastIndex = i;
     let m = SUBSCRIPT.exec(input);
     if (!m) {
@@ -235,11 +250,10 @@ function parseSep(input: string, from: number, budget: { left: number }) {
     if (!m) {
       break;
     }
-    if (budget.left < m[0].length) {
-      return -1;
-    }
-    budget.left -= m[0].length;
     i += m[0].length;
+  }
+  for (const v of visited) {
+    memo.set(v, i);
   }
   SEP_CHAR.lastIndex = i;
   const c = SEP_CHAR.exec(input);
@@ -334,14 +348,14 @@ function valueSpan(
 
 function redactKeyNames(input: string): string {
   KEY_SCAN.lastIndex = 0;
-  const skipBudget = { left: 2 * input.length + 1000 };
+  const chainMemo = new Map<number, number>();
   let out = '';
   let pos = 0;
   for (let m = KEY_SCAN.exec(input); m; m = KEY_SCAN.exec(input)) {
     const [, before, key] = m;
     const keyEnd = m.index + before.length + key.length;
     const cls = classifyKey(key);
-    const sepEnd = cls ? parseSep(input, keyEnd, skipBudget) : -1;
+    const sepEnd = cls ? parseSep(input, keyEnd, chainMemo) : -1;
     const peek = () => {
       const o = input.slice(sepEnd, sepEnd + 200);
       return o.replace(/^\\*["'`]/, '').split(/[\s&#;,"'`]/)[0];
@@ -583,25 +597,45 @@ export function redact(value: unknown): unknown {
  * AggregateError members and primitive own props such as `status` / `code`.
  * Request/response/config (headers, bodies) are never copied.
  */
+/** Run a property read that may throw (hostile getters, revoked proxies). */
+function safeRead<T>(read: () => T, fallback: T): T {
+  try {
+    return read();
+  } catch {
+    return fallback;
+  }
+}
+
 function safeErrorCopy(
   error: Error,
   depth = 0,
   seen = new WeakSet<object>()
 ): Error {
   seen.add(error);
-  // Read each getter exactly once.
-  const { message, name, stack } = error;
-  const copy = new Error(redactString(message));
-  copy.name = name;
-  copy.stack = stack ? redactString(stack) : undefined;
+  // Read each getter exactly once, and never let one throw.
+  const message = safeRead(() => error.message, '[unreadable]');
+  const name = safeRead(() => error.name, 'Error');
+  const stack = safeRead(() => error.stack, undefined);
+  const copy = new Error(
+    typeof message === 'string' ? redactString(message) : '[unreadable]'
+  );
+  copy.name = typeof name === 'string' ? redactString(name) : 'Error';
+  copy.stack =
+    typeof stack === 'string' && stack ? redactString(stack) : undefined;
   if (depth < MAX_DEPTH) {
-    const cause = (error as { cause?: unknown }).cause;
+    const cause = safeRead(
+      () => (error as { cause?: unknown }).cause,
+      undefined
+    );
     if (cause instanceof Error && !seen.has(cause)) {
       copy.cause = safeErrorCopy(cause, depth + 1, seen);
     } else if (cause !== undefined && !(cause instanceof Error)) {
       copy.cause = redact(cause);
     }
-    const members = (error as { errors?: unknown }).errors;
+    const members = safeRead(
+      () => (error as { errors?: unknown }).errors,
+      undefined
+    );
     if (Array.isArray(members)) {
       (copy as unknown as { errors: unknown[] }).errors = members.map((m) =>
         m instanceof Error && !seen.has(m)
@@ -612,7 +646,7 @@ function safeErrorCopy(
   }
   // Keys first, then read values only for the ones we keep (Object.entries
   // would invoke every getter, including message/stack, a second time).
-  for (const key of Object.keys(error)) {
+  for (const key of safeRead(() => Object.keys(error), [] as string[])) {
     if (
       key === 'message' ||
       key === 'name' ||
@@ -624,7 +658,10 @@ function safeErrorCopy(
     ) {
       continue;
     }
-    const val = (error as unknown as Record<string, unknown>)[key];
+    const val = safeRead(
+      () => (error as unknown as Record<string, unknown>)[key],
+      '[unreadable]'
+    );
     if (typeof val === 'number' || typeof val === 'boolean') {
       (copy as unknown as Record<string, unknown>)[key] = val;
     } else if (typeof val === 'string') {
@@ -764,10 +801,12 @@ function sendBreadcrumb(
 }
 
 function httpSummary(error: unknown): HttpErrorSummary | undefined {
-  if (error && typeof error === 'object' && isAxiosLike(error)) {
-    return summariseAxios(error as Record<string, unknown>);
-  }
-  return undefined;
+  return safeRead(() => {
+    if (error && typeof error === 'object' && isAxiosLike(error)) {
+      return summariseAxios(error as Record<string, unknown>);
+    }
+    return undefined;
+  }, undefined);
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

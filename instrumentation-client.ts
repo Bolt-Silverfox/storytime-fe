@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/nextjs';
+import { isLoggerConsoleEmit } from './lib/logger';
 
 // Client-side-only Sentry. We deliberately do NOT add the server/edge
 // instrumentation (instrumentation.ts + sentry.server/edge.config): under
@@ -16,6 +17,13 @@ Sentry.init({
   enabled: process.env.NODE_ENV === 'production',
   // Light performance sampling; errors are always captured.
   tracesSampleRate: 0.1,
+  // The logger records its own breadcrumb for warn/error; drop the duplicate
+  // that Sentry's console integration would add for the logger's console write.
+  // Console breadcrumbs from raw console.* calls are untouched.
+  beforeBreadcrumb: (breadcrumb) =>
+    breadcrumb.category === 'console' && isLoggerConsoleEmit()
+      ? null
+      : breadcrumb,
 });
 
 // Instruments App Router client-side navigations for tracing.

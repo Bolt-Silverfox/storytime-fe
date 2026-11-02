@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
+import { isExpectedFailure, logger } from '@/lib/logger';
 import {
   addKidsService,
   getKidsService,
@@ -69,7 +70,9 @@ const KidPicker = ({
       }));
       setKids(mappedKids);
     } catch (error) {
-      console.error('Failed to fetch kids:', error);
+      logger.error('Failed to fetch kids', error, {
+        expected: isExpectedFailure(error),
+      });
       setKids([]);
     } finally {
       setLoading(false);

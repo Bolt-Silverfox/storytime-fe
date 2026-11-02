@@ -279,16 +279,16 @@ body {
 @keyframes synth-wave-pulse {
   0%,
   100% {
-    transform: scaleY(0.82) scaleX(0.99);
-    opacity: 0.75;
+    transform: scaleY(1);
+    opacity: 1;
   }
-  35% {
-    transform: scaleY(1.1) scaleX(1.01);
+  30% {
+    transform: scaleY(1.1);
     opacity: 1;
   }
   65% {
-    transform: scaleY(0.92) scaleX(1);
-    opacity: 0.9;
+    transform: scaleY(0.82);
+    opacity: 0.75;
   }
 }
 

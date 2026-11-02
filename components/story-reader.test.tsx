@@ -22,6 +22,7 @@ const guest = vi.hoisted(() => ({
   story: {} as Record<string, unknown>,
   clips: 0,
   pending: 0,
+  gate: null as Promise<void> | null,
 }));
 
 vi.mock('next/image', () => ({
@@ -52,7 +53,10 @@ vi.mock('@/lib/services', () => {
   return {
     getGuestStoryService: vi.fn(async () => guest.story),
     getStoryByIdService: vi.fn(),
-    startGuestStoryAudioBatchService: vi.fn(async () => batch()),
+    startGuestStoryAudioBatchService: vi.fn(async () => {
+      await guest.gate;
+      return batch();
+    }),
     getGuestStoryAudioBatchStatusService: vi.fn(async () => batch()),
     startStoryAudioBatchService: vi.fn(),
     getStoryAudioBatchStatusService: vi.fn(),
@@ -241,6 +245,13 @@ describe('synth wave animation', () => {
   const wave = () =>
     document.querySelector('.synth-wave') as HTMLElement | null;
   const playing = () => wave()?.getAttribute('data-playing');
+  const fire = async (
+    ev: 'playing' | 'play' | 'pause' | 'emptied' | 'ended' | 'error' | 'waiting'
+  ) => {
+    await act(async () => {
+      fireEvent[ev](audioEl());
+    });
+  };
   const ready = async (readAlong: boolean) => {
     renderReader();
     await waitFor(() => screen.getByRole('switch'));
@@ -254,9 +265,14 @@ describe('synth wave animation', () => {
     ['per-page clips', 3],
   ] as const;
 
+  beforeEach(() => {
+    guest.gate = null;
+    guest.pending = 0;
+  });
+
   for (const [label, clips] of cases) {
     for (const readAlong of [false, true]) {
-      it(`${label}, read-along ${readAlong ? 'on' : 'off'}: moves only while audio plays`, async () => {
+      it(`${label}, read-along ${readAlong ? 'on' : 'off'}: moves only while audio is sounding`, async () => {
         guest.clips = clips;
         guest.story = {
           id: 'story-1',
@@ -266,41 +282,63 @@ describe('synth wave animation', () => {
         };
         await ready(readAlong);
         expect(playing()).toBe('false');
-        await act(async () => {
-          fireEvent.play(audioEl());
-        });
+        // `play` alone is a request, not sound
+        await fire('play');
+        expect(playing()).toBe('false');
+        await fire('playing');
         expect(playing()).toBe('true');
-        await act(async () => {
-          fireEvent.pause(audioEl());
-        });
+        await fire('pause');
         expect(playing()).toBe('false');
-        await act(async () => {
-          fireEvent.play(audioEl());
-        });
-        await act(async () => {
-          fireEvent.error(audioEl());
-        });
+        await fire('playing');
+        await fire('error');
         expect(playing()).toBe('false');
-        await act(async () => {
-          fireEvent.play(audioEl());
-        });
-        await endAudio();
+        await fire('playing');
+        await fire('emptied');
+        expect(playing()).toBe('false');
+        await fire('playing');
+        await fire('waiting');
+        expect(playing()).toBe('false');
+        await fire('playing');
+        expect(playing()).toBe('true');
+        await fire('ended');
         expect(playing()).toBe('false');
       });
     }
   }
 
-  it('is still while the next clip is loading (buffering)', async () => {
+  it('keeps moving while later paragraphs are still generating', async () => {
+    guest.clips = 2;
+    guest.pending = 2;
+    guest.story = { id: 'story-1', title: 'T', textContent: TEXT };
+    await ready(false);
+    await fire('playing');
+    expect(playing()).toBe('true');
+  });
+
+  it('is still on a freshly mounted, paused element after Try again', async () => {
     guest.clips = 3;
     guest.story = { id: 'story-1', title: 'T', textContent: TEXT };
     await ready(false);
-    await act(async () => {
-      fireEvent.play(audioEl());
-    });
+    await fire('playing');
     expect(playing()).toBe('true');
-    await act(async () => {
-      fireEvent.waiting(audioEl());
+    // Playback then errors out without the element emitting pause/emptied.
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(() =>
+      Promise.reject(new Error('nope'))
+    );
+    fireEvent.click(playButton()); // isPlaying was false -> tries to play, fails
+    const retry = await screen.findByRole('button', { name: /try again/i });
+    expect(playing()).toBe('true');
+    let release: () => void = () => undefined;
+    guest.gate = new Promise<void>((r) => {
+      release = r;
     });
+    fireEvent.click(retry);
+    await waitFor(() => expect(audioEl()).toBeNull());
+    expect(playing()).toBe('false');
+    await act(async () => {
+      release();
+    });
+    await waitFor(() => expect(audioEl()).toBeTruthy());
     expect(playing()).toBe('false');
   });
 });

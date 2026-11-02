@@ -112,8 +112,8 @@ const StoryReader = ({
   // True only while the initial batch request is in flight (before any clip is
   // playable). Once the first paragraph has audio, playback is enabled.
   const [audioLoading, setAudioLoading] = useState(false);
-  // True only while the <audio> element is actually producing sound (driven by
-  // its own events, not the Play button), so the synth image never animates
+  // True only while the <audio> element is actually producing sound (set by its
+  // `playing` event, not the Play button), so the synth image never animates
   // over silence (buffering, paused, ended, errored, switching clips).
   const [audioSounding, setAudioSounding] = useState(false);
   // True while more paragraphs are still generating in the background (pending,
@@ -275,6 +275,7 @@ const StoryReader = ({
       setFailedIndices(new Set());
       setAudioParagraphs([]);
       setAudioUrl(null);
+      setAudioSounding(false);
       setCurrentClip(0);
       setIsPlaying(false);
       playlistRef.current = [];
@@ -578,6 +579,13 @@ const StoryReader = ({
     // ran once before any <audio> was rendered and never attached anything.
   }, [audioUrl]);
 
+  // A new or removed <audio> element starts silent: its predecessor's
+  // `playing` must not leak into it (unmounting fires no `emptied`).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset is keyed on the element changing, not read from it.
+  useEffect(() => {
+    setAudioSounding(false);
+  }, [audioUrl]);
+
   // When the current clip changes (next paragraph), resume playback if we were
   // already playing.
   useEffect(() => {
@@ -782,7 +790,9 @@ const StoryReader = ({
   }
 
   const currentQuestion = story?.questions?.[currentQuestionIndex];
-  const synthMoving = audioSounding && !audioLoading && !audioGenerating;
+  // Sound is what moves the image, so it keeps moving while later paragraphs
+  // are still generating. Never without an <audio> element to be sounding.
+  const synthMoving = audioSounding && Boolean(audioUrl);
 
   return (
     <div>
@@ -792,7 +802,6 @@ const StoryReader = ({
           ref={audioRef}
           src={audioUrl}
           preload='metadata'
-          onPlay={() => setAudioSounding(true)}
           onPlaying={() => setAudioSounding(true)}
           onPause={() => setAudioSounding(false)}
           onWaiting={() => setAudioSounding(false)}

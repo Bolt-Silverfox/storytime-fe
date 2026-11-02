@@ -13,6 +13,7 @@ const quotaState = vi.hoisted(() => ({
 
 const svc = vi.hoisted(() => ({
   loggedIn: false,
+  story: null as null | Record<string, unknown>,
   error: {
     message: 'limit',
     status: 403,
@@ -28,14 +29,27 @@ vi.mock('@/components/quota-indicator', () => ({
     <div data-testid='quota-indicator'>{variant}</div>
   ),
 }));
-vi.mock('@/components/story-reader', () => ({ default: () => null }));
+vi.mock('@/components/story-reader', () => ({
+  default: ({ storyId }: { storyId: string }) => (
+    <div data-testid='story-reader'>{storyId}</div>
+  ),
+}));
 vi.mock('@/components/mode-selector', () => ({ default: () => null }));
 vi.mock('@/components/voice-selector', () => ({ default: () => null }));
-vi.mock('@/components/ui/modal', () => ({ default: () => null }));
+vi.mock('@/components/ui/modal', () => ({
+  default: ({
+    open,
+    children,
+  }: {
+    open: boolean;
+    children: React.ReactNode;
+  }) => (open ? <div data-testid='modal'>{children}</div> : null),
+}));
 vi.mock('@/lib/services', () => ({
   addFavoriteService: vi.fn(),
-  getPreferredVoiceService: () => Promise.resolve(null),
-  getStoryByIdService: () => Promise.reject(svc.error),
+  getPreferredVoiceService: () => Promise.resolve({ id: 'v1', name: 'Voice' }),
+  getStoryByIdService: () =>
+    svc.story ? Promise.resolve(svc.story) : Promise.reject(svc.error),
   getVoiceAccessService: () => Promise.resolve({}),
   isUserLoggedIn: () => svc.loggedIn,
   listFavoritesService: () => Promise.resolve([]),
@@ -43,15 +57,30 @@ vi.mock('@/lib/services', () => ({
 }));
 
 describe('StoryView quota', () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    svc.story = null;
+  });
 
-  it('still lets the user open a story when no free stories are left (re-reading is free; backend 403s new stories)', () => {
+  it('keeps the Read button enabled and shows the banner when no free stories are left', () => {
     quotaState.quota = { remaining: 0, totalAllowed: 3, unlimited: false };
     render(<StoryView storyId='s1' />);
     const btn = screen.getByRole('button', { name: 'Read this story' });
     expect(btn).toBeTruthy();
     expect((btn as HTMLButtonElement).disabled).toBe(false);
     expect(screen.getByTestId('quota-indicator').textContent).toBe('banner');
+  });
+
+  it('out of quota, an already-read story (backend resolves it) opens the reader', async () => {
+    svc.loggedIn = true;
+    svc.story = { id: 's1', title: 'Seen before' };
+    quotaState.quota = { remaining: 0, totalAllowed: 3, unlimited: false };
+    render(<StoryView storyId='s1' />);
+    fireEvent.click(screen.getByRole('button', { name: 'Read this story' }));
+    expect((await screen.findByTestId('story-reader')).textContent).toBe('s1');
+    expect(screen.queryByText(/enjoyed your free stories/)).toBeNull();
+    expect(screen.queryByText(/couldn.t open this story/)).toBeNull();
+    svc.loggedIn = false;
   });
 
   it('shows the compact pill (not the banner) when quota remains', () => {

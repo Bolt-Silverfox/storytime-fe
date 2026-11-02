@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import ModeSelector from '@/components/mode-selector';
 import QuotaIndicator from '@/components/quota-indicator';
+import QuotaWall from '@/components/quota-wall';
 import StoryReader from '@/components/story-reader';
 import Modal from '@/components/ui/modal';
 import VoiceSelector, { type SelectedVoice } from '@/components/voice-selector';
@@ -33,6 +34,8 @@ export default function StoryView({ storyId }: { storyId: string }) {
   const [step, setStep] = useState(1);
   const [preparing, setPreparing] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+  // Backend refused a NEW story for quota before the reader could mount.
+  const [quotaWalled, setQuotaWalled] = useState(false);
 
   const [isGuest, setIsGuest] = useState(false);
   const [showInteractive, setShowInteractive] = useState(false);
@@ -42,9 +45,10 @@ export default function StoryView({ storyId }: { storyId: string }) {
   );
   const [storyDetail, setStoryDetail] = useState<StoryDetail | null>(null);
 
-  // Guests / free users: surface remaining quota and block opening a new story
-  // once it's exhausted (the backend 403s anyway, but gating here means they
-  // aren't sent into a reader that immediately walls them).
+  // Guests / free users: surface remaining quota. Never block opening a story
+  // on quota alone: re-reading an already-read story is always free, and the
+  // client can't tell which stories were read. The backend 403s a genuinely new
+  // story and the reader shows the wall then.
   const { quota } = useStoryQuota();
   const outOfQuota = !!quota && !quota.unlimited && quota.remaining <= 0;
 
@@ -89,6 +93,7 @@ export default function StoryView({ storyId }: { storyId: string }) {
   const handleStart = async () => {
     setPreparing(true);
     setStartError(null);
+    setQuotaWalled(false);
     const guest = !isUserLoggedIn();
     setIsGuest(guest);
     setSelectedMode(null);
@@ -150,6 +155,15 @@ export default function StoryView({ storyId }: { storyId: string }) {
       }
       setModalOpen(true);
     } catch (err) {
+      // getStoryByIdService rethrows { status, data } (data = response body).
+      const { status, data } = (err ?? {}) as {
+        status?: number | null;
+        data?: { code?: string };
+      };
+      if (status === 403 || data?.code === 'STORY_LIMIT_EXCEEDED') {
+        setQuotaWalled(true);
+        return;
+      }
       console.error('Failed to prepare story:', err);
       setStartError('We couldn’t open this story. Please try again.');
     } finally {
@@ -169,20 +183,18 @@ export default function StoryView({ storyId }: { storyId: string }) {
 
   return (
     <div className='flex flex-col items-center gap-3'>
+      <button
+        type='button'
+        onClick={handleStart}
+        disabled={preparing}
+        className='rounded-2xl bg-brand px-8 py-4 text-base font-semibold text-white transition hover:opacity-90 disabled:opacity-60'
+      >
+        {preparing ? 'Opening…' : 'Read this story'}
+      </button>
       {outOfQuota ? (
         <QuotaIndicator variant='banner' className='w-full max-w-md' />
       ) : (
-        <>
-          <button
-            type='button'
-            onClick={handleStart}
-            disabled={preparing}
-            className='rounded-2xl bg-brand px-8 py-4 text-base font-semibold text-white transition hover:opacity-90 disabled:opacity-60'
-          >
-            {preparing ? 'Opening…' : 'Read this story'}
-          </button>
-          <QuotaIndicator variant='compact' />
-        </>
+        <QuotaIndicator variant='compact' />
       )}
       {canFavorite && (
         <button
@@ -195,6 +207,7 @@ export default function StoryView({ storyId }: { storyId: string }) {
           {isFavorite ? 'Saved to favorites' : 'Save to favorites'}
         </button>
       )}
+      {quotaWalled && <QuotaWall isGuest={false} />}
       {startError && (
         <p className='text-sm text-red-600 dark:text-red-400'>{startError}</p>
       )}

@@ -1,6 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
-import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { ensureGuestSession } from '@/lib/guest';
 import { STORY_QUOTA_QUERY_KEY } from '@/lib/hooks/use-story-quota';
@@ -21,6 +20,7 @@ import movement from '@/public/movement.png';
 import movementSmall from '@/public/movement-small.png';
 import pause from '@/public/pause.svg';
 import play from '@/public/play.svg';
+import QuotaWall from './quota-wall';
 import { Switch } from './ui/switch';
 
 // Turn the story text into readable paragraphs for read-along. Prefer explicit
@@ -648,22 +648,7 @@ const StoryReader = ({
   }
 
   if (quotaReached) {
-    return (
-      <div className='flex flex-col items-center justify-center h-64 text-center px-4'>
-        <h3 className='text-strong text-2xl not-italic font-bold leading-7 font-qilka mb-2'>
-          You've enjoyed your free stories!
-        </h3>
-        <p className='text-body text-base not-italic font-normal leading-5 font-abeezee mb-6 max-w-md'>
-          Sign up to keep reading unlimited stories with audio narration.
-        </p>
-        <Link
-          href='/register'
-          className='rounded-[3.125rem] bg-brand px-8 py-4 text-base font-semibold text-white transition hover:opacity-90'
-        >
-          Sign up to read more
-        </Link>
-      </div>
-    );
+    return <QuotaWall isGuest={isGuest} />;
   }
 
   if (error) {

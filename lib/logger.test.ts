@@ -811,6 +811,13 @@ describe('round 4: linear time', () => {
     [']]]', ']]]'],
     ['password=password=', 'password='],
     ['backtick', 'password=`a '],
+    ['password[0]', 'password[0]'],
+    ['password[ x', 'password[ x'],
+    ['password[a][b]=', 'password[a][b]'],
+    ['%5B', 'password%5Ba%5D'],
+    ['unclosed [', 'password[ '],
+    ['sensitive subscript chain', '[token]'],
+    ['sensitive subscript chain 2', '[password]'],
   ];
   // 8k vs 64k characters: linear is ~8x, quadratic ~64x, so < 20x separates
   // them with room for scheduler noise.
@@ -1032,5 +1039,98 @@ describe('round 5: more leaks and over-matches', () => {
     );
     expect(out).toMatch(/c1.*s1.*h1.*b1/);
     expect(out).not.toMatch(/SECRET/);
+  });
+});
+
+describe('round 6: subscripts after a sensitive key', () => {
+  it.each([
+    'password[0][1][2][3][4]=SECRETVALUE',
+    'password["a"]="SECRETVALUE"',
+    "password['a b']=SECRETVALUE",
+    'password[a b]=SECRETVALUE',
+    'password[ ]=SECRETVALUE',
+    'user%5Bpassword%5D=SECRETVALUE',
+    'user[password][x][y][z][w][v]=SECRETVALUE',
+    'password%5B0%5D%5B1%5D%5B2%5D%5B3%5D%5B4%5D=SECRETVALUE',
+    'password[a][b][c][d][e][f][g][h]: SECRETVALUE',
+  ])('masks %s', (input) => {
+    expect(redact(input)).not.toContain('SECRETVALUE');
+  });
+
+  it('keeps the value of non-sensitive subscripted keys', () => {
+    expect(redact('page[0][1][2][3][4][5]=ok')).toBe(
+      'page[0][1][2][3][4][5]=ok'
+    );
+  });
+
+  it('handles backticks around a key and in the separator', () => {
+    expect(redact('`password`: `a b SECRETVALUE`')).not.toContain(
+      'SECRETVALUE'
+    );
+    expect(redact('password`=SECRETVALUE')).not.toContain('SECRETVALUE');
+  });
+});
+
+describe('round 6: more credential words', () => {
+  it.each([
+    'PHPSESSID=abc123xyz',
+    'pwd_hash=abc123xyz',
+    'pwdHash=abc123xyz',
+    'pwd_salt=abc123xyz',
+    'otpPin=abc123xyz',
+    'connect.sid: abc123xyz',
+    'user_sid: abc123xyz',
+    'connect.sid=abc123xyz',
+  ])('masks %s', (text) => {
+    expect(redact(text)).not.toContain('abc123xyz');
+  });
+
+  it.each([
+    'user_sid_count=5',
+    'otp_sent=true',
+    'otp_enabled=true',
+    'pwd_changed_at=2026',
+    'ssn_last4_hint=x',
+    'iban_country=NG',
+    'sid: main',
+  ])('leaves %s alone', (text) => {
+    expect(redact(text)).toBe(text);
+  });
+
+  it('applies to object keys too', () => {
+    const out = JSON.stringify(
+      redact({
+        PHPSESSID: 'S1',
+        pwd_hash: 'S2',
+        pwdHash: 'S3',
+        pwd_salt: 'S4',
+        otpPin: 'S5',
+        'connect.sid': 'S6',
+        user_sid: 'S7',
+        otp_sent: 'keep1',
+        user_sid_count: 'keep2',
+      })
+    );
+    expect(out).not.toMatch(/S\d/);
+    expect(out).toContain('keep1');
+    expect(out).toContain('keep2');
+  });
+});
+
+describe('round 6: error getters', () => {
+  it('reads err.message once per call', () => {
+    let reads = 0;
+    const err = new Error('x');
+    // A preset stack stops V8 formatting it lazily (which reads message too).
+    err.stack = 'Error: boom\n    at fn (a.js:1:1)';
+    Object.defineProperty(err, 'message', {
+      get() {
+        reads++;
+        return 'boom';
+      },
+      enumerable: true,
+    });
+    logger.error('m', err);
+    expect(reads).toBe(1);
   });
 });

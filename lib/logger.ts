@@ -85,6 +85,7 @@ const SENSITIVE_STEMS = [
   'otpcode',
   'verificationcode',
   'pincode',
+  'sessid',
 ];
 // Unambiguous short credential words: matched as a whole key OR as one word
 // (segment) of a longer key (db_pwd, user_otp), never as a substring
@@ -93,7 +94,16 @@ const SENSITIVE_WORDS = new Set(['otp', 'pwd', 'ssn', 'iban']);
 // A sensitive word only counts when it ends the key ("db_pwd", "user_otp") or
 // is followed only by these ("iban_number"); "otp_sent", "pwd_changed_at" and
 // "ssn_last4_hint" describe the credential rather than hold it.
-const TAIL_WORDS = new Set(['code', 'token', 'value', 'number', 'no']);
+const TAIL_WORDS = new Set([
+  'code',
+  'token',
+  'value',
+  'number',
+  'no',
+  'hash',
+  'salt',
+  'pin',
+]);
 // Short words match only as the whole key (substring would hit "keyboard",
 // "shipping", "statusCode", ...).
 const SENSITIVE_EXACT = new Set([
@@ -195,12 +205,51 @@ const EMAIL =
 // not depend on parsing labels, so "Failed: token: x", "url=https://a?token=x"
 // and "password    ＝ x" are all handled the same way.
 //   group 1: the char before the key (so a key never starts mid-word)
-//   group 2: the key name
-//   group 3: separator: closing/escaped quotes or brackets ("password":,
-//            \"password\":, data[password]=, password[]=), spaces, = : (or
-//            full-width / percent-encoded forms), spaces
+//   group 2: the key name (any length)
+// The separator is parsed by parseSep() only for keys that are sensitive, so
+// ordinary words cost O(word) and nothing is rescanned.
 const KEY_SCAN =
-  /(^|[^\w.-])([A-Za-z][\w.-]*)((?:\\*["'`]|\]|\[[\w.-]{0,20}\]){0,4}\s{0,16}(?:[=:：＝]|%3[DdAa])\s{0,16})/g;
+  /(^|[^\w.-]|%(?:5[Bb]|26|3[Ff]|23|20|2[CcFf]))([A-Za-z][\w.-]*)/g;
+// Subscripts after a key: [..] / %5B..%5D with any content but no nested
+// brackets, so each one is consumed once.
+const SUBSCRIPT = /\[[^[\]]*\]|%5[Bb](?:(?!%5[BbDd])[\s\S])*%5[Dd]/y;
+// Closing/escaped quotes ("password":, \"password\":, `password`:), stray
+// closing brackets and spaces between the key and its separator.
+const SEP_FILLER = /\\*["'`]|\]|%5[Dd]|\s{1,16}/y;
+const SEP_CHAR = /[=:：＝]|%3[DdAa]/y;
+const TRAIL_SPACE = /\s{0,16}/y;
+
+/**
+ * End of the separator that follows a key at `from`, or -1. `budget` bounds the
+ * characters skipped over a whole string so adversarial input stays linear.
+ */
+function parseSep(input: string, from: number, budget: { left: number }) {
+  let i = from;
+  for (;;) {
+    SUBSCRIPT.lastIndex = i;
+    let m = SUBSCRIPT.exec(input);
+    if (!m) {
+      SEP_FILLER.lastIndex = i;
+      m = SEP_FILLER.exec(input);
+    }
+    if (!m) {
+      break;
+    }
+    if (budget.left < m[0].length) {
+      return -1;
+    }
+    budget.left -= m[0].length;
+    i += m[0].length;
+  }
+  SEP_CHAR.lastIndex = i;
+  const c = SEP_CHAR.exec(input);
+  if (!c) {
+    return -1;
+  }
+  i += c[0].length;
+  TRAIL_SPACE.lastIndex = i;
+  return i + (TRAIL_SPACE.exec(input)?.[0].length ?? 0);
+}
 const FILE_NAME = /\.(?:m?[jt]sx?|map|css|html?)$/i;
 // Unquoted values run to the next delimiter, with NO length cap, so a long
 // token is never cut in the middle and left half-visible.
@@ -213,19 +262,40 @@ const VALUE_OPEN_QUOTE = /(\\*)(["'`])/y;
 const looksLikeCredential = (v: string) =>
   /\d/.test(v) || v.length >= 12 || /^[A-Z0-9_-]{4,}$/.test(v);
 
-function shouldMask(key: string, sep: string, peek: () => string): boolean {
+interface KeyClass {
+  credential: boolean;
+  bareOrAmbiguous: boolean;
+}
+
+/** Whether `key` names a secret at all (cheap; no separator needed). */
+function classifyKey(key: string): KeyClass | null {
   if (FILE_NAME.test(key)) {
-    return false;
+    return null;
   }
   const k = normaliseKey(key);
   const words = keyWords(key);
-  const credential = hasStem(key) || hasCredentialWord(words);
-  const sid = words.at(-1) === 'sid';
-  if (!(credential || sid || SENSITIVE_EXACT.has(k))) {
-    return false;
+  // "connect.sid" / "user_sid" are cookies; a bare "sid" is a common word.
+  const compoundSid = words.length > 1 && words.at(-1) === 'sid';
+  const credential = hasStem(key) || hasCredentialWord(words) || compoundSid;
+  const bareSid = k === 'sid';
+  if (!(credential || bareSid || SENSITIVE_EXACT.has(k))) {
+    return null;
   }
-  const explicit = /[=＝]|%3[Dd]/.test(sep) || /^[\\"'`\]]/.test(sep);
-  if (!credential && (sid || AMBIGUOUS_IN_TEXT.has(k))) {
+  return {
+    credential,
+    bareOrAmbiguous: bareSid || AMBIGUOUS_IN_TEXT.has(k),
+  };
+}
+
+function shouldMask(
+  cls: KeyClass,
+  key: string,
+  sep: string,
+  peek: () => string
+): boolean {
+  const explicit =
+    /[=＝]|%3[Dd]/.test(sep) || /^[\\"'`\][]|^%5[BbDd]/.test(sep);
+  if (!cls.credential && cls.bareOrAmbiguous) {
     return explicit; // "code: be kind" / "sid: main" are prose; "code=abc" is a parameter
   }
   if (explicit) {
@@ -264,19 +334,24 @@ function valueSpan(
 
 function redactKeyNames(input: string): string {
   KEY_SCAN.lastIndex = 0;
+  const skipBudget = { left: 2 * input.length + 1000 };
   let out = '';
   let pos = 0;
   for (let m = KEY_SCAN.exec(input); m; m = KEY_SCAN.exec(input)) {
-    const [, before, key, sep] = m;
+    const [, before, key] = m;
     const keyEnd = m.index + before.length + key.length;
-    const valueStart = m.index + m[0].length;
+    const cls = classifyKey(key);
+    const sepEnd = cls ? parseSep(input, keyEnd, skipBudget) : -1;
     const peek = () => {
-      const o = input.slice(valueStart, valueStart + 200);
+      const o = input.slice(sepEnd, sepEnd + 200);
       return o.replace(/^\\*["'`]/, '').split(/[\s&#;,"'`]/)[0];
     };
-    const span = shouldMask(key, sep, peek)
-      ? valueSpan(input, valueStart)
-      : null;
+    const span =
+      cls &&
+      sepEnd !== -1 &&
+      shouldMask(cls, key, input.slice(keyEnd, sepEnd), peek)
+        ? valueSpan(input, sepEnd)
+        : null;
     if (!span || input.startsWith(REDACTED, span.start)) {
       // Not a secret: resume right after the key (not after its value) so a
       // nested key ("Failed: token: x") is still seen, without re-scanning
@@ -514,9 +589,11 @@ function safeErrorCopy(
   seen = new WeakSet<object>()
 ): Error {
   seen.add(error);
-  const copy = new Error(redactString(error.message));
-  copy.name = error.name;
-  copy.stack = error.stack ? redactString(error.stack) : undefined;
+  // Read each getter exactly once.
+  const { message, name, stack } = error;
+  const copy = new Error(redactString(message));
+  copy.name = name;
+  copy.stack = stack ? redactString(stack) : undefined;
   if (depth < MAX_DEPTH) {
     const cause = (error as { cause?: unknown }).cause;
     if (cause instanceof Error && !seen.has(cause)) {
@@ -533,8 +610,13 @@ function safeErrorCopy(
       );
     }
   }
-  for (const [key, val] of Object.entries(error)) {
+  // Keys first, then read values only for the ones we keep (Object.entries
+  // would invoke every getter, including message/stack, a second time).
+  for (const key of Object.keys(error)) {
     if (
+      key === 'message' ||
+      key === 'name' ||
+      key === 'stack' ||
       isSensitiveKey(key) ||
       key === 'config' ||
       key === 'request' ||
@@ -542,6 +624,7 @@ function safeErrorCopy(
     ) {
       continue;
     }
+    const val = (error as unknown as Record<string, unknown>)[key];
     if (typeof val === 'number' || typeof val === 'boolean') {
       (copy as unknown as Record<string, unknown>)[key] = val;
     } else if (typeof val === 'string') {

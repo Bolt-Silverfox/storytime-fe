@@ -398,14 +398,58 @@ describe('sentence read-along highlight', () => {
     expect(active()).toEqual(['a0']);
   });
 
-  it('clears on pause and returns on play', async () => {
+  it('keeps the highlight on the current sentence while paused mid-clip', async () => {
     await start();
     await setClock(15);
     expect(active()).toEqual(['b0']);
     fireEvent.click(playButton());
-    await waitFor(() => expect(active()).toEqual([]));
+    await waitFor(() =>
+      expect(playButton().getAttribute('aria-pressed')).toBe('false')
+    );
+    expect(active()).toEqual(['b0']);
     fireEvent.click(playButton());
     await waitFor(() => expect(active()).toEqual(['b0']));
+  });
+
+  it('hides the highlight once the story has finished and rewound', async () => {
+    await start();
+    await setClock(29);
+    await endAudio();
+    await setClock(29);
+    // The rewound first clip of a real element starts from zero.
+    Object.defineProperty(audioEl(), 'currentTime', {
+      value: 0,
+      configurable: true,
+    });
+    await endAudio();
+    await waitFor(() =>
+      expect(playButton().getAttribute('aria-pressed')).toBe('false')
+    );
+    expect(active()).toEqual([]);
+  });
+
+  it('keeps read-along on through a finish and replay loop', async () => {
+    await start();
+    await setClock(29);
+    await endAudio();
+    await setClock(29);
+    await endAudio();
+    expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe(
+      'true'
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Previous page' }));
+    expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe(
+      'true'
+    );
+  });
+
+  it('does not show the first clip duration on a later page before play', async () => {
+    await start(1); // only page 1 has a clip; page 2 has none yet
+    await setClock(0, 3);
+    fireEvent.click(playButton()); // pause
+    await turnTo(1);
+    expect(screen.queryByText('00:00 / 00:03')).toBeNull();
+    expect(screen.getByText('--:-- / --:--')).toBeTruthy();
   });
 
   // Active sentence index seen in every committed render while tracking.

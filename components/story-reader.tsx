@@ -779,6 +779,15 @@ const StoryReader = ({
     duration > 0 ? currentTime / duration : Number.NaN
   );
 
+  // The clock belongs to the narrated clip. While the reader sits on another
+  // page (before Play re-aims the narration there) it says nothing about this
+  // page, so don't show the other clip's length.
+  const clockIsForThisPage =
+    !(isChecked && useAudioParagraphs) || reader.page === narratedPage;
+  const timeLabel = clockIsForThisPage
+    ? `${formatTime(currentTime)} / ${formatTime(duration)}`
+    : '--:-- / --:--';
+
   if (loading) {
     return (
       <div className='flex items-center justify-center h-64'>
@@ -892,9 +901,7 @@ const StoryReader = ({
               </button>
             </div>
             <small className='text-body text-base not-italic font-normal leading-5 font-abeezee mt-2'>
-              {audioLoading || audioGenerating
-                ? 'Preparing audio…'
-                : `${formatTime(currentTime)} / ${formatTime(duration)}`}
+              {audioLoading || audioGenerating ? 'Preparing audio…' : timeLabel}
             </small>
           </div>
         ) : (
@@ -906,7 +913,7 @@ const StoryReader = ({
               <small className='text-body text-base not-italic font-normal leading-5 font-abeezee mt-2'>
                 {audioLoading || audioGenerating
                   ? 'Preparing audio…'
-                  : `${formatTime(currentTime)} / ${formatTime(duration)}`}
+                  : timeLabel}
               </small>
             </div>
             <div className='bg-surface flex justify-center items-center gap-3 shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] px-6 py-2.5 rounded-[3.125rem] border-[0.5px] border-solid border-[#FAF4F2] font-qilka'>
@@ -1026,7 +1033,9 @@ const StoryReader = ({
                 pages={pages}
                 page={reader.page}
                 activeSentence={
-                  isPlaying &&
+                  // Playing, or paused part-way through the clip (keep the
+                  // "where we are" marker); hidden at the start / once finished.
+                  (isPlaying || currentTime > 0) &&
                   useAudioParagraphs &&
                   reader.page === narratedPage
                     ? narratedSentence
@@ -1090,7 +1099,7 @@ const StoryReader = ({
           disabled={!audioUrl || audioLoading || playBlocked}
           aria-label={isPlaying ? 'Pause' : 'Play'}
           aria-pressed={isPlaying}
-          className={`mt-12 rounded-full transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 ${
+          className={`sticky bottom-3 z-10 mt-12 rounded-full shadow-lg transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 ${
             !audioUrl || audioLoading || playBlocked
               ? 'opacity-50 cursor-not-allowed'
               : 'cursor-pointer'

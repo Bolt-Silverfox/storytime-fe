@@ -144,6 +144,16 @@ describe('PageView', () => {
     );
   });
 
+  it('renders the page text without a card background or border', () => {
+    setup();
+    const area = screen.getByTestId('reader-swipe-area');
+    expect(area.className).toContain('touch-pan-y');
+    const text = screen.getByTestId('reader-page-text');
+    for (const el of [area, text]) {
+      expect(el.className).not.toMatch(/bg-cream|(^|\s)border|(^|\s)rounded/);
+    }
+  });
+
   it('respects reduced motion (animation is opt-in via motion-safe)', () => {
     setup();
     const cls = screen.getByTestId('reader-page-text').className;

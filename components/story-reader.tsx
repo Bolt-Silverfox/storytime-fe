@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import { ensureGuestSession } from '@/lib/guest';
+import { GUEST_HISTORY_QUERY_KEY } from '@/lib/hooks/use-guest-history';
 import { STORY_QUOTA_QUERY_KEY } from '@/lib/hooks/use-story-quota';
 import { markDone, markReading } from '@/lib/progress-store';
 import {
@@ -184,6 +185,7 @@ const StoryReader = ({
         // story may have consumed a quota slot, so refresh the quota indicator.
         markReading(storyId);
         queryClient.invalidateQueries({ queryKey: STORY_QUOTA_QUERY_KEY });
+        queryClient.invalidateQueries({ queryKey: GUEST_HISTORY_QUERY_KEY });
       } catch (err) {
         const status = (err as { status?: number | null })?.status;
         if (status === 403) {

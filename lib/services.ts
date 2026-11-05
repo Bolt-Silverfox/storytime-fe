@@ -1026,6 +1026,28 @@ export const getStoryQuotaService = async (): Promise<StoryQuota | null> => {
   }
 };
 
+export interface GuestHistoryStory {
+  storyId: string;
+  title: string;
+  description?: string;
+  coverImageUrl?: string | null;
+  ageMin?: number;
+  ageMax?: number;
+  progress: number;
+  lastAccessed: string;
+  readStatus: 'done' | 'reading' | null;
+}
+
+export const getGuestHistoryService = async (): Promise<
+  GuestHistoryStory[]
+> => {
+  if (isUserLoggedIn() || !Cookies.get('guestSessionId')) {
+    return [];
+  }
+  const { data } = await api.get('guest/history');
+  return data?.stories ?? [];
+};
+
 export interface StoryCategory {
   id: string;
   name: string;

@@ -1,5 +1,6 @@
 'use client';
 
+import { useGuestHistory } from '@/lib/hooks/use-guest-history';
 import { useStoryStatus } from '@/lib/progress-store';
 
 const StoryStatusBadge = ({
@@ -10,16 +11,25 @@ const StoryStatusBadge = ({
   className?: string;
 }) => {
   const status = useStoryStatus(storyId);
+  const historyEntry = useGuestHistory().find((s) => s.storyId === storyId);
 
-  if (!status) {
+  const isDone = status === 'done' || historyEntry?.readStatus === 'done';
+  let label: string;
+  let colors: string;
+  if (isDone) {
+    label = 'Done';
+    colors =
+      'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300';
+  } else if (status) {
+    label = 'Reading';
+    colors =
+      'bg-[#FFEFB8] text-[#8A5A00] dark:bg-reader-hl dark:text-[#E8C26A]';
+  } else if (historyEntry) {
+    label = 'Read';
+    colors = 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300';
+  } else {
     return null;
   }
-
-  const isDone = status === 'done';
-  const label = isDone ? 'Done' : 'Reading';
-  const colors = isDone
-    ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
-    : 'bg-[#FFEFB8] text-[#8A5A00] dark:bg-reader-hl dark:text-[#E8C26A]';
 
   return (
     <span

@@ -3,10 +3,14 @@
 import Link from 'next/link';
 import { useGuestHistory } from '@/lib/hooks/use-guest-history';
 
+const timeOf = (value: string) => {
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? Number.NEGATIVE_INFINITY : time;
+};
+
 const ReadBeforeRow = () => {
   const stories = [...useGuestHistory()].sort(
-    (a, b) =>
-      new Date(b.lastAccessed).getTime() - new Date(a.lastAccessed).getTime()
+    (a, b) => timeOf(b.lastAccessed) - timeOf(a.lastAccessed)
   );
 
   if (stories.length === 0) {

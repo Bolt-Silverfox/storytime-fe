@@ -10,6 +10,7 @@ import VoiceSelector, { type SelectedVoice } from '@/components/voice-selector';
 import { useStoryQuota } from '@/lib/hooks/use-story-quota';
 import {
   addFavoriteService,
+  getAvailableVoicesService,
   getPreferredVoiceService,
   getStoryByIdService,
   getVoiceAccessService,
@@ -28,6 +29,24 @@ interface StoryDetail {
   [key: string]: unknown;
 }
 
+// Display name for the voice that reads when none was explicitly picked (the
+// locked/default account voice, or the guest default). `key` is a VoiceType key
+// or voice UUID. Display only: never used as the TTS voiceId.
+const resolveVoiceName = async (key: string | null) => {
+  if (!key) {
+    return null;
+  }
+  try {
+    const k = key.toLowerCase();
+    const v = (await getAvailableVoicesService()).find(
+      (x) => x.id.toLowerCase() === k || x.name.toLowerCase() === k
+    );
+    return v ? v.displayName || v.name : null;
+  } catch {
+    return null;
+  }
+};
+
 export default function StoryView({ storyId }: { storyId: string }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [expand, setExpand] = useState(false);
@@ -43,6 +62,13 @@ export default function StoryView({ storyId }: { storyId: string }) {
   const [selectedVoice, setSelectedVoice] = useState<SelectedVoice | null>(
     null
   );
+  const [defaultVoiceName, setDefaultVoiceName] = useState<string | null>(null);
+  // Which voice to label when none was picked; resolved off the critical path
+  // in an effect so a slow voices list never delays opening the reader.
+  const [labelFor, setLabelFor] = useState<{
+    guest: boolean;
+    key: string | null;
+  } | null>(null);
   const [storyDetail, setStoryDetail] = useState<StoryDetail | null>(null);
 
   // Guests / free users: surface remaining quota. Never block opening a story
@@ -72,6 +98,26 @@ export default function StoryView({ storyId }: { storyId: string }) {
       active = false;
     };
   }, [storyId]);
+
+  useEffect(() => {
+    setDefaultVoiceName(null);
+    if (!labelFor) {
+      return;
+    }
+    let active = true;
+    (async () => {
+      const key = labelFor.guest
+        ? (await getVoiceAccessService()).defaultVoice
+        : labelFor.key;
+      const name = await resolveVoiceName(key);
+      if (active) {
+        setDefaultVoiceName(name);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [labelFor]);
 
   const toggleFavorite = async () => {
     setFavoriteBusy(true);
@@ -106,6 +152,7 @@ export default function StoryView({ storyId }: { storyId: string }) {
         // endpoint omits, so it's hidden.
         setShowInteractive(false);
         setSelectedVoice(null);
+        setLabelFor({ guest: true, key: null });
         setStoryDetail(null);
         setStep(1);
         setModalOpen(true);
@@ -125,8 +172,9 @@ export default function StoryView({ storyId }: { storyId: string }) {
       setShowInteractive(interactive);
 
       // A preferred voice was explicitly chosen (onboarding or Settings). When
-      // there's none, the account may still have a locked/default voice —
-      // StoryReader falls back to it when voiceId is null. Either way the voice
+      // there's none, the account may still have a locked/default voice
+      // (shown as the label only; the backend resolves a null voiceId to
+      // DEFAULT_VOICE, i.e. NIMBUS, not a free user's locked voice). Either way the voice
       // is settled and we skip the per-story voice picker (removing the
       // repetitive "pick a voice every time" friction). Only when there's
       // genuinely no voice anywhere do we prompt.
@@ -137,8 +185,13 @@ export default function StoryView({ storyId }: { storyId: string }) {
           id: preferred.id,
           name: preferred.name,
         });
+        setLabelFor(null);
       } else {
         setSelectedVoice(null);
+        setLabelFor({
+          guest: false,
+          key: access.lockedVoiceId ?? access.defaultVoice,
+        });
       }
 
       if (!(preferred?.id || hasAccountDefault)) {
@@ -171,7 +224,7 @@ export default function StoryView({ storyId }: { storyId: string }) {
     }
   };
 
-  const voiceName = selectedVoice?.name ?? 'Storyteller';
+  const voiceName = selectedVoice?.name ?? defaultVoiceName ?? 'Default voice';
   const voiceId = isGuest ? null : (selectedVoice?.id ?? null);
 
   const modalTitle =

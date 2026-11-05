@@ -27,13 +27,18 @@ vi.mock('@/lib/services', () => ({
   recordUserProgressService: vi.fn().mockResolvedValue(undefined),
 }));
 
-const story = (storyId: string, title: string, lastAccessed: string) => ({
+const story = (
+  storyId: string,
+  title: string,
+  lastAccessed: string,
+  readStatus: 'done' | 'reading' | null = 'reading'
+) => ({
   storyId,
   title,
   coverImageUrl: '',
   lastAccessed,
   progress: 10,
-  readStatus: 'reading',
+  readStatus,
 });
 
 const makeClient = () =>
@@ -84,12 +89,14 @@ describe('guest read markers', () => {
     expect(await screen.findAllByText('Read')).toHaveLength(1);
   });
 
-  it('guest with local Reading status and server history sees Read', async () => {
+  it('Reading wins over Read for a guest story in progress and in history', async () => {
     svc.history.mockResolvedValue([story('r1', 'R', '2026-01-01')]);
     markReading('r1');
-    render(wrap(makeClient(), <StoryStatusBadge storyId='r1' />));
-    expect(await screen.findByText('Read')).toBeTruthy();
-    expect(screen.queryByText('Reading')).toBeNull();
+    const client = makeClient();
+    render(wrap(client, <StoryStatusBadge storyId='r1' />));
+    await settled(client, SESSION_KEY);
+    expect(screen.getByText('Reading')).toBeTruthy();
+    expect(screen.queryByText('Read')).toBeNull();
   });
 
   it('guest with local Reading status but no history still sees Reading', async () => {
@@ -155,6 +162,56 @@ describe('guest read markers', () => {
       )
     );
     await settled(client, SESSION_KEY);
+    expect(container.textContent).toBe('');
+  });
+
+  it('server done status shows Done with no local state', async () => {
+    svc.history.mockResolvedValue([story('sd1', 'S', '2026-01-01', 'done')]);
+    render(wrap(makeClient(), <StoryStatusBadge storyId='sd1' />));
+    expect(await screen.findByText('Done')).toBeTruthy();
+    expect(screen.queryByText('Read')).toBeNull();
+  });
+
+  it('server done status beats local Reading', async () => {
+    svc.history.mockResolvedValue([story('sd2', 'S', '2026-01-01', 'done')]);
+    markReading('sd2');
+    const client = makeClient();
+    render(wrap(client, <StoryStatusBadge storyId='sd2' />));
+    await settled(client, SESSION_KEY);
+    expect(screen.getByText('Done')).toBeTruthy();
+    expect(screen.queryByText('Reading')).toBeNull();
+  });
+
+  it('logged-in user does not get Done from cached guest history', () => {
+    svc.loggedIn = true;
+    const client = makeClient();
+    client.setQueryData(SESSION_KEY, [story('sd3', 'S', '2026-01-01', 'done')]);
+    const { container } = render(
+      wrap(client, <StoryStatusBadge storyId='sd3' />)
+    );
+    expect(container.textContent).toBe('');
+  });
+
+  it('a failed refetch hides previously loaded history from badge and row', async () => {
+    svc.history.mockRejectedValue(new Error('refetch failed'));
+    const client = makeClient();
+    client.setQueryData(SESSION_KEY, [story('h1', 'H', '2026-01-01')]);
+    const { container } = render(
+      wrap(
+        client,
+        <>
+          <ReadBeforeRow />
+          <StoryStatusBadge storyId='h1' />
+        </>
+      )
+    );
+    expect(screen.getByText('Read before')).toBeTruthy();
+    expect(screen.getByText('Read')).toBeTruthy();
+    await client.refetchQueries({ queryKey: SESSION_KEY });
+    await waitFor(() =>
+      expect(client.getQueryState(SESSION_KEY)?.status).toBe('error')
+    );
+    expect(client.getQueryData(SESSION_KEY)).toBeTruthy();
     expect(container.textContent).toBe('');
   });
 

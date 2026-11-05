@@ -23,7 +23,7 @@ export function useGuestHistory() {
     retry: false,
   });
 
-  if (loggedIn || !sessionId) {
+  if (loggedIn || !sessionId || query.isError) {
     return NO_HISTORY;
   }
   return query.data ?? NO_HISTORY;

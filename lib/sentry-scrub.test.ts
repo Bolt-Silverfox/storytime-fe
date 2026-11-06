@@ -66,7 +66,7 @@ const hostile = () => ({
 
 describe('sentry scrubber', () => {
   it('removes the sentinel from every field of an error event', () => {
-    const out = scrubErrorEvent(hostile() as Event);
+    const out = scrubErrorEvent(hostile() as unknown as Event);
     expect(JSON.stringify(out)).not.toContain(S);
     expect(out?.request).not.toHaveProperty('data');
     expect(out?.request).not.toHaveProperty('cookies');
@@ -76,31 +76,31 @@ describe('sentry scrubber', () => {
     const out = scrubTransactionEvent({
       ...hostile(),
       type: 'transaction',
-    } as Event);
+    } as unknown as Event);
     expect(JSON.stringify(out)).not.toContain(S);
   });
 
   it('removes the sentinel from a breadcrumb', () => {
-    const out = scrubBreadcrumb(hostile().breadcrumbs[0] as Event);
+    const out = scrubBreadcrumb(hostile().breadcrumbs[0] as unknown as Event);
     expect(JSON.stringify(out)).not.toContain(S);
-    const xhr = scrubBreadcrumb(hostile().breadcrumbs[1] as Event);
+    const xhr = scrubBreadcrumb(hostile().breadcrumbs[1] as unknown as Event);
     expect(JSON.stringify(xhr)).not.toContain(S);
   });
 
   it('removes the sentinel from a span', () => {
-    const out = scrubSpan(hostile().spans[0] as Event);
+    const out = scrubSpan(hostile().spans[0] as unknown as Event);
     expect(JSON.stringify(out)).not.toContain(S);
   });
 
   it('redacts percent-encoded fragments and params', () => {
     const out = scrubErrorEvent({
       message: `a %23t%3D${S} b token%3D${S}`,
-    } as Event);
+    } as unknown as Event);
     expect(JSON.stringify(out)).not.toContain(S);
   });
 
   it('keeps non-secret context so events stay useful', () => {
-    const out = scrubErrorEvent(hostile() as Event);
+    const out = scrubErrorEvent(hostile() as unknown as Event);
     expect(out?.exception?.values?.[0]?.type).toBe('Error');
     expect(out?.request?.url).toContain('/auth/magic');
     expect(out?.user).toEqual({ id: 'u1' });
@@ -114,7 +114,7 @@ describe('sentry scrubber', () => {
       },
       enumerable: true,
     });
-    const out = scrubErrorEvent(event as Event);
+    const out = scrubErrorEvent(event as unknown as Event);
     expect(out).not.toBeNull();
     expect(JSON.stringify(out)).not.toContain(S);
     expect(out).not.toHaveProperty('request');
@@ -133,7 +133,7 @@ describe('sentry scrubber', () => {
       },
       enumerable: true,
     });
-    expect(scrubTransactionEvent(event as Event)).toBeNull();
+    expect(scrubTransactionEvent(event as unknown as Event)).toBeNull();
   });
 
   it('fails closed for breadcrumbs and spans that cannot be scrubbed', () => {
@@ -144,7 +144,7 @@ describe('sentry scrubber', () => {
       },
       enumerable: true,
     });
-    expect(scrubBreadcrumb(crumb as Event)).toBeNull();
+    expect(scrubBreadcrumb(crumb as unknown as Event)).toBeNull();
     const span = { description: S } as Record<string, unknown>;
     Object.defineProperty(span, 'data', {
       get() {
@@ -152,7 +152,7 @@ describe('sentry scrubber', () => {
       },
       enumerable: true,
     });
-    const out = scrubSpan(span as Event);
+    const out = scrubSpan(span as unknown as Event);
     expect(JSON.stringify(out)).not.toContain(S);
   });
 
@@ -163,7 +163,7 @@ describe('sentry scrubber', () => {
     for (let i = 0; i < 5000; i++) {
       deep = { next: deep };
     }
-    const out = scrubErrorEvent({ extra: { a, deep } } as Event);
+    const out = scrubErrorEvent({ extra: { a, deep } } as unknown as Event);
     expect(JSON.stringify(out)).not.toContain(S);
   });
 });

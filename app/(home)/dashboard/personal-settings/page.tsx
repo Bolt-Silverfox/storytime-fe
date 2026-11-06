@@ -7,6 +7,7 @@ import BackButton from '@/components/back-button';
 import Header from '@/components/header';
 import KidsCard from '@/components/kids-card';
 import { ThemeSegmented } from '@/components/mode-toggle';
+import ReadAlongDefaultSetting from '@/components/read-along-default-setting';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Modal from '@/components/ui/modal';
@@ -382,6 +383,12 @@ const PersonalSettingsPage = () => {
           Appearance
         </h2>
         <ThemeSegmented />
+      </div>
+      <div className='mt-16'>
+        <h2 className='text-body text-base not-italic font-normal leading-5 font-abeezee mb-4 uppercase'>
+          Reading
+        </h2>
+        <ReadAlongDefaultSetting />
       </div>
       <div className='mt-16'>
         <h2 className='text-body text-base not-italic font-normal leading-5 font-abeezee mb-4 uppercase'>

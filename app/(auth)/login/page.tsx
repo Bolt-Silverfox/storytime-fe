@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -21,6 +21,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { PasswordInputToggle } from '@/components/ui/password-input-toggle';
 import { useAuth } from '@/context/auth-context';
+import { isPasswordlessUnavailable } from '@/lib/passwordless';
 import {
   clearUserFromStorage,
   isUserLoggedIn,
@@ -35,8 +36,15 @@ const FormSchema = z.object({
   password: z.string({ error: 'Password is required' }),
 });
 
+const subscribeNever = () => () => {};
+
 const Page = () => {
   const router = useRouter();
+  const codeUnavailable = useSyncExternalStore(
+    subscribeNever,
+    isPasswordlessUnavailable,
+    () => true
+  );
   const { registrationData } = useAuth();
   const [passwordType, setPasswordType] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
@@ -182,6 +190,15 @@ const Page = () => {
           >
             Login
           </Button>
+
+          {!codeUnavailable && (
+            <Link
+              href='/login/code'
+              className='block w-full text-center text-link hover:underline font-abeezee'
+            >
+              Email me a code
+            </Link>
+          )}
 
           <OAuthButtons mode='login' />
 

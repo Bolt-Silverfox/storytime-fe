@@ -1,6 +1,11 @@
 import type { Breadcrumb, Event } from '@sentry/nextjs';
 import { describe, expect, it } from 'vitest';
-import { scrubBreadcrumb, scrubErrorEvent, scrubSpan } from './sentry-scrub';
+import {
+  scrubBreadcrumb,
+  scrubErrorEvent,
+  scrubSpan,
+  scrubTransactionEvent,
+} from './sentry-scrub';
 
 const S = 'SENTINEL_9f3a1c';
 const url = (extra = '') => `https://app.example.com/auth/magic${extra}`;
@@ -65,6 +70,28 @@ describe('sentry scrubber', () => {
     expect(JSON.stringify(out)).not.toContain(S);
     expect(out?.request).not.toHaveProperty('data');
     expect(out?.request).not.toHaveProperty('cookies');
+  });
+
+  it('removes the sentinel from a transaction event and its spans', () => {
+    const out = scrubTransactionEvent({
+      ...hostile(),
+      type: 'transaction',
+    } as unknown as Event);
+    expect(JSON.stringify(out)).not.toContain(S);
+  });
+
+  it('fails closed when scrubbing throws: transaction is dropped', () => {
+    const event = { ...hostile(), type: 'transaction' } as Record<
+      string,
+      unknown
+    >;
+    Object.defineProperty(event, 'spans', {
+      get() {
+        throw new Error('boom');
+      },
+      enumerable: true,
+    });
+    expect(scrubTransactionEvent(event as unknown as Event)).toBeNull();
   });
 
   it('removes the sentinel from a breadcrumb', () => {

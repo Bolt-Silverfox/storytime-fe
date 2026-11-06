@@ -110,6 +110,16 @@ export function scrubErrorEvent<T extends SentryEvent>(event: T): T | null {
   }
 }
 
+export function scrubTransactionEvent<T extends SentryEvent>(
+  event: T
+): T | null {
+  try {
+    return scrubEvent(event);
+  } catch {
+    return null;
+  }
+}
+
 export function scrubBreadcrumb(breadcrumb: Breadcrumb): Breadcrumb | null {
   try {
     return scrubObject(breadcrumb);

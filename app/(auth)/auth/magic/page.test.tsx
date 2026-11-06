@@ -138,7 +138,7 @@ describe('magic link page', () => {
     expect(window.location.href).not.toContain(TOKEN);
   });
 
-  it('forwards the guest session and refreshes user, quota and library state', async () => {
+  it('forwards the guest session and refreshes quota, history and stories state', async () => {
     Cookies.set('guestSessionId', 'guest-1');
     mocks.post.mockResolvedValueOnce(loginBody());
     renderPage();
@@ -154,8 +154,7 @@ describe('magic link page', () => {
       expect.arrayContaining([
         '["story-quota"]',
         '["guest-history"]',
-        '["user"]',
-        '["library"]',
+        '["stories"]',
       ])
     );
   });
@@ -177,6 +176,9 @@ describe('magic link page', () => {
     ['empty', '#t='],
     ['malformed', '#t=short'],
     ['wrong key', `#x=${TOKEN}`],
+    ['token after another key', `#a=1&t=${TOKEN}`],
+    ['extra keys after token', `#t=${TOKEN}&a=1`],
+    ['token with trailing text', `#t=${TOKEN}x`],
   ])(
     '%s token: friendly error, new-code link, no request',
     async (_n, hash) => {
@@ -218,6 +220,17 @@ describe('magic link page', () => {
     ).toBe('/login/code');
     expect(mocks.push).not.toHaveBeenCalled();
     expect(Cookies.get('accessToken')).toBeUndefined();
+  });
+
+  it('404: says email sign-in is unavailable and points to password sign-in', async () => {
+    mocks.post.mockRejectedValueOnce(httpError(404));
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: /continue/i }));
+    await screen.findByText(/isn't available right now/i);
+    expect(
+      screen.getByRole('link', { name: /password/i }).getAttribute('href')
+    ).toBe('/login');
+    expect(screen.queryByText(/link didn't work/i)).toBeNull();
   });
 
   it('429: asks to wait and keeps the confirm button', async () => {

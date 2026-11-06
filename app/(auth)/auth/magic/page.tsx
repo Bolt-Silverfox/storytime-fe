@@ -17,13 +17,12 @@ import {
 } from '@/lib/passwordless';
 import { isUserLoggedIn } from '@/lib/services';
 
-const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+const FRAGMENT_PATTERN = /^#t=([A-Za-z0-9_-]{43})$/;
 
 type View = 'loading' | 'confirm' | 'invalid' | 'signedIn';
 
 const readFragmentToken = () => {
-  const token = new URLSearchParams(window.location.hash.slice(1)).get('t');
-  return token && TOKEN_PATTERN.test(token) ? token : null;
+  return FRAGMENT_PATTERN.exec(window.location.hash)?.[1] ?? null;
 };
 
 const Page = () => {
@@ -94,6 +93,19 @@ const Page = () => {
         </h1>
         <Link href={SIGN_IN_ROUTE} className='text-link hover:underline'>
           Go to your home page
+        </Link>
+      </div>
+    );
+  }
+
+  if (view === 'invalid' && failure === 'unavailable') {
+    return (
+      <div className='max-w-[440px] mx-auto space-y-6 text-center'>
+        <h1 className='font-qilka font-bold text-[26px] text-strong'>
+          {FAILURE_MESSAGES.unavailable}
+        </h1>
+        <Link href='/login' className='text-link hover:underline'>
+          Sign in with your password
         </Link>
       </div>
     );

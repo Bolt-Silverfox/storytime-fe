@@ -5,8 +5,12 @@ const MAX_DEPTH = 10;
 const PARAM_KEYS =
   'token|code|email|password|jwt|id_token|access_token|refresh_token|accesstoken|refreshtoken';
 
-const FRAGMENT_TOKEN = /(#|%23)t(=|%3d)[\w.~-]*/gi;
-const SECRET_PARAM = new RegExp(`\\b(${PARAM_KEYS})(=|%3d)[\\w.~-]*`, 'gi');
+const VALUE = '[^&\\s#"\'<>]*';
+const FRAGMENT_TOKEN = new RegExp(
+  `(#|&|\\?|%23|%26|%3f)t(=|%3d)${VALUE}`,
+  'gi'
+);
+const SECRET_PARAM = new RegExp(`\\b(${PARAM_KEYS})(=|%3d)${VALUE}`, 'gi');
 const BEARER = /\bBearer\s+[\w.~+/=-]+/gi;
 const SECRET_KEY = new RegExp(
   `^(authorization|cookie|set-cookie|x-api-key|${PARAM_KEYS})$`,
@@ -37,6 +41,13 @@ function scrubValue(
   }
   seen.add(value);
   if (Array.isArray(value)) {
+    if (
+      value.length === 2 &&
+      typeof value[0] === 'string' &&
+      SECRET_KEY.test(value[0])
+    ) {
+      return [value[0], REDACTED];
+    }
     return value.map((item) => scrubValue(item, depth + 1, seen));
   }
   const out: Record<string, unknown> = {};
@@ -96,16 +107,6 @@ export function scrubErrorEvent<T extends SentryEvent>(event: T): T | null {
     return scrubEvent(event);
   } catch {
     return failClosedErrorEvent(event);
-  }
-}
-
-export function scrubTransactionEvent<T extends SentryEvent>(
-  event: T
-): T | null {
-  try {
-    return scrubEvent(event);
-  } catch {
-    return null;
   }
 }
 

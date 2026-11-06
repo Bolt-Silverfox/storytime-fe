@@ -161,7 +161,7 @@ describe('passwordless code page', () => {
     expect(resend().disabled).toBe(true);
   });
 
-  it('signs in like password login and refreshes user, quota and library state', async () => {
+  it('signs in like password login and refreshes quota, history and stories state', async () => {
     Cookies.set('guestSessionId', 'guest-1');
     mocks.post
       .mockResolvedValueOnce(requestOk)
@@ -185,8 +185,7 @@ describe('passwordless code page', () => {
       expect.arrayContaining([
         '["story-quota"]',
         '["guest-history"]',
-        '["user"]',
-        '["library"]',
+        '["stories"]',
       ])
     );
   });
@@ -207,21 +206,22 @@ describe('passwordless code page', () => {
     expect(mocks.push).not.toHaveBeenCalledWith('/dashboard');
   });
 
-  it('existing user still mid-onboarding is routed to setup', async () => {
-    mocks.post
-      .mockResolvedValueOnce(requestOk)
-      .mockResolvedValueOnce(
-        loginBody({ user: { id: 'u1', onboardingStatus: 'email_verified' } })
-      );
+  it('existing user is not sent to setup, whatever onboardingStatus says', async () => {
+    mocks.post.mockResolvedValueOnce(requestOk).mockResolvedValueOnce(
+      loginBody({
+        isNewUser: false,
+        user: { id: 'u1', onboardingStatus: 'email_verified' },
+      })
+    );
     renderPage();
     await submitEmail();
     typeCode();
-    await waitFor(() =>
-      expect(mocks.push).toHaveBeenCalledWith('/register/setup')
-    );
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith('/dashboard'));
+    expect(mocks.push).not.toHaveBeenCalledWith('/register/setup');
   });
 
-  it('wrong, expired or locked code: one message and an offer for a new code', async () => {
+  it('wrong, expired or locked code: one message, no server text, new code offered after the countdown', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     mocks.post
       .mockResolvedValueOnce(requestOk)
       .mockRejectedValueOnce(httpError(400));
@@ -231,15 +231,60 @@ describe('passwordless code page', () => {
     await screen.findByText(/That code didn't work/);
     expect(mocks.push).not.toHaveBeenCalled();
     expect(Cookies.get('accessToken')).toBeUndefined();
+    expect(screen.queryByText(/Invalid or expired code/)).toBeNull();
+    expect(mocks.error).not.toHaveBeenCalled();
+    const again = () =>
+      screen.getByRole('button', {
+        name: /(email me a new code|resend code)/i,
+      }) as HTMLButtonElement;
+    expect(again().disabled).toBe(true);
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(again().textContent).toMatch(/email me a new code/i);
     mocks.post.mockResolvedValueOnce(requestOk);
-    fireEvent.click(
-      screen.getByRole('button', { name: /email me a new code/i })
-    );
+    fireEvent.click(again());
     await waitFor(() => expect(mocks.post).toHaveBeenCalledTimes(3));
     expect(mocks.post).toHaveBeenLastCalledWith('auth/passwordless/request', {
       email: EMAIL,
     });
     expect(screen.queryByText(/That code didn't work/)).toBeNull();
+  });
+
+  it('honours resendAfterSeconds from the response', async () => {
+    mocks.post.mockResolvedValueOnce({
+      data: { message: 'ok', expiresInSeconds: 600, resendAfterSeconds: 45 },
+    });
+    renderPage();
+    await submitEmail();
+    expect(
+      screen.getByRole('button', { name: /resend code/i }).textContent
+    ).toMatch(/45/);
+  });
+
+  it('two resend clicks in one tick send one request', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mocks.post.mockResolvedValueOnce(requestOk);
+    renderPage();
+    await submitEmail();
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+    });
+    let resolve: (v: unknown) => void = () => {};
+    mocks.post.mockReturnValueOnce(
+      new Promise((r) => {
+        resolve = r;
+      })
+    );
+    const resend = screen.getByRole('button', { name: /resend code/i });
+    await act(async () => {
+      resend.click();
+      resend.click();
+    });
+    expect(mocks.post).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      resolve(requestOk);
+    });
   });
 
   it('429 on verify: asks the user to wait', async () => {
@@ -251,6 +296,18 @@ describe('passwordless code page', () => {
     typeCode();
     await screen.findByText(/too many attempts/i);
     expect(screen.queryByText(/That code didn't work/)).toBeNull();
+  });
+
+  it('never shows server error text or an error toast on request failure', async () => {
+    mocks.post.mockRejectedValueOnce(httpError(500));
+    renderPage();
+    fireEvent.change(screen.getByLabelText(/email address/i), {
+      target: { value: EMAIL },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /email me a code/i }));
+    await screen.findByText(/something went wrong/i);
+    expect(screen.queryByText(/Invalid or expired code/)).toBeNull();
+    expect(mocks.error).not.toHaveBeenCalled();
   });
 
   it('429 on request: asks the user to wait and stays on the email step', async () => {
@@ -284,7 +341,7 @@ describe('passwordless code page', () => {
       target: { value: EMAIL },
     });
     fireEvent.click(screen.getByRole('button', { name: /email me a code/i }));
-    await screen.findByText(/aren't available right now/i);
+    await screen.findByText(/isn't available right now/i);
     expect(
       screen.getByRole('link', { name: /password/i }).getAttribute('href')
     ).toBe('/login');

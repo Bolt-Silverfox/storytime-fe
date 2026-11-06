@@ -3,7 +3,6 @@ import {
   scrubBreadcrumb,
   scrubErrorEvent,
   scrubSpan,
-  scrubTransactionEvent,
 } from '@/lib/sentry-scrub';
 
 // Client-side-only Sentry. We deliberately do NOT add the server/edge
@@ -23,7 +22,6 @@ Sentry.init({
   // Light performance sampling; errors are always captured.
   tracesSampleRate: 0.1,
   beforeSend: scrubErrorEvent,
-  beforeSendTransaction: scrubTransactionEvent,
   beforeSendSpan: scrubSpan,
   beforeBreadcrumb: scrubBreadcrumb,
 });

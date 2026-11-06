@@ -16,11 +16,10 @@ describe('AASA', () => {
     );
   });
 
-  it('adds /auth/magic to paths and components', () => {
-    expect(detail.paths).toContain('/auth/magic');
-    expect(detail.components).toContainEqual(
-      expect.objectContaining({ '/': '/auth/magic' })
-    );
+  it('makes no /auth/magic universal-link claim until the app has a handler', () => {
+    expect(detail.paths).toEqual(['/story/*']);
+    expect(detail.components).toHaveLength(1);
+    expect(JSON.stringify(aasa)).not.toContain('auth/magic');
   });
 });
 

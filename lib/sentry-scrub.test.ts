@@ -1,11 +1,6 @@
-import type { Event } from '@sentry/nextjs';
+import type { Breadcrumb, Event } from '@sentry/nextjs';
 import { describe, expect, it } from 'vitest';
-import {
-  scrubBreadcrumb,
-  scrubErrorEvent,
-  scrubSpan,
-  scrubTransactionEvent,
-} from './sentry-scrub';
+import { scrubBreadcrumb, scrubErrorEvent, scrubSpan } from './sentry-scrub';
 
 const S = 'SENTINEL_9f3a1c';
 const url = (extra = '') => `https://app.example.com/auth/magic${extra}`;
@@ -72,14 +67,6 @@ describe('sentry scrubber', () => {
     expect(out?.request).not.toHaveProperty('cookies');
   });
 
-  it('removes the sentinel from a transaction event and its spans', () => {
-    const out = scrubTransactionEvent({
-      ...hostile(),
-      type: 'transaction',
-    } as unknown as Event);
-    expect(JSON.stringify(out)).not.toContain(S);
-  });
-
   it('removes the sentinel from a breadcrumb', () => {
     const out = scrubBreadcrumb(hostile().breadcrumbs[0] as unknown as Event);
     expect(JSON.stringify(out)).not.toContain(S);
@@ -96,6 +83,60 @@ describe('sentry scrubber', () => {
     const out = scrubErrorEvent({
       message: `a %23t%3D${S} b token%3D${S}`,
     } as unknown as Event);
+    expect(JSON.stringify(out)).not.toContain(S);
+  });
+
+  it('redacts the token when it is not the first fragment key', () => {
+    const out = scrubErrorEvent({
+      message: `at ${url(`#a=1&t=${S}`)} and ${url(`?x=1&t=${S}`)}`,
+      request: { url: url(`#a=1&t=${S}`) },
+      breadcrumbs: [{ data: { from: url(`#a=1&t=${S}`) } }],
+      spans: [{ data: { 'url.full': url(`#a=1&t=${S}`) } }],
+    } as unknown as Event);
+    expect(JSON.stringify(out)).not.toContain(S);
+  });
+
+  it('redacts the whole email value, not just the local part', () => {
+    const out = scrubErrorEvent({
+      message: 'GET /x?email=a@b.com&y=1 and email=a%40b.com',
+    } as unknown as Event);
+    const text = JSON.stringify(out);
+    expect(text).not.toContain('b.com');
+    expect(text).toContain('y=1');
+  });
+
+  it('is idempotent so a breadcrumb scrubbed twice is not double-marked', () => {
+    const once = scrubBreadcrumb({
+      message: url(`#t=${S}`),
+    } as unknown as Breadcrumb);
+    const twice = scrubBreadcrumb(once as Breadcrumb);
+    expect(twice?.message).toBe(once?.message);
+    expect(twice?.message).toBe(url('#t=[REDACTED]'));
+  });
+
+  it('redacts tuple-form query strings', () => {
+    const out = scrubErrorEvent({
+      request: {
+        query_string: [
+          ['code', S],
+          ['token', S],
+          ['page', '2'],
+        ],
+      },
+    } as unknown as Event);
+    const text = JSON.stringify(out);
+    expect(text).not.toContain(S);
+    expect(text).toContain('"2"');
+  });
+
+  it('redacts a streamed span in the Sentry 11 shape', () => {
+    const out = scrubSpan({
+      name: `navigation ${url(`#a=1&t=${S}`)}`,
+      attributes: {
+        'url.full': { type: 'string', value: url(`#t=${S}`) },
+        'http.query': `?code=${S}`,
+      },
+    });
     expect(JSON.stringify(out)).not.toContain(S);
   });
 
@@ -120,20 +161,6 @@ describe('sentry scrubber', () => {
     expect(out).not.toHaveProperty('request');
     expect(out).not.toHaveProperty('exception');
     expect(out).not.toHaveProperty('transaction');
-  });
-
-  it('fails closed when scrubbing throws: transaction is dropped', () => {
-    const event = { ...hostile(), type: 'transaction' } as Record<
-      string,
-      unknown
-    >;
-    Object.defineProperty(event, 'spans', {
-      get() {
-        throw new Error('boom');
-      },
-      enumerable: true,
-    });
-    expect(scrubTransactionEvent(event as unknown as Event)).toBeNull();
   });
 
   it('fails closed for breadcrumbs and spans that cannot be scrubbed', () => {

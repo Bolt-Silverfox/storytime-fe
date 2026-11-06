@@ -11,8 +11,7 @@ import { GUEST_HISTORY_QUERY_KEY } from './use-guest-history';
 import { STORY_QUOTA_QUERY_KEY } from './use-story-quota';
 
 const SIGN_IN_INVALIDATED_KEYS = [
-  ['user'],
-  ['library'],
+  ['stories'],
   STORY_QUOTA_QUERY_KEY,
   GUEST_HISTORY_QUERY_KEY,
 ] as const;

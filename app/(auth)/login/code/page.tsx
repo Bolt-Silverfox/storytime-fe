@@ -3,7 +3,7 @@
 import { REGEXP_ONLY_DIGITS } from 'input-otp';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -51,6 +51,7 @@ const Page = () => {
   const [code, setCode] = useState('');
   const [failure, setFailure] = useState<PasswordlessFailure | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
+  const sendingRef = useRef(false);
 
   useEffect(() => {
     if (isUserLoggedIn()) {
@@ -69,6 +70,10 @@ const Page = () => {
   const emailValid = EmailSchema.safeParse(email).success;
 
   const send = async () => {
+    if (sendingRef.current) {
+      return;
+    }
+    sendingRef.current = true;
     setFailure(null);
     setCode('');
     try {
@@ -81,6 +86,8 @@ const Page = () => {
         markPasswordlessUnavailable();
       }
       setFailure(kind);
+    } finally {
+      sendingRef.current = false;
     }
   };
 
@@ -145,7 +152,8 @@ const Page = () => {
           <p>{failureText}</p>
           {failure === 'invalid' && (
             <p className='text-body'>
-              It may have expired or been used too many times.
+              It may have expired or been used too many times. You can request a
+              new code below.
             </p>
           )}
         </div>
@@ -233,16 +241,6 @@ const Page = () => {
             Sign in
           </Button>
           <div className='flex flex-col items-center gap-2 font-abeezee text-sm'>
-            {failure === 'invalid' && (
-              <Button
-                variant='link'
-                type='button'
-                onClick={send}
-                disabled={sending}
-              >
-                Email me a new code
-              </Button>
-            )}
             <Button
               variant='link'
               type='button'
@@ -251,7 +249,9 @@ const Page = () => {
             >
               {secondsLeft > 0
                 ? `Resend code in ${secondsLeft}s`
-                : 'Resend code'}
+                : failure === 'invalid'
+                  ? 'Email me a new code'
+                  : 'Resend code'}
             </Button>
             <Button
               variant='link'

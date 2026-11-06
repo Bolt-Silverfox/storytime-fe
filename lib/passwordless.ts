@@ -1,7 +1,6 @@
 import type { PasswordlessSignInResult } from '@/lib/services';
 
 const UNAVAILABLE_KEY = 'passwordlessUnavailable';
-const SETUP_STATUSES = ['account_created', 'email_verified', 'profile_setup'];
 
 export const SIGN_IN_ROUTE = '/dashboard';
 export const SETUP_ROUTE = '/register/setup';
@@ -24,8 +23,7 @@ export const isPasswordlessUnavailable = () => {
 };
 
 export const needsAccountSetup = (result: PasswordlessSignInResult) =>
-  result.isNewUser === true ||
-  SETUP_STATUSES.includes(result.user?.onboardingStatus ?? '');
+  result.isNewUser === true;
 
 export type PasswordlessFailure =
   | 'invalid'
@@ -58,6 +56,6 @@ export const FAILURE_MESSAGES: Record<PasswordlessFailure, string> = {
   rateLimited: 'Too many attempts. Please wait a minute and try again.',
   network: "We couldn't reach Storytime. Check your connection and try again.",
   unavailable:
-    "Email codes aren't available right now. Please sign in with your password.",
+    "Email sign-in isn't available right now. Please sign in with your password.",
   other: 'Something went wrong. Please try again.',
 };

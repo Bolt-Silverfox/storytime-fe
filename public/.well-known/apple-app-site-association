@@ -5,15 +5,11 @@
       {
         "appID": "36CFL54G89.net.emerj.storytime",
         "appIDs": ["36CFL54G89.net.emerj.storytime"],
-        "paths": ["/story/*", "/auth/magic"],
+        "paths": ["/story/*"],
         "components": [
           {
             "/": "/story/*",
             "comment": "Story deep links open the Storytime app"
-          },
-          {
-            "/": "/auth/magic",
-            "comment": "Passwordless sign-in links open the Storytime app"
           }
         ]
       }

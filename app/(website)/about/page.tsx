@@ -5,7 +5,15 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Icons } from '@/components/ui/icons';
 import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern';
 import { featureCard2 } from '@/lib/data';
+import { pageMetadata } from '@/lib/page-metadata';
 import { cn } from '@/lib/utils';
+
+export const metadata = pageMetadata({
+  title: 'About Storytime',
+  description:
+    'Learn why Storytime exists: a world of wonder for every child, built to spark imagination and bring families closer through stories.',
+  path: '/about',
+});
 
 const Page = () => {
   return (

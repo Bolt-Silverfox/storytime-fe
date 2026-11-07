@@ -26,7 +26,15 @@ import {
   testimonials,
   yellowFeatures,
 } from '@/lib/data';
+import { pageMetadata } from '@/lib/page-metadata';
 import { cn } from '@/lib/utils';
+
+export const metadata = pageMetadata({
+  title: 'Storytime — Audio stories crafted just for kids',
+  description:
+    'Listen, read, and explore hundreds of interactive, screen-free stories made just for kids, perfect for bedtime and beyond.',
+  path: '/',
+});
 
 export default function Home() {
   return (

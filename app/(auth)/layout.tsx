@@ -1,21 +1,12 @@
-'use client';
+import type { Metadata } from 'next';
+import AuthShell from './auth-shell';
 
-import { Suspense } from 'react';
-import { PageLoader } from '@/components/page-loader';
-import AuthContextProvider from '@/context/auth-context';
-import { AuthNav } from './register/components/auth-nav';
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
-  return (
-    <Suspense fallback={<PageLoader />}>
-      <AuthContextProvider>
-        <main className='max-w-[1140px] h-full mx-auto px-4 py-12 space-y-8'>
-          <AuthNav />
-          {children}
-        </main>
-      </AuthContextProvider>
-    </Suspense>
-  );
+  return <AuthShell>{children}</AuthShell>;
 };
 
 export default Layout;

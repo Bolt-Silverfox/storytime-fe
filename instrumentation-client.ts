@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/nextjs';
+import { beforeSend, beforeSendTransaction } from '@/lib/sentry-scrub';
 
 // Client-side-only Sentry. We deliberately do NOT add the server/edge
 // instrumentation (instrumentation.ts + sentry.server/edge.config): under
@@ -16,6 +17,8 @@ Sentry.init({
   enabled: process.env.NODE_ENV === 'production',
   // Light performance sampling; errors are always captured.
   tracesSampleRate: 0.1,
+  beforeSend,
+  beforeSendTransaction,
 });
 
 // Instruments App Router client-side navigations for tracing.

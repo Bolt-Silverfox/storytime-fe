@@ -49,7 +49,7 @@ export default function StoryView({ storyId }: { storyId: string }) {
   // on quota alone: re-reading an already-read story is always free, and the
   // client can't tell which stories were read. The backend 403s a genuinely new
   // story and the reader shows the wall then.
-  const { quota } = useStoryQuota();
+  const { quota, refetch: refetchQuota } = useStoryQuota();
   const outOfQuota = !!quota && !quota.unlimited && quota.remaining <= 0;
 
   // Favorites (auth-only). Reflect current saved state and allow toggling.
@@ -162,6 +162,9 @@ export default function StoryView({ storyId }: { storyId: string }) {
       };
       if (status === 403 || data?.code === 'STORY_LIMIT_EXCEEDED') {
         setQuotaWalled(true);
+        // The cached count may be stale (another session used the quota up):
+        // refresh so the indicator agrees with the wall.
+        void refetchQuota();
         return;
       }
       console.error('Failed to prepare story:', err);

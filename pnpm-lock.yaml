@@ -210,6 +210,9 @@ importers:
       '@biomejs/biome':
         specifier: 2.6.4
         version: 2.6.4
+      '@sentry/browser':
+        specifier: 11.10.0
+        version: 11.10.0
       '@tailwindcss/postcss':
         specifier: ^4
         version: 4.3.3

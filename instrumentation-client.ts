@@ -17,6 +17,7 @@ Sentry.init({
   enabled: process.env.NODE_ENV === 'production',
   // Light performance sampling; errors are always captured.
   tracesSampleRate: 0.1,
+  traceLifecycle: 'static',
   beforeSend,
   beforeSendTransaction,
 });

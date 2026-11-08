@@ -10,6 +10,7 @@ vi.mock('next/font/google', () => ({
   ABeeZee: () => ({ variable: '', className: '' }),
 }));
 
+import { pathToRegexp } from 'next/dist/compiled/path-to-regexp';
 import nextConfig from '@/next.config';
 import * as authLayout from './(auth)/layout';
 import * as homeLayout from './(home)/layout';
@@ -60,10 +61,14 @@ describe('robots', () => {
   const disallow = ([] as string[]).concat(rule.disallow ?? []);
   const allow = ([] as string[]).concat(rule.allow ?? []);
 
-  it('disallows every auth and per-user route', () => {
+  it('does not block noindex pages from being crawled', () => {
     for (const route of privateRoutes) {
-      expect(disallow).toContain(route);
+      expect(disallow).not.toContain(route);
     }
+  });
+
+  it('keeps api paths disallowed', () => {
+    expect(disallow).toContain('/api/');
   });
 
   it('allows the public pages and story pages', () => {
@@ -139,37 +144,41 @@ describe('noindex layouts', () => {
 });
 
 describe('headers', () => {
-  it('sends no-referrer on auth routes', async () => {
+  const referrerPoliciesFor = async (pathname: string) => {
     const entries = (await nextConfig.headers?.()) ?? [];
-    const sources = entries
-      .filter((e) =>
-        e.headers.some(
-          (h) => h.key === 'Referrer-Policy' && h.value === 'no-referrer'
-        )
-      )
-      .map((e) => e.source);
-    for (const prefix of [
-      '/login',
-      '/register',
-      '/create-new-password',
-      '/forgot-password',
-      '/verify-email',
-    ]) {
-      expect(sources.some((s) => s.startsWith(prefix))).toBe(true);
-    }
+    return entries
+      .filter((e) => pathToRegexp(e.source).test(pathname))
+      .flatMap((e) => e.headers)
+      .filter((h) => h.key === 'Referrer-Policy')
+      .map((h) => h.value);
+  };
+
+  it.each([
+    '/login',
+    '/register',
+    '/register/setup',
+    '/register/setup/voice',
+    '/create-new-password',
+    '/create-new-password/success',
+    '/forgot-password',
+    '/forgot-password/verify',
+    '/verify-email',
+    '/auth/callback',
+  ])('sends only no-referrer on %s', async (route) => {
+    expect(await referrerPoliciesFor(route)).toEqual(['no-referrer']);
   });
 
-  it('sends strict-origin-when-cross-origin elsewhere', async () => {
-    const entries = (await nextConfig.headers?.()) ?? [];
-    const fallback = entries.find((e) =>
-      e.headers.some(
-        (h) =>
-          h.key === 'Referrer-Policy' &&
-          h.value === 'strict-origin-when-cross-origin'
-      )
-    );
-    expect(fallback).toBeDefined();
-    expect(fallback?.source).toContain('(?!');
+  it.each([
+    '/',
+    '/about',
+    '/stories',
+    '/story/abc',
+    '/dashboard',
+    '/privacy-policy',
+  ])('sends only strict-origin-when-cross-origin on %s', async (route) => {
+    expect(await referrerPoliciesFor(route)).toEqual([
+      'strict-origin-when-cross-origin',
+    ]);
   });
 });
 
@@ -179,6 +188,8 @@ describe('manifest', () => {
     expect(icons.map((i) => i.sizes).sort()).toEqual(
       expect.arrayContaining(['192x192', '512x512'])
     );
+    const maskable = icons.find((i) => i.purpose === 'maskable');
+    expect(maskable?.sizes).toBe('512x512');
     for (const icon of icons) {
       expect(() =>
         readFileSync(path.join(process.cwd(), 'public', icon.src))

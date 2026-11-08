@@ -49,9 +49,13 @@ const NON_SECRET_CODE_WORDS = new Set([
   'response',
 ]);
 
-const ERROR_CLASS_NAME = /(error|exception)$/i;
+const ERROR_CLASS_NAME = /^[A-Z][A-Za-z0-9]*(Error|Exception)$/;
 
-const SECRET_LOOKING_VALUE = /^[A-Za-z0-9._~+/=-]{16,}$/;
+const TOKEN_CHARS = /^[A-Za-z0-9._~+/=-]+$/;
+
+const looksSecret = (value: string): boolean =>
+  TOKEN_CHARS.test(value) &&
+  (value.length >= 16 || (value.length >= 6 && /\d/.test(value)));
 
 const PII_WORDS = new Set(['dob', 'kid', 'kids', 'child', 'children']);
 
@@ -191,7 +195,7 @@ const scrubKeyValues = (text: string, nested = true): string => {
     }
     const byWhitespace = match[3] !== undefined;
     const label = decodeKey(match[2]);
-    if (ERROR_CLASS_NAME.test(label)) {
+    if (match[0].includes(':') && ERROR_CLASS_NAME.test(label)) {
       continue;
     }
     if (byWhitespace && !isSecretLabel(label)) {
@@ -214,7 +218,7 @@ const scrubKeyValues = (text: string, nested = true): string => {
     if (!quote && OUTCOME_VALUES.has(inner.toLowerCase())) {
       continue;
     }
-    if (byWhitespace && !SECRET_LOOKING_VALUE.test(inner)) {
+    if (byWhitespace && !looksSecret(inner)) {
       continue;
     }
     if (!sensitive && quote) {

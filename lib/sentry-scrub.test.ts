@@ -352,7 +352,7 @@ describe('keys that must survive', () => {
     expect(get(result, 'debug_meta.images.0.code_file')).toBe('/a/b.js');
   });
 
-  it.each(['code', 'Code', 'verification_code'])(
+  it.each(['code', 'Code', 'verification_code', 'otp_code', 'pin_code'])(
     'still filters a %s value',
     async (key) => {
       const result = await beforeSend(
@@ -396,6 +396,27 @@ describe('prose that mentions secret-like words', () => {
     'Each child in a list should have a unique "key" prop.',
     'Check the token expiry before retrying',
   ])('leaves %s alone', async (text) => {
+    expect(await scrub(text)).toBe(text);
+  });
+
+  it.each([
+    ['Error: token abc123', 'abc123'],
+    ['AuthError: otp 483920', '483920'],
+    ['Error: invalid password hunter2', 'hunter2'],
+    ['passwordError=hunter2', 'hunter2'],
+    ['authError: hunter2', 'hunter2'],
+    ['tokenError=abc123', 'abc123'],
+    ['secretError: s3cr3t', 's3cr3t'],
+    ['PasswordError=hunter2', 'hunter2'],
+    ['PasswordError hunter2', 'hunter2'],
+  ])('filters the secret in %s', async (text, secret) => {
+    expect(await scrub(text)).not.toContain(secret);
+  });
+
+  it.each([
+    'password hunter',
+    "TypeError: Cannot read properties of undefined (reading 'token')",
+  ])('keeps %s', async (text) => {
     expect(await scrub(text)).toBe(text);
   });
 

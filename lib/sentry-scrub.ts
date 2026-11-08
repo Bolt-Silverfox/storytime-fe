@@ -17,7 +17,6 @@ const SENSITIVE_SUBSTRING =
 const SENSITIVE_WORDS = new Set([
   'pin',
   'otp',
-  'code',
   'cvv',
   'cvc',
   'card',
@@ -28,7 +27,31 @@ const SENSITIVE_WORDS = new Set([
 ]);
 
 const PII_SUBSTRING =
-  /e-?mail|phone|msisdn|first.?name|last.?name|full.?name|display.?name|user.?name|user.?id|birth|avatar|client.?ip|forwarded|real.?ip|remote.?addr|address/i;
+  /e-?mail|phone|msisdn|first.?name|last.?name|full.?name|display.?name|user.?name|user.?id|birth|avatar|client.?ip|forwarded|real.?ip|remote.?addr/i;
+
+const ADDRESS_SUBSTRING = /address/i;
+
+const CLIENT_IDENTITY_KEYS = new Set([
+  'client.address',
+  'client.socket.address',
+  'http.client_ip',
+  'net.peer.ip',
+  'net.sock.peer.addr',
+  'network.peer.address',
+]);
+
+const NON_SECRET_CODE_WORDS = new Set([
+  'status',
+  'file',
+  'error',
+  'http',
+  'exit',
+  'response',
+]);
+
+const ERROR_CLASS_NAME = /(error|exception)$/i;
+
+const SECRET_LOOKING_VALUE = /^[A-Za-z0-9._~+/=-]{16,}$/;
 
 const PII_WORDS = new Set(['dob', 'kid', 'kids', 'child', 'children']);
 
@@ -58,10 +81,23 @@ const isSensitive = (key: string): boolean => {
   if (SENSITIVE_SUBSTRING.test(key) || PII_SUBSTRING.test(key)) {
     return true;
   }
+  if (CLIENT_IDENTITY_KEYS.has(key.toLowerCase())) {
+    return true;
+  }
   if (key.includes('.')) {
     return false;
   }
-  return words(key).some(
+  if (ADDRESS_SUBSTRING.test(key)) {
+    return true;
+  }
+  const keyWords = words(key);
+  if (
+    keyWords.includes('code') &&
+    !keyWords.some((word) => NON_SECRET_CODE_WORDS.has(word))
+  ) {
+    return true;
+  }
+  return keyWords.some(
     (word) => SENSITIVE_WORDS.has(word) || PII_WORDS.has(word)
   );
 };
@@ -154,14 +190,18 @@ const scrubKeyValues = (text: string, nested = true): string => {
       continue;
     }
     const byWhitespace = match[3] !== undefined;
-    if (byWhitespace && !isSecretLabel(decodeKey(match[2]))) {
+    const label = decodeKey(match[2]);
+    if (ERROR_CLASS_NAME.test(label)) {
+      continue;
+    }
+    if (byWhitespace && !isSecretLabel(label)) {
       continue;
     }
     const valueAt = match.index + match[0].length;
     if (src.startsWith(FILTERED, valueAt)) {
       continue;
     }
-    const sensitive = isSensitive(decodeKey(match[2]));
+    const sensitive = isSensitive(label);
     const mayHideSecret = nested && !byWhitespace && match[0].includes('=');
     if (!(sensitive || mayHideSecret)) {
       continue;
@@ -174,7 +214,7 @@ const scrubKeyValues = (text: string, nested = true): string => {
     if (!quote && OUTCOME_VALUES.has(inner.toLowerCase())) {
       continue;
     }
-    if (byWhitespace && /^[a-z]+$/.test(inner)) {
+    if (byWhitespace && !SECRET_LOOKING_VALUE.test(inner)) {
       continue;
     }
     if (!sensitive && quote) {

@@ -1,3 +1,5 @@
+import { createRequire } from 'node:module';
+import path from 'node:path';
 import {
   BrowserClient,
   browserTracingIntegration,
@@ -123,5 +125,36 @@ describe('sentry client wiring', () => {
     expect(sent).not.toContain(encodeURIComponent(PARENT_EMAIL));
     expect(sent).not.toContain(KID_ID);
     expect(sent).toContain('/verify-email?[Filtered]');
+  });
+});
+
+describe('instrumentation options', () => {
+  it('passes traceLifecycle static to Sentry.init', async () => {
+    await makeClient();
+    const options = vi.mocked(Sentry.init).mock.calls[0]?.[0] as unknown as {
+      traceLifecycle?: string;
+    };
+    expect(options.traceLifecycle).toBe('static');
+  });
+});
+
+describe('sentry package alignment', () => {
+  const require = createRequire(import.meta.url);
+  const versionOf = (name: string, from?: string) =>
+    require(
+      require.resolve(
+        `${name}/package.json`,
+        from ? { paths: [from] } : undefined
+      )
+    ).version as string;
+
+  it('uses the same @sentry/browser as @sentry/nextjs', () => {
+    const nextjsDir = path.dirname(
+      require.resolve('@sentry/nextjs/package.json')
+    );
+    expect(versionOf('@sentry/browser')).toBe(
+      versionOf('@sentry/browser', nextjsDir)
+    );
+    expect(versionOf('@sentry/browser')).toBe(versionOf('@sentry/nextjs'));
   });
 });

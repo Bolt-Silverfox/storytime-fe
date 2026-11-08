@@ -320,3 +320,92 @@ describe('performance', () => {
     expect(serialised(result)).not.toContain(S);
   });
 });
+
+describe('keys that must survive', () => {
+  const get = (value: unknown, dotted: string) =>
+    dotted
+      .split('.')
+      .reduce<unknown>(
+        (node, key) => (node as Record<string, unknown> | undefined)?.[key],
+        value
+      );
+
+  it('keeps http status codes on breadcrumbs and contexts', async () => {
+    const result = await beforeSend(
+      {
+        breadcrumbs: [{ category: 'fetch', data: { status_code: 500 } }],
+        contexts: { response: { status_code: 404 } },
+      } as unknown as ErrorEvent,
+      {}
+    );
+    expect(get(result, 'breadcrumbs.0.data.status_code')).toBe(500);
+    expect(get(result, 'contexts.response.status_code')).toBe(404);
+  });
+
+  it('keeps code_file on debug images', async () => {
+    const result = await beforeSend(
+      {
+        debug_meta: { images: [{ type: 'sourcemap', code_file: '/a/b.js' }] },
+      } as unknown as ErrorEvent,
+      {}
+    );
+    expect(get(result, 'debug_meta.images.0.code_file')).toBe('/a/b.js');
+  });
+
+  it.each(['code', 'Code', 'verification_code'])(
+    'still filters a %s value',
+    async (key) => {
+      const result = await beforeSend(
+        { extra: { [key]: S } } as unknown as ErrorEvent,
+        {}
+      );
+      expect(serialised(result)).not.toContain(S);
+    }
+  );
+
+  it('keeps server.address but filters client addresses', async () => {
+    const result = await beforeSend(
+      {
+        spans: [
+          {
+            data: {
+              'server.address': 'api.storytimeapp.me',
+              'client.address': S,
+              address: S,
+              email_address: S,
+            },
+          },
+        ],
+      } as unknown as ErrorEvent,
+      {}
+    );
+    const data = get(result, 'spans.0.data') as Record<string, unknown>;
+    expect(data['server.address']).toBe('api.storytimeapp.me');
+    expect(serialised(result)).not.toContain(S);
+  });
+});
+
+describe('prose that mentions secret-like words', () => {
+  const scrub = async (message: string) =>
+    ((await beforeSend({ message } as ErrorEvent, {})) as ErrorEvent).message;
+
+  it.each([
+    'TokenExpiredError: jwt expired',
+    'SessionError: please sign in again',
+    'at handleToken (https://web.storytimeapp.me/_next/a.js:1:234)',
+    'Each child in a list should have a unique "key" prop.',
+    'Check the token expiry before retrying',
+  ])('leaves %s alone', async (text) => {
+    expect(await scrub(text)).toBe(text);
+  });
+
+  it('still filters a long token after a bare label', async () => {
+    const out = await scrub('refresh token abcdef0123456789abcdef failed');
+    expect(out).not.toContain('abcdef0123456789abcdef');
+  });
+
+  it('still filters colon and equals forms', async () => {
+    expect(await scrub(`token: ${S}`)).not.toContain(S);
+    expect(await scrub(`secret=${S}`)).not.toContain(S);
+  });
+});

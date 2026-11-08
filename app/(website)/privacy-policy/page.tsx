@@ -1,6 +1,14 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern';
 import { privacySections } from '@/lib/data';
+import { pageMetadata } from '@/lib/page-metadata';
+
+export const metadata = pageMetadata({
+  title: 'Privacy policy — Storytime',
+  description:
+    'Read how Storytime collects, uses and protects information from parents and children, and how to contact us about your data.',
+  path: '/privacy-policy',
+});
 
 const Page = () => {
   return (

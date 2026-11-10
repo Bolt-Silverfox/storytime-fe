@@ -23,6 +23,11 @@ import {
 } from '@/components/ui/input-otp';
 import { useAuth } from '@/context/auth-context';
 import {
+  RESET_CODE_LENGTH,
+  ResetCodeSchema,
+  sanitizeResetCode,
+} from '@/lib/reset-code';
+import {
   sendVerificationEmailService,
   validateResetTokenService,
 } from '@/lib/services';
@@ -30,10 +35,10 @@ import { maskEmail } from '@/lib/utils';
 import { StepBackButton } from '../../register/components/step-back';
 
 const FormSchema = z.object({
-  pin: z.string().min(6, {
-    message: 'Your one-time password must be 6 characters.',
-  }),
+  pin: ResetCodeSchema,
 });
+
+const SLOT_INDEXES = Array.from({ length: RESET_CODE_LENGTH }, (_, i) => i);
 
 const Page = () => {
   const router = useRouter();
@@ -125,12 +130,25 @@ const Page = () => {
             control={form.control}
             name='pin'
             render={({ field }) => (
-              <FormItem>
+              <FormItem className='w-full'>
                 <FormControl>
-                  <InputOTP maxLength={6} {...field}>
-                    <InputOTPGroup className='gap-[9px] justify-center items-center'>
-                      {Array.from({ length: 6 }).map((_, i) => (
-                        <InputOTPSlot key={Math.random()} index={i} />
+                  <InputOTP
+                    maxLength={RESET_CODE_LENGTH}
+                    inputMode='numeric'
+                    containerClassName='w-full'
+                    {...field}
+                    onChange={(value) =>
+                      field.onChange(sanitizeResetCode(value))
+                    }
+                    pasteTransformer={sanitizeResetCode}
+                  >
+                    <InputOTPGroup className='w-full gap-1.5 sm:gap-[9px] justify-center items-center'>
+                      {SLOT_INDEXES.map((i) => (
+                        <InputOTPSlot
+                          key={i}
+                          index={i}
+                          className='min-w-0 flex-1 !px-0 min-h-11 sm:min-h-[50px] rounded-lg sm:rounded-[16px]'
+                        />
                       ))}
                     </InputOTPGroup>
                   </InputOTP>

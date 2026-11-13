@@ -1,8 +1,8 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -18,6 +18,11 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { PasswordInputToggle } from '@/components/ui/password-input-toggle';
+import {
+  clearResetSession,
+  type ResetSession,
+  readResetSession,
+} from '@/lib/reset-session';
 import { resetPasswordService } from '@/lib/services';
 import { cn } from '@/lib/utils';
 
@@ -58,9 +63,7 @@ const FormSchema = z
 
 export const CreateNewPasswordContent = () => {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const token = searchParams.get('token');
-  const email = searchParams.get('email');
+  const [session, setSession] = useState<ResetSession | null>(null);
   const [passwordType, setPasswordType] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -69,13 +72,24 @@ export const CreateNewPasswordContent = () => {
     mode: 'onChange',
   });
 
-  async function onSubmit(data: z.infer<typeof FormSchema>) {
-    if (!(token && email)) {
-      toast.error(
-        'Reset link is missing information. Please request a new one.'
-      );
+  useEffect(() => {
+    if (window.location.search) {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+    const stored = readResetSession();
+    if (!stored) {
+      toast.error('Start the reset again to continue.');
+      router.replace('/forgot-password');
       return;
     }
+    setSession(stored);
+  }, [router]);
+
+  async function onSubmit(data: z.infer<typeof FormSchema>) {
+    if (!session) {
+      return;
+    }
+    const { token, email } = session;
     setIsLoading(true);
 
     try {
@@ -85,6 +99,7 @@ export const CreateNewPasswordContent = () => {
         newPassword: data.password,
       });
 
+      clearResetSession();
       toast.success(response.message);
       router.push('/create-new-password/success');
       // biome-ignore lint/suspicious/noExplicitAny: the caught value is untyped; only .message is read below
@@ -95,7 +110,7 @@ export const CreateNewPasswordContent = () => {
     }
   }
 
-  if (isLoading) {
+  if (isLoading || !session) {
     return <PageLoader />;
   }
 

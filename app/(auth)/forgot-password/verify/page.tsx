@@ -27,6 +27,7 @@ import {
   ResetCodeSchema,
   sanitizeResetCode,
 } from '@/lib/reset-code';
+import { saveResetSession } from '@/lib/reset-session';
 import {
   sendVerificationEmailService,
   validateResetTokenService,
@@ -88,11 +89,8 @@ const Page = () => {
       const response = await validateResetTokenService({ token, email });
 
       toast.success(response.message);
-      router.push(
-        `/create-new-password?token=${encodeURIComponent(
-          data.pin
-        )}&email=${encodeURIComponent(email)}`
-      );
+      saveResetSession({ token, email });
+      router.push('/create-new-password');
       // biome-ignore lint/suspicious/noExplicitAny: the caught value is untyped; only .message is read below
     } catch (error: any) {
       toast.error('OTP verification failed', {

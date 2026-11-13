@@ -4,15 +4,15 @@
   "private": true,
   "scripts": {
     "prepare": "command -v git >/dev/null 2>&1 && { cur=$(git config --local core.hooksPath 2>/dev/null || true); if [ -z \"$cur\" ] || [ \"$cur\" = .githooks ]; then git config core.hooksPath .githooks || echo '[prepare] warning: failed to set core.hooksPath for git hooks' >&2; else echo \"[prepare] warning: core.hooksPath already set to '$cur'; not overwriting (run: git config core.hooksPath .githooks to enable the CodeRabbit pre-push hook)\" >&2; fi; }; true",
-    "dev": "next dev --turbopack",
-    "build": "next build",
-    "start": "next start",
+    "dev": "node init && next dev --turbopack",
+    "build": "node init && next build",
+    "start": "node init && next start",
     "lint": "biome check .",
     "test": "vitest run",
     "format": "biome format --write ."
   },
   "dependencies": {
-    "@hookform/resolvers": "^6.0.2",
+    "@hookform/resolvers": "^7.0.5",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/api-logs": "^0.223.0",
     "@opentelemetry/instrumentation": "^0.223.0",

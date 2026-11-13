@@ -78,7 +78,7 @@ export const CreateNewPasswordContent = () => {
     }
     const stored = readResetSession();
     if (!stored) {
-      toast.error('Your reset session has expired. Please request a new code.');
+      toast.error('Start the reset again to continue.');
       router.replace('/forgot-password');
       return;
     }

@@ -6,6 +6,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
+import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readResetSession, saveResetSession } from '@/lib/reset-session';
 
@@ -95,6 +96,9 @@ describe('CreateNewPasswordContent', () => {
     render(<CreateNewPasswordContent />);
     await waitFor(() =>
       expect(replace).toHaveBeenCalledWith('/forgot-password')
+    );
+    expect(toast.error).toHaveBeenCalledWith(
+      'Start the reset again to continue.'
     );
   });
 

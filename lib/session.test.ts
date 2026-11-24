@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-import type { InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import Cookies from 'js-cookie';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import api from '@/lib/axios';
 import { isUserLoggedIn } from '@/lib/services';
 import { hasUsableSession, isAccessTokenUsable } from '@/lib/session';
@@ -146,6 +146,76 @@ describe('expired access token WITH a refresh token', () => {
     const config = await send('guest/stories/s1');
     expect(config.headers.get('X-Guest-Session-Id')).toBe('guest-1');
     expect(config.headers.get('Authorization')).toBeFalsy();
+  });
+});
+
+describe('401 handling with a refresh token cookie', () => {
+  const reject401 = () => {
+    api.defaults.adapter = async (config) => {
+      throw new AxiosError('Unauthorized', 'ERR_BAD_REQUEST', config, null, {
+        data: { message: 'Unauthorized' },
+        status: 401,
+        statusText: 'Unauthorized',
+        headers: {},
+        config,
+      });
+    };
+  };
+
+  beforeEach(() => {
+    clear();
+    vi.restoreAllMocks();
+    Cookies.set('accessToken', expired);
+    Cookies.set('refreshToken', 'r');
+    Cookies.set('guestSessionId', 'guest-1');
+  });
+
+  it('a guest endpoint 401 skips the refresh and keeps the session cookies', async () => {
+    const refresh = vi
+      .spyOn(axios, 'post')
+      .mockRejectedValue(new Error('refresh rejected'));
+    reject401();
+
+    const error = await api.get('guest/stories/s1').catch((e: unknown) => e);
+
+    expect(refresh).not.toHaveBeenCalled();
+    expect(error).toBeInstanceOf(AxiosError);
+    expect((error as AxiosError).response?.status).toBe(401);
+    expect(Cookies.get('refreshToken')).toBe('r');
+    expect(Cookies.get('accessToken')).toBe(expired);
+  });
+
+  it('a non-guest 401 still refreshes and retries with the new token', async () => {
+    const renewed = jwt({ expiry: sec(3600_000) });
+    const refresh = vi
+      .spyOn(axios, 'post')
+      .mockResolvedValue({ data: { data: { jwt: renewed } } });
+    let calls = 0;
+    api.defaults.adapter = async (config) => {
+      calls += 1;
+      if (calls === 1) {
+        throw new AxiosError('Unauthorized', 'ERR_BAD_REQUEST', config, null, {
+          data: {},
+          status: 401,
+          statusText: 'Unauthorized',
+          headers: {},
+          config,
+        });
+      }
+      seen = config;
+      return {
+        data: { success: true, data: {} },
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config,
+      };
+    };
+
+    await api.get('stories/user/quota');
+
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(seen?.headers.get('Authorization')).toBe(`Bearer ${renewed}`);
   });
 });
 

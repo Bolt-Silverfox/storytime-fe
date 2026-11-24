@@ -31,6 +31,8 @@ const API_ORIGIN =
 // mobile app's X-API-Key header (EXPO_PUBLIC_API_KEY). Inlined at build time.
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
 
+const isGuestUrl = (url: string | undefined) => /^\/?guest\//.test(url ?? '');
+
 const api = axios.create({
   baseURL: `${API_ORIGIN}/api/v1/`,
   headers: {
@@ -47,7 +49,7 @@ api.interceptors.request.use((config) => {
   // (possibly expired) user token. Note: the backend's OptionalAuth guest
   // routes (guest/progress, guest/history) would lose a logged-in bearer under
   // this rule; the web app does not call them. Exclude them here if it ever does.
-  const isGuestEndpoint = /^\/?guest\//.test(config.url ?? '');
+  const isGuestEndpoint = isGuestUrl(config.url);
   const token = Cookies.get('accessToken');
   // Send the bearer only for a signed-in session: a still-valid token, or an
   // expired one that the refresh flow (refreshToken cookie) can renew. A dead
@@ -92,11 +94,12 @@ api.interceptors.response.use(
     // /voice/preferred) must NOT trigger a refresh+redirect to /login. Just
     // surface the error so the caller can handle it (guests browse freely).
     const hasRefreshToken = !!Cookies.get('refreshToken');
+    const canRefresh = hasRefreshToken && !isGuestUrl(originalRequest?.url);
 
     if (
       error.response?.status === 401 &&
       !originalRequest._retry &&
-      hasRefreshToken
+      canRefresh
     ) {
       originalRequest._retry = true;
 

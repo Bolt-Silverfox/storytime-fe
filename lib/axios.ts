@@ -48,7 +48,8 @@ api.interceptors.request.use((config) => {
   // Guest endpoints always identify the caller by guest session, never by a
   // (possibly expired) user token. Note: the backend's OptionalAuth guest
   // routes (guest/progress, guest/history) would lose a logged-in bearer under
-  // this rule; the web app does not call them. Exclude them here if it ever does.
+  // this rule; the web app calls guest/history only for guests, and never
+  // calls guest/progress.
   const isGuestEndpoint = isGuestUrl(config.url);
   const token = Cookies.get('accessToken');
   // Send the bearer only for a signed-in session: a still-valid token, or an

@@ -64,6 +64,107 @@ describe('isAccessTokenUsable', () => {
   });
 });
 
+describe('isAccessTokenUsable token structure', () => {
+  const [header, payload, signature] = jwt({ exp: sec(3600_000) }).split('.');
+
+  it('accepts a complete unexpired header.payload.signature token', () => {
+    expect(isAccessTokenUsable(`${header}.${payload}.${signature}`, NOW)).toBe(
+      true
+    );
+  });
+
+  it('rejects a token missing its signature segment and final separator', () => {
+    expect(isAccessTokenUsable(`${header}.${payload}`, NOW)).toBe(false);
+  });
+
+  it('rejects a token with an empty signature segment', () => {
+    expect(isAccessTokenUsable(`${header}.${payload}.`, NOW)).toBe(false);
+  });
+
+  it('rejects a token with an empty header segment', () => {
+    expect(isAccessTokenUsable(`.${payload}.${signature}`, NOW)).toBe(false);
+  });
+
+  it('rejects a token with an empty payload segment', () => {
+    expect(isAccessTokenUsable(`${header}..${signature}`, NOW)).toBe(false);
+  });
+
+  it('rejects a token with more than three segments', () => {
+    expect(
+      isAccessTokenUsable(`${header}.${payload}.${signature}.extra`, NOW)
+    ).toBe(false);
+    expect(isAccessTokenUsable(`${header}.${payload}.${signature}.`, NOW)).toBe(
+      false
+    );
+  });
+
+  it('a two-segment access token without a refresh token is no session', () => {
+    expect(hasUsableSession({ accessToken: `${header}.${payload}` }, NOW)).toBe(
+      false
+    );
+  });
+});
+
+describe('isAccessTokenUsable payload decoding', () => {
+  const withRawPayload = (json: string) => {
+    const bytes = new TextEncoder().encode(json);
+    const b64 = btoa(String.fromCharCode(...bytes))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+    return `eyJhbGciOiJIUzI1NiJ9.${b64}.sig`;
+  };
+
+  it('decodes base64url payloads that use - and _ and drop padding', () => {
+    const token = withRawPayload(`{"exp":${sec(3600_000)},"n":"??>>~~"}`);
+    expect(token.split('.')[1]).toMatch(/[-_]/);
+    expect(token.split('.')[1].length % 4).not.toBe(0);
+    expect(isAccessTokenUsable(token, NOW)).toBe(true);
+  });
+
+  it('decodes a payload carrying non-ASCII UTF-8 text', () => {
+    expect(
+      isAccessTokenUsable(
+        withRawPayload(`{"name":"Zoë 😀","exp":${sec(3600_000)}}`),
+        NOW
+      )
+    ).toBe(true);
+  });
+
+  it('rejects a payload that is not JSON or not an object', () => {
+    expect(isAccessTokenUsable(withRawPayload('not json'), NOW)).toBe(false);
+    expect(isAccessTokenUsable(withRawPayload(`${sec(3600_000)}`), NOW)).toBe(
+      false
+    );
+    expect(isAccessTokenUsable(withRawPayload('null'), NOW)).toBe(false);
+    expect(isAccessTokenUsable(withRawPayload(`[${sec(3600_000)}]`), NOW)).toBe(
+      false
+    );
+  });
+
+  it('rejects an exp that is not a usable future time', () => {
+    for (const exp of [0, -1, '', 'soon', true, null, {}, [sec(3600_000)]]) {
+      expect(isAccessTokenUsable(jwt({ exp }), NOW)).toBe(false);
+    }
+  });
+
+  it('accepts a numeric-string exp in the future', () => {
+    expect(isAccessTokenUsable(jwt({ exp: String(sec(3600_000)) }), NOW)).toBe(
+      true
+    );
+  });
+
+  it('ignores exp supplied through __proto__ in the payload', () => {
+    expect(
+      isAccessTokenUsable(
+        withRawPayload(`{"__proto__":{"exp":${sec(3600_000)}}}`),
+        NOW
+      )
+    ).toBe(false);
+    expect(({} as Record<string, unknown>).exp).toBeUndefined();
+  });
+});
+
 describe('hasUsableSession', () => {
   it('expired access alone is signed out; with refresh stays in', () => {
     expect(hasUsableSession({ accessToken: expired }, NOW)).toBe(false);

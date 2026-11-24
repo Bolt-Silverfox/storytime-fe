@@ -9,10 +9,11 @@ export const CLOCK_SKEW_MS = 30_000;
 
 const decodePayload = (token: string): Record<string, unknown> | null => {
   try {
-    const part = token.split('.')[1];
-    if (!part) {
+    const segments = token.split('.');
+    if (segments.length !== 3 || segments.some((segment) => !segment)) {
       return null;
     }
+    const part = segments[1];
     const b64 = part.replace(/-/g, '+').replace(/_/g, '/');
     const json = atob(b64.padEnd(Math.ceil(b64.length / 4) * 4, '='));
     const payload = JSON.parse(json);

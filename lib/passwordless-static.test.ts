@@ -26,7 +26,7 @@ describe('AASA', () => {
 describe('next.config headers', () => {
   it('sends no-referrer for the magic-link route and keeps the AASA headers', async () => {
     const rules = (await nextConfig.headers?.()) ?? [];
-    const magic = rules.find((r) => r.source === '/auth/magic');
+    const magic = rules.find((r) => r.source === '/auth/:path*');
     expect(magic?.headers).toContainEqual({
       key: 'Referrer-Policy',
       value: 'no-referrer',

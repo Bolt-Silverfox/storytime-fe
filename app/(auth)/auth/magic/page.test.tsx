@@ -50,6 +50,12 @@ const loginBody = (extra: Record<string, unknown> = {}) => ({
     ...extra,
   },
 });
+const unexpiredJwt = () => {
+  const b64 = (o: unknown) => btoa(JSON.stringify(o)).replace(/=+$/, '');
+  const exp = Math.floor((Date.now() + 3600_000) / 1000);
+  return `${b64({ alg: 'HS256' })}.${b64({ exp })}.sig`;
+};
+
 const httpError = (status: number) =>
   new AxiosError('x', 'ERR_BAD_REQUEST', undefined, {}, {
     status,
@@ -197,7 +203,7 @@ describe('magic link page', () => {
   );
 
   it('already signed in: says so, links home, does not offer the token', async () => {
-    Cookies.set('accessToken', 'existing');
+    Cookies.set('accessToken', unexpiredJwt());
     renderPage();
     await screen.findByText(/already signed in/i);
     expect(

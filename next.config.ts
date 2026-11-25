@@ -1,5 +1,23 @@
 import type { NextConfig } from 'next';
 
+const AUTH_PATHS = [
+  '/login',
+  '/register/:path*',
+  '/create-new-password/:path*',
+  '/forgot-password/:path*',
+  '/verify-email',
+  '/auth/:path*',
+];
+
+const AUTH_PREFIXES = [
+  'login',
+  'register',
+  'create-new-password',
+  'forgot-password',
+  'verify-email',
+  'auth',
+];
+
 const nextConfig: NextConfig = {
   output: 'standalone',
   // Apple fetches the (extensionless) AASA file and expects application/json.
@@ -7,9 +25,18 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        source: '/auth/magic',
-        headers: [{ key: 'Referrer-Policy', value: 'no-referrer' }],
+        source: `/:path((?!${AUTH_PREFIXES.join('|')}).*)`,
+        headers: [
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
+          },
+        ],
       },
+      ...AUTH_PATHS.map((source) => ({
+        source,
+        headers: [{ key: 'Referrer-Policy', value: 'no-referrer' }],
+      })),
       {
         source: '/.well-known/apple-app-site-association',
         headers: [{ key: 'Content-Type', value: 'application/json' }],

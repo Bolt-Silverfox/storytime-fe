@@ -441,6 +441,9 @@ describe('passwordless sign-in secrets', () => {
     ['a magic-link fragment', magicUrl(`#t=${MAGIC}`)],
     ['a later fragment key', magicUrl(`#a=1&t=${MAGIC}`)],
     ['a percent-encoded fragment', magicUrl(`%23t%3D${MAGIC}`)],
+    ['a lower-case percent-encoded fragment', magicUrl(`%23t%3d${MAGIC}`)],
+    ['a double-encoded fragment', magicUrl(`%2523t%253D${MAGIC}`)],
+    ['a query parameter', magicUrl(`?t=${MAGIC}`)],
     ['a navigation breadcrumb', `navigating to ${magicUrl(`#t=${MAGIC}`)}`],
   ])('filters the magic-link token in %s', async (_label, text) => {
     const result = await beforeSend(
@@ -452,6 +455,12 @@ describe('passwordless sign-in secrets', () => {
       {}
     );
     expect(serialised(result)).not.toContain(MAGIC);
+  });
+
+  it('leaves fragments and text that only resemble the token key', async () => {
+    const text = '/library#tab=favourites /story#top AT&T=carrier &times=3';
+    const result = await beforeSend({ message: text } as ErrorEvent, {});
+    expect(result?.message).toBe(text);
   });
 
   it('filters the magic-link token from transaction spans', async () => {

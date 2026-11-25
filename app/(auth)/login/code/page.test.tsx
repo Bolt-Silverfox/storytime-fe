@@ -319,6 +319,23 @@ describe('passwordless code page', () => {
     expect(screen.queryByText(/that code has expired/i)).toBeNull();
   });
 
+  it('shows a failed resend after expiry and keeps code entry locked', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mocks.post
+      .mockResolvedValueOnce(requestOk)
+      .mockRejectedValueOnce(httpError(429));
+    renderPage();
+    await submitEmail();
+    vi.setSystemTime(Date.now() + 601_000);
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    fireEvent.click(resendButton());
+    await screen.findByText(/too many attempts/i);
+    expect(screen.getByText(/that code has expired/i)).toBeTruthy();
+    expect(otpInput().disabled).toBe(true);
+  });
+
   it('does not carry an expired code notice back to the email step', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     mocks.post.mockResolvedValueOnce(requestOk);

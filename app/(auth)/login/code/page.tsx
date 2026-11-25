@@ -164,9 +164,8 @@ const Page = () => {
   const sending = requestCode.isPending;
   const locked = sending || verifyCode.isPending || verifyCode.isSuccess;
   const codeLocked = locked || expired;
-  const failureText = expired
-    ? 'That code has expired.'
-    : failure
+  const failureText =
+    failure && !(expired && failure === 'invalid')
       ? FAILURE_MESSAGES[failure]
       : null;
   const offerNewCode = expired || failure === 'invalid';
@@ -184,14 +183,17 @@ const Page = () => {
         </p>
       </div>
 
-      {failureText && (
+      {(failureText || expired) && (
         <div
           role='alert'
           className='text-center text-destructive font-abeezee text-sm space-y-2'
         >
-          <p>{failureText}</p>
+          {failureText && <p>{failureText}</p>}
           {expired ? (
-            <p className='text-body'>Request a new code below.</p>
+            <>
+              <p>That code has expired.</p>
+              <p className='text-body'>Request a new code below.</p>
+            </>
           ) : (
             failure === 'invalid' && (
               <p className='text-body'>

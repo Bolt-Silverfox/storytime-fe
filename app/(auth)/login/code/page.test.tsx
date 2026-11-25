@@ -262,6 +262,80 @@ describe('passwordless code page', () => {
     ).toMatch(/45/);
   });
 
+  const resendButton = () =>
+    screen.getByRole('button', {
+      name: /(email me a new code|resend code)/i,
+    }) as HTMLButtonElement;
+
+  it('enables resend when a frozen page resumes after the cooldown', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mocks.post.mockResolvedValueOnce(requestOk);
+    renderPage();
+    await submitEmail();
+    expect(resendButton().disabled).toBe(true);
+    vi.setSystemTime(Date.now() + 61_000);
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    expect(resendButton().disabled).toBe(false);
+    expect(resendButton().textContent).toMatch(/^resend code$/i);
+  });
+
+  it('counts down from the deadline, not by ticks', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mocks.post.mockResolvedValueOnce(requestOk);
+    renderPage();
+    await submitEmail();
+    vi.setSystemTime(Date.now() + 40_000);
+    await act(async () => {
+      vi.advanceTimersByTime(1_000);
+    });
+    expect(resendButton().textContent).toMatch(/in 19s/);
+  });
+
+  it('honours expiresInSeconds: an expired code cannot be submitted and a new one is offered', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mocks.post.mockResolvedValueOnce({
+      data: { message: 'ok', expiresInSeconds: 300, resendAfterSeconds: 60 },
+    });
+    renderPage();
+    await submitEmail();
+    vi.setSystemTime(Date.now() + 301_000);
+    await act(async () => {
+      window.dispatchEvent(new Event('pageshow'));
+    });
+    expect(screen.getByText(/that code has expired/i)).toBeTruthy();
+    expect(otpInput().disabled).toBe(true);
+    typeCode();
+    fireEvent.click(screen.getByRole('button', { name: /^sign in$/i }));
+    expect(
+      mocks.post.mock.calls.filter((c) => c[0] === 'auth/passwordless/verify')
+    ).toHaveLength(0);
+    expect(resendButton().disabled).toBe(false);
+    expect(resendButton().textContent).toMatch(/email me a new code/i);
+    mocks.post.mockResolvedValueOnce(requestOk);
+    fireEvent.click(resendButton());
+    await waitFor(() => expect(otpInput().disabled).toBe(false));
+    expect(screen.queryByText(/that code has expired/i)).toBeNull();
+  });
+
+  it('does not carry an expired code notice back to the email step', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mocks.post.mockResolvedValueOnce(requestOk);
+    renderPage();
+    await submitEmail();
+    vi.setSystemTime(Date.now() + 601_000);
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'));
+    });
+    expect(screen.getByText(/that code has expired/i)).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole('button', { name: /use a different email/i })
+    );
+    expect(screen.getByLabelText(/email address/i)).toBeTruthy();
+    expect(screen.queryByText(/that code has expired/i)).toBeNull();
+  });
+
   it('two resend clicks in one tick send one request', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     mocks.post.mockResolvedValueOnce(requestOk);

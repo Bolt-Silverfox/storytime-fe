@@ -37,6 +37,11 @@ const OTP_SLOTS = [0, 1, 2, 3, 4, 5];
 
 const subscribeNever = () => () => {};
 
+const positiveSeconds = (value: unknown) =>
+  typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? value
+    : null;
+
 const Page = () => {
   const router = useRouter();
   const requestCode = usePasswordlessRequest();
@@ -51,8 +56,14 @@ const Page = () => {
   const [sentEmail, setSentEmail] = useState('');
   const [code, setCode] = useState('');
   const [failure, setFailure] = useState<PasswordlessFailure | null>(null);
-  const [secondsLeft, setSecondsLeft] = useState(0);
+  const [resendAt, setResendAt] = useState(0);
+  const [expiresAt, setExpiresAt] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const sendingRef = useRef(false);
+
+  const secondsLeft = Math.max(0, Math.ceil((resendAt - now) / 1000));
+  const expired = expiresAt !== null && now >= expiresAt;
+  const counting = secondsLeft > 0 || (expiresAt !== null && !expired);
 
   useEffect(() => {
     if (isUserLoggedIn()) {
@@ -61,12 +72,21 @@ const Page = () => {
   }, [router]);
 
   useEffect(() => {
-    if (secondsLeft <= 0) {
+    if (!counting) {
       return;
     }
-    const timer = setInterval(() => setSecondsLeft((s) => s - 1), 1000);
-    return () => clearInterval(timer);
-  }, [secondsLeft]);
+    const tick = () => setNow(Date.now());
+    const timer = setInterval(tick, 1000);
+    document.addEventListener('visibilitychange', tick);
+    window.addEventListener('pageshow', tick);
+    window.addEventListener('focus', tick);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', tick);
+      window.removeEventListener('pageshow', tick);
+      window.removeEventListener('focus', tick);
+    };
+  }, [counting]);
 
   const emailValid = EmailSchema.safeParse(email).success;
 
@@ -80,8 +100,14 @@ const Page = () => {
     setCode('');
     try {
       const result = await requestCode.mutateAsync(target);
+      const sentAt = Date.now();
+      const resendAfter =
+        positiveSeconds(result.resendAfterSeconds) ?? DEFAULT_RESEND_SECONDS;
+      const expiresIn = positiveSeconds(result.expiresInSeconds);
       setSentEmail(target);
-      setSecondsLeft(result.resendAfterSeconds || DEFAULT_RESEND_SECONDS);
+      setNow(sentAt);
+      setResendAt(sentAt + resendAfter * 1000);
+      setExpiresAt(expiresIn === null ? null : sentAt + expiresIn * 1000);
       setPhase('code');
     } catch (error) {
       const kind = classifyPasswordlessError(error);
@@ -96,6 +122,10 @@ const Page = () => {
 
   const submitCode = async (value: string) => {
     if (!/^\d{6}$/.test(value)) {
+      return;
+    }
+    if (expiresAt !== null && Date.now() >= expiresAt) {
+      setNow(Date.now());
       return;
     }
     setFailure(null);
@@ -133,7 +163,13 @@ const Page = () => {
 
   const sending = requestCode.isPending;
   const locked = sending || verifyCode.isPending || verifyCode.isSuccess;
-  const failureText = failure ? FAILURE_MESSAGES[failure] : null;
+  const codeLocked = locked || expired;
+  const failureText = expired
+    ? 'That code has expired.'
+    : failure
+      ? FAILURE_MESSAGES[failure]
+      : null;
+  const offerNewCode = expired || failure === 'invalid';
 
   return (
     <div className='max-w-[440px] mx-auto space-y-8'>
@@ -154,11 +190,15 @@ const Page = () => {
           className='text-center text-destructive font-abeezee text-sm space-y-2'
         >
           <p>{failureText}</p>
-          {failure === 'invalid' && (
-            <p className='text-body'>
-              It may have expired or been used too many times. You can request a
-              new code below.
-            </p>
+          {expired ? (
+            <p className='text-body'>Request a new code below.</p>
+          ) : (
+            failure === 'invalid' && (
+              <p className='text-body'>
+                It may have expired or been used too many times. You can request
+                a new code below.
+              </p>
+            )
           )}
         </div>
       )}
@@ -222,7 +262,7 @@ const Page = () => {
               pasteTransformer={stripNonDigits}
               inputMode='numeric'
               autoComplete='one-time-code'
-              disabled={locked}
+              disabled={codeLocked}
               aria-label='6-digit sign-in code'
             >
               <InputOTPGroup className='gap-2'>
@@ -240,7 +280,7 @@ const Page = () => {
             variant='primary'
             type='button'
             onClick={() => submitCode(code)}
-            disabled={code.length !== 6 || locked}
+            disabled={code.length !== 6 || codeLocked}
             className='w-full py-[15px] h-auto'
           >
             Sign in
@@ -254,7 +294,7 @@ const Page = () => {
             >
               {secondsLeft > 0
                 ? `Resend code in ${secondsLeft}s`
-                : failure === 'invalid'
+                : offerNewCode
                   ? 'Email me a new code'
                   : 'Resend code'}
             </Button>
@@ -264,6 +304,7 @@ const Page = () => {
               disabled={locked}
               onClick={() => {
                 setPhase('email');
+                setExpiresAt(null);
                 setCode('');
                 setFailure(null);
               }}

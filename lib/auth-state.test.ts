@@ -16,8 +16,10 @@ describe('isUserLoggedIn matches middleware (token cookie = signed in)', () => {
     localStorage.setItem('user', '{"id":"u"}');
     expect(isUserLoggedIn()).toBe(false);
   });
-  it('true for access cookie only', () => {
-    document.cookie = 'accessToken=a; path=/';
+  it('true for a valid access cookie only', () => {
+    const b64 = (o: unknown) => btoa(JSON.stringify(o)).replace(/=+$/, '');
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    document.cookie = `accessToken=${b64({})}.${b64({ exp })}.s; path=/`;
     expect(isUserLoggedIn()).toBe(true);
   });
   it('true for refresh cookie only', () => {

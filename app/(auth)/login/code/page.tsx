@@ -48,6 +48,7 @@ const Page = () => {
   );
   const [phase, setPhase] = useState<'email' | 'code'>('email');
   const [email, setEmail] = useState('');
+  const [sentEmail, setSentEmail] = useState('');
   const [code, setCode] = useState('');
   const [failure, setFailure] = useState<PasswordlessFailure | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
@@ -74,10 +75,12 @@ const Page = () => {
       return;
     }
     sendingRef.current = true;
+    const target = email.trim();
     setFailure(null);
     setCode('');
     try {
-      const result = await requestCode.mutateAsync(email.trim());
+      const result = await requestCode.mutateAsync(target);
+      setSentEmail(target);
       setSecondsLeft(result.resendAfterSeconds || DEFAULT_RESEND_SECONDS);
       setPhase('code');
     } catch (error) {
@@ -98,7 +101,7 @@ const Page = () => {
     setFailure(null);
     try {
       const result = await verifyCode.mutateAsync({
-        email: email.trim(),
+        email: sentEmail,
         code: value,
       });
       if (needsAccountSetup(result)) {
@@ -129,6 +132,7 @@ const Page = () => {
   }
 
   const sending = requestCode.isPending;
+  const locked = sending || verifyCode.isPending || verifyCode.isSuccess;
   const failureText = failure ? FAILURE_MESSAGES[failure] : null;
 
   return (
@@ -140,7 +144,7 @@ const Page = () => {
         <p className='text-body font-abeezee text-sm'>
           {phase === 'email'
             ? "We'll email you a 6-digit code and a sign-in link."
-            : `Enter the 6-digit code we sent to ${email.trim()}.`}
+            : `Enter the 6-digit code we sent to ${sentEmail}.`}
         </p>
       </div>
 
@@ -179,6 +183,7 @@ const Page = () => {
               autoComplete='email'
               placeholder='Enter your email address'
               value={email}
+              disabled={sending}
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
@@ -217,7 +222,7 @@ const Page = () => {
               pasteTransformer={stripNonDigits}
               inputMode='numeric'
               autoComplete='one-time-code'
-              disabled={verifyCode.isPending}
+              disabled={locked}
               aria-label='6-digit sign-in code'
             >
               <InputOTPGroup className='gap-2'>
@@ -235,7 +240,7 @@ const Page = () => {
             variant='primary'
             type='button'
             onClick={() => submitCode(code)}
-            disabled={code.length !== 6 || verifyCode.isPending}
+            disabled={code.length !== 6 || locked}
             className='w-full py-[15px] h-auto'
           >
             Sign in
@@ -245,7 +250,7 @@ const Page = () => {
               variant='link'
               type='button'
               onClick={send}
-              disabled={secondsLeft > 0 || sending}
+              disabled={secondsLeft > 0 || locked}
             >
               {secondsLeft > 0
                 ? `Resend code in ${secondsLeft}s`
@@ -256,6 +261,7 @@ const Page = () => {
             <Button
               variant='link'
               type='button'
+              disabled={locked}
               onClick={() => {
                 setPhase('email');
                 setCode('');

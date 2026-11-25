@@ -388,6 +388,107 @@ describe('passwordless code page', () => {
     await waitFor(() => expect(mocks.push).toHaveBeenCalledTimes(1));
   });
 
+  const pending = () => {
+    let resolve: (v: unknown) => void = () => {};
+    const promise = new Promise((r) => {
+      resolve = r;
+    });
+    return { promise, resolve: (v: unknown) => resolve(v) };
+  };
+  const differentEmail = () =>
+    screen.getByRole('button', {
+      name: /use a different email/i,
+    }) as HTMLButtonElement;
+
+  it('keeps the user on the code step while a resend is in flight', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mocks.post.mockResolvedValueOnce(requestOk);
+    renderPage();
+    await submitEmail();
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+    });
+    const resend = pending();
+    mocks.post.mockReturnValueOnce(resend.promise);
+    fireEvent.click(screen.getByRole('button', { name: /resend code/i }));
+    expect(differentEmail().disabled).toBe(true);
+    fireEvent.click(differentEmail());
+    expect(screen.queryByLabelText(/email address/i)).toBeNull();
+    await act(async () => {
+      resend.resolve(requestOk);
+    });
+    expect(differentEmail().disabled).toBe(false);
+  });
+
+  it('cannot leave the code step or resend while the code is being verified', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mocks.post.mockResolvedValueOnce(requestOk);
+    renderPage();
+    await submitEmail();
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+    });
+    const verify = pending();
+    mocks.post.mockReturnValueOnce(verify.promise);
+    typeCode();
+    await waitFor(() => expect(differentEmail().disabled).toBe(true));
+    expect(
+      (
+        screen.getByRole('button', {
+          name: /resend code/i,
+        }) as HTMLButtonElement
+      ).disabled
+    ).toBe(true);
+    await act(async () => {
+      verify.resolve(loginBody());
+    });
+    expect(mocks.push).toHaveBeenCalledWith('/dashboard');
+  });
+
+  it('locks the email while the code is sent and verifies against that email', async () => {
+    const request = pending();
+    mocks.post
+      .mockReturnValueOnce(request.promise)
+      .mockResolvedValueOnce(loginBody());
+    renderPage();
+    const input = screen.getByLabelText(/email address/i) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: EMAIL } });
+    fireEvent.click(screen.getByRole('button', { name: /email me a code/i }));
+    await waitFor(() => expect(input.disabled).toBe(true));
+    fireEvent.change(input, { target: { value: 'other@example.com' } });
+    await act(async () => {
+      request.resolve(requestOk);
+    });
+    await screen.findByText(`Enter the 6-digit code we sent to ${EMAIL}.`);
+    typeCode();
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith('/dashboard'));
+    const verifyCalls = mocks.post.mock.calls.filter(
+      (c) => c[0] === 'auth/passwordless/verify'
+    );
+    expect(verifyCalls.map((c) => c[1])).toEqual([
+      { email: EMAIL, code: CODE },
+    ]);
+  });
+
+  it('keeps the code step locked after a successful sign-in', async () => {
+    mocks.post
+      .mockResolvedValueOnce(requestOk)
+      .mockResolvedValueOnce(loginBody());
+    renderPage();
+    await submitEmail();
+    typeCode();
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith('/dashboard'));
+    const signIn = screen.getByRole('button', {
+      name: /^sign in$/i,
+    }) as HTMLButtonElement;
+    expect(signIn.disabled).toBe(true);
+    expect(differentEmail().disabled).toBe(true);
+    fireEvent.click(signIn);
+    expect(
+      mocks.post.mock.calls.filter((c) => c[0] === 'auth/passwordless/verify')
+    ).toHaveLength(1);
+  });
+
   it('never writes the email or code to the console', async () => {
     const spies = (['log', 'info', 'warn', 'error', 'debug'] as const).map(
       (m) => vi.spyOn(console, m).mockImplementation(() => {})

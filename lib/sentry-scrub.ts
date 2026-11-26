@@ -238,6 +238,7 @@ const scrubKeyValues = (text: string, nested = true): string => {
 const EMAIL = /[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,255}\.[A-Za-z]{2,}/g;
 const JWT = /eyJ[\w-]+\.[\w-]+\.[\w-]*/g;
 const QUERY = /\?[^\s#"']*=[^\s#"']*/g;
+const FRAGMENT_TOKEN = /([#&])t=[^\s&#"'<>]+/g;
 const PHONE = /(?<!\d)(?:\+?234|0)[789][01]\d{8}(?!\d)/g;
 const NAMED_RESOURCE_ID =
   /\/(kids?|children|child)\/(?!(?:daily-challenge|categories|category|kid|kids|search)(?:[/?#\s"']|$))([^/?#\s"']+)/gi;
@@ -253,6 +254,7 @@ const scrubPlain = (value: string): string =>
     .replace(JWT, FILTERED)
     .replace(EMAIL, '[email]')
     .replace(QUERY, '?[Filtered]')
+    .replace(FRAGMENT_TOKEN, `$1t=${FILTERED}`)
     .replace(PHONE, '[phone]')
     .replace(NAMED_RESOURCE_ID, '/$1/:id')
     .replace(DIGIT_RESOURCE_ID, '/$1/:id')

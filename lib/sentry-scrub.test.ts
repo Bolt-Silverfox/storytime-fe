@@ -430,3 +430,68 @@ describe('prose that mentions secret-like words', () => {
     expect(await scrub(`secret=${S}`)).not.toContain(S);
   });
 });
+
+describe('passwordless sign-in secrets', () => {
+  const MAGIC = 'Zq8_mWxP-3kLvRt9YbNc2HdJfGs7AeUo4iQz1Vy6TnK';
+  const CODE = '483920';
+  const magicUrl = (suffix: string) =>
+    `https://storytimeapp.me/auth/magic${suffix}`;
+
+  it.each([
+    ['a magic-link fragment', magicUrl(`#t=${MAGIC}`)],
+    ['a later fragment key', magicUrl(`#a=1&t=${MAGIC}`)],
+    ['a percent-encoded fragment', magicUrl(`%23t%3D${MAGIC}`)],
+    ['a lower-case percent-encoded fragment', magicUrl(`%23t%3d${MAGIC}`)],
+    ['a double-encoded fragment', magicUrl(`%2523t%253D${MAGIC}`)],
+    ['a query parameter', magicUrl(`?t=${MAGIC}`)],
+    ['a navigation breadcrumb', `navigating to ${magicUrl(`#t=${MAGIC}`)}`],
+  ])('filters the magic-link token in %s', async (_label, text) => {
+    const result = await beforeSend(
+      {
+        message: text,
+        request: { url: text },
+        breadcrumbs: [{ category: 'navigation', data: { to: text } }],
+      } as unknown as ErrorEvent,
+      {}
+    );
+    expect(serialised(result)).not.toContain(MAGIC);
+  });
+
+  it('leaves fragments and text that only resemble the token key', async () => {
+    const text = '/library#tab=favourites /story#top AT&T=carrier &times=3';
+    const result = await beforeSend({ message: text } as ErrorEvent, {});
+    expect(result?.message).toBe(text);
+  });
+
+  it('filters the magic-link token from transaction spans', async () => {
+    const result = await beforeSendTransaction(
+      {
+        type: 'transaction',
+        transaction: magicUrl(`#t=${MAGIC}`),
+        spans: [{ description: `navigation ${magicUrl(`#t=${MAGIC}`)}` }],
+      } as unknown as TransactionEvent,
+      {}
+    );
+    expect(serialised(result)).not.toContain(MAGIC);
+  });
+
+  it('filters the emailed code from verify requests', async () => {
+    const result = await beforeSend(
+      {
+        message: `POST /auth/passwordless/verify?code=${CODE}`,
+        breadcrumbs: [
+          {
+            category: 'xhr',
+            data: {
+              url: `https://api.storytimeapp.me/api/v1/auth/passwordless/verify?code=${CODE}`,
+              request_body: { email: 'p@example.com', code: CODE },
+            },
+          },
+        ],
+      } as unknown as ErrorEvent,
+      {}
+    );
+    expect(serialised(result)).not.toContain(CODE);
+    expect(serialised(result)).not.toContain('p@example.com');
+  });
+});

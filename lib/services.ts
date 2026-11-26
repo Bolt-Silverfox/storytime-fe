@@ -61,13 +61,24 @@ export interface Voice {
   elevenLabsVoiceId?: string | null;
 }
 
+const cacheStoredUser = (userData: unknown) => {
+  try {
+    localStorage.setItem('user', JSON.stringify(userData));
+  } catch {
+    try {
+      localStorage.removeItem('user');
+    } catch {
+      return;
+    }
+  }
+};
+
 const setTokens = (jwt: string, refreshToken: string, userData?: unknown) => {
   Cookies.set('accessToken', jwt, { expires: 1 / 24 });
   Cookies.set('refreshToken', refreshToken, { expires: 7 });
 
-  // Store user data in local storage if provided
   if (userData) {
-    localStorage.setItem('user', JSON.stringify(userData));
+    cacheStoredUser(userData);
   }
 };
 
@@ -181,6 +192,72 @@ export const appleLoginService = async (payload: {
     return response.data;
   } catch (error: unknown) {
     throw normaliseAuthError(error, 'Apple sign-in failed');
+  }
+};
+
+export interface PasswordlessRequestResult {
+  message: string;
+  expiresInSeconds: number;
+  resendAfterSeconds: number;
+}
+
+export interface PasswordlessSignInResult {
+  jwt: string;
+  refreshToken: string;
+  user: { id: string; onboardingStatus?: string } & Record<string, unknown>;
+  isNewUser?: boolean;
+}
+
+const guestSessionConfig = () => {
+  const guestSessionId = Cookies.get('guestSessionId');
+  return guestSessionId
+    ? { headers: { 'X-Guest-Session-Id': guestSessionId } }
+    : undefined;
+};
+
+export const passwordlessRequestService = async (
+  email: string
+): Promise<PasswordlessRequestResult> => {
+  try {
+    const response = await api.post('auth/passwordless/request', { email });
+    return response.data;
+  } catch (error: unknown) {
+    throw normaliseAuthError(error, 'Could not send a code');
+  }
+};
+
+export const passwordlessVerifyService = async (
+  email: string,
+  code: string
+): Promise<PasswordlessSignInResult> => {
+  try {
+    const response = await api.post(
+      'auth/passwordless/verify',
+      { email, code },
+      guestSessionConfig()
+    );
+    const { jwt, refreshToken, user } = response.data;
+    setTokens(jwt, refreshToken, user);
+    return response.data;
+  } catch (error: unknown) {
+    throw normaliseAuthError(error, 'Invalid or expired code');
+  }
+};
+
+export const passwordlessConsumeService = async (
+  token: string
+): Promise<PasswordlessSignInResult> => {
+  try {
+    const response = await api.post(
+      'auth/passwordless/consume',
+      { token },
+      guestSessionConfig()
+    );
+    const { jwt, refreshToken, user } = response.data;
+    setTokens(jwt, refreshToken, user);
+    return response.data;
+  } catch (error: unknown) {
+    throw normaliseAuthError(error, 'Invalid or expired code');
   }
 };
 

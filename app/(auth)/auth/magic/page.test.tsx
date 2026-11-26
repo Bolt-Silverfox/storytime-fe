@@ -144,6 +144,23 @@ describe('magic link page', () => {
     expect(window.location.href).not.toContain(TOKEN);
   });
 
+  it('completes sign-in when the browser cannot store the user profile', async () => {
+    localStorage.setItem('user', JSON.stringify({ id: 'previous-user' }));
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError');
+    });
+    mocks.post.mockResolvedValueOnce(loginBody());
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: /continue/i }));
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith('/dashboard'));
+    expect(mocks.success).toHaveBeenCalledWith('Signed in');
+    expect(Cookies.get('accessToken')).toBe('jwt-1');
+    expect(Cookies.get('refreshToken')).toBe('refresh-1');
+    expect(localStorage.getItem('user')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(mocks.post).toHaveBeenCalledTimes(1);
+  });
+
   it('forwards the guest session and refreshes quota, history and stories state', async () => {
     Cookies.set('guestSessionId', 'guest-1');
     mocks.post.mockResolvedValueOnce(loginBody());

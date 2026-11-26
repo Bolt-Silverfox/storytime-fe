@@ -61,13 +61,24 @@ export interface Voice {
   elevenLabsVoiceId?: string | null;
 }
 
+const cacheStoredUser = (userData: unknown) => {
+  try {
+    localStorage.setItem('user', JSON.stringify(userData));
+  } catch {
+    try {
+      localStorage.removeItem('user');
+    } catch {
+      return;
+    }
+  }
+};
+
 const setTokens = (jwt: string, refreshToken: string, userData?: unknown) => {
   Cookies.set('accessToken', jwt, { expires: 1 / 24 });
   Cookies.set('refreshToken', refreshToken, { expires: 7 });
 
-  // Store user data in local storage if provided
   if (userData) {
-    localStorage.setItem('user', JSON.stringify(userData));
+    cacheStoredUser(userData);
   }
 };
 

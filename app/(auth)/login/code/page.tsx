@@ -114,7 +114,7 @@ const Page = () => {
       if (kind === 'unavailable') {
         markPasswordlessUnavailable();
       }
-      setFailure(kind);
+      setFailure(kind === 'invalid' ? 'invalidEmail' : kind);
     } finally {
       sendingRef.current = false;
     }

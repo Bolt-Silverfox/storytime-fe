@@ -432,6 +432,19 @@ describe('passwordless code page', () => {
     expect(screen.getByLabelText(/email address/i)).toBeTruthy();
   });
 
+  it('400 on request: asks the user to check the email, not the code', async () => {
+    mocks.post.mockRejectedValueOnce(httpError(400));
+    renderPage();
+    fireEvent.change(screen.getByLabelText(/email address/i), {
+      target: { value: EMAIL },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /email me a code/i }));
+    await screen.findByText(/check your email address/i);
+    expect(screen.queryByText(/That code didn't work/)).toBeNull();
+    expect(screen.queryByText(/request a new code/i)).toBeNull();
+    expect(screen.getByLabelText(/email address/i)).toBeTruthy();
+  });
+
   it('network error on verify: shows a connection message and allows retry', async () => {
     mocks.post
       .mockResolvedValueOnce(requestOk)

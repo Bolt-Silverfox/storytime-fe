@@ -27,6 +27,7 @@ export const needsAccountSetup = (result: PasswordlessSignInResult) =>
 
 export type PasswordlessFailure =
   | 'invalid'
+  | 'invalidEmail'
   | 'rateLimited'
   | 'network'
   | 'unavailable'
@@ -53,6 +54,7 @@ export const classifyPasswordlessError = (
 
 export const FAILURE_MESSAGES: Record<PasswordlessFailure, string> = {
   invalid: "That code didn't work.",
+  invalidEmail: 'Check your email address and try again.',
   rateLimited: 'Too many attempts. Please wait a minute and try again.',
   network: "We couldn't reach Storytime. Check your connection and try again.",
   unavailable:

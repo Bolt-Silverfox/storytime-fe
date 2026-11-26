@@ -53,8 +53,8 @@ export default function QuotaIndicator({
 
   const message = noneLeft
     ? loggedIn
-      ? "You've read all your free stories. Upgrade to premium in the Storytime app for unlimited access."
-      : "You've read all your free stories. Sign up to keep reading more."
+      ? "You've read all your free stories. Stories you've already read are still free. Upgrade to premium in the Storytime app for unlimited access."
+      : "You've read all your free stories. Stories you've already read are still free. Sign up to read more."
     : 'Each new story you open uses one. Re-reading a story is always free.';
 
   return (

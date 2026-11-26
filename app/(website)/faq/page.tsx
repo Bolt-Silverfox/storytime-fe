@@ -7,6 +7,14 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern';
 import { faqPageItems } from '@/lib/data';
+import { pageMetadata } from '@/lib/page-metadata';
+
+export const metadata = pageMetadata({
+  title: 'Storytime FAQ — Questions and answers',
+  description:
+    'Answers to common questions about Storytime, from how the stories work to parental controls, safety and subscriptions.',
+  path: '/faq',
+});
 
 const faq = () => {
   return (

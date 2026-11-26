@@ -4,6 +4,12 @@ import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AuthLink } from './auth-link';
 
+// A structurally valid, unexpired access token (the session check decodes it).
+const VALID_ACCESS = (() => {
+  const b64 = (o: unknown) => btoa(JSON.stringify(o)).replace(/=+$/, '');
+  return `${b64({})}.${b64({ exp: Math.floor(Date.now() / 1000) + 3600 })}.s`;
+})();
+
 const setCookie = (v: string) => {
   document.cookie = v;
 };
@@ -42,7 +48,7 @@ describe('AuthLink', () => {
   });
 
   it('signed in, same label: keeps label, href swaps to /dashboard', () => {
-    setCookie('accessToken=a; path=/');
+    setCookie(`accessToken=${VALID_ACCESS}; path=/`);
     render(<AuthLink href='/register'>Start listening</AuthLink>);
     expect(screen.getByText('Start listening').getAttribute('href')).toBe(
       '/dashboard'

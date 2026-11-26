@@ -1240,3 +1240,30 @@ describe('round 7: hostile error proxies', () => {
     expect(spies.error).toHaveBeenCalled();
   });
 });
+
+describe('passwordless links', () => {
+  const linkToken = 'Zx9_mK2-pQ7wR4tY8uI0oP3aS6dF1gH5jK9lZ2xC4vB';
+
+  it('masks the magic-link fragment token in messages, errors and context', () => {
+    const link = `https://web.storytimeapp.me/auth/magic#t=${linkToken}`;
+    logger.warn(`opened ${link}`, { href: link });
+    logger.error(`failed at ${link}`, new Error(`navigation to ${link}`), {
+      context: { href: link },
+    });
+    const out = JSON.stringify([
+      spies.warn.mock.calls,
+      spies.error.mock.calls,
+      sentry.addBreadcrumb.mock.calls,
+      sentry.captureException.mock.calls,
+    ]);
+    expect(out).not.toContain(linkToken);
+    expect(out).toContain('/auth/magic#t=[REDACTED]');
+  });
+
+  it('masks percent-encoded emails', () => {
+    logger.warn('redirect /login?next=%2Fstories&e=kid%40example.com');
+    expect(JSON.stringify(spies.warn.mock.calls)).not.toContain(
+      'kid%40example.com'
+    );
+  });
+});

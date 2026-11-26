@@ -198,7 +198,8 @@ const SCHEME_BASIC =
 // Bounded quantifiers keep this linear; the TLD must be letters, so
 // "pkg@1.2.3" is left alone.
 const EMAIL =
-  /[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){0,5}\.[A-Za-z]{2,24}/g;
+  /[A-Za-z0-9._%+-]{1,64}(?:@|%40)[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){0,5}\.[A-Za-z]{2,24}/g;
+const FRAGMENT_TOKEN = /([#&])t=[^\s&#"'<>]+/g;
 
 // Independent final pass: find sensitive key NAMES anywhere (after a label, a
 // URL "?", "&", "#", a quote, ...), then mask the value that follows. It does
@@ -416,6 +417,7 @@ function redactString(input: string): string {
       .replace(BEARER, `Bearer ${REDACTED}`)
       .replace(SCHEME_LONG, REDACTED)
       .replace(SCHEME_BASIC, `Basic ${REDACTED}`)
+      .replace(FRAGMENT_TOKEN, `$1t=${REDACTED}`)
   ).replace(EMAIL, REDACTED);
   return value.length > MAX_STRING || cutInput
     ? `${value.slice(0, MAX_STRING)}…[truncated]`

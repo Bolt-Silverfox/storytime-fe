@@ -171,6 +171,8 @@ const JWT = /eyJ[\w-]{3,200}\.[\w-]{1,20000}\.[\w-]{0,2000}/g;
 // "Authorization: <scheme> <token>" with any scheme (or none).
 const AUTH_HEADER =
   /(authorization["']?\s*[:=]\s*)(?:"[^"]{0,2000}"|'[^']{0,2000}'|(?:[A-Za-z]{1,20}\s+)?[^\s,;"'&]+)/gi;
+// A Cookie header holds several pairs whose names are not secret-looking.
+const COOKIE_HEADER = /(\b(?:set-)?cookie["']?\s*:\s*)[^\r\n"'`]+/gi;
 // Scheme-prefixed credentials. The value must look like a credential, so
 // "a token of friendship" and "Basic information" stay readable. A
 // capitalised "Bearer" is the scheme name and is masked whatever follows.
@@ -421,6 +423,7 @@ function redactString(input: string, budget: Walk): string {
     value
       .replace(JWT, REDACTED)
       .replace(AUTH_HEADER, `$1${REDACTED}`)
+      .replace(COOKIE_HEADER, `$1${REDACTED}`)
       .replace(BEARER, `Bearer ${REDACTED}`)
       .replace(SCHEME_LONG, REDACTED)
       .replace(SCHEME_BASIC, `Basic ${REDACTED}`)
@@ -684,6 +687,9 @@ function cleanError(
     }
     const keys = safeRead(() => Object.keys(source), [] as string[]);
     for (const key of keys.slice(0, MAX_ENTRIES)) {
+      if (walk.out <= 0) {
+        break;
+      }
       if (ERROR_SKIP.has(key) || isSensitiveKey(key)) {
         continue;
       }
@@ -807,14 +813,17 @@ function sanitiseData(message: unknown, data: unknown[]): Entry {
   };
 }
 
-// The error is cleaned first so the exception keeps priority on the shared budgets.
+// The error is cleaned first, within half the output, so the exception keeps
+// priority on the scan budget and still leaves room for the context.
 function sanitiseError(
   message: unknown,
   error: unknown,
   options: LogOptions
 ): ErrorEntry {
   const walk = newWalk();
+  walk.out = MAX_OUTPUT / 2;
   const cleaned = error === undefined ? undefined : clean(error, 0, walk);
+  walk.out += MAX_OUTPUT / 2;
   const record =
     cleaned && typeof cleaned === 'object'
       ? (cleaned as Record<string, unknown>)
@@ -1125,7 +1134,8 @@ const safely = (fn: () => void) => {
   }
 };
 
-export function createLogger(scope?: string): Logger {
+export function createLogger(name?: string): Logger {
+  const scope = name === undefined ? undefined : cleanMessage(name, newWalk());
   const plain =
     (level: 'debug' | 'info') =>
     (message: string, ...data: unknown[]) =>

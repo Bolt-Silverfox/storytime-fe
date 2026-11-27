@@ -41,18 +41,25 @@ const httpError = (url: string, status?: number) => {
   return err;
 };
 
-const services: [string, () => Promise<unknown>, string][] = [
-  ['getKidsService', () => getKidsService(), 'auth/kids'],
+const services: [string, () => Promise<unknown>, string, string][] = [
+  ['getKidsService', () => getKidsService(), 'auth/kids', '/auth/kids'],
   [
     'getAvailableVoicesService',
     () => getAvailableVoicesService(),
     'voice/available',
+    '/voice/available',
   ],
-  ['getStoryByIdService', () => getStoryByIdService('s1'), 'stories/s1'],
+  [
+    'getStoryByIdService',
+    () => getStoryByIdService('s1'),
+    'stories/s1',
+    '/stories/:id',
+  ],
   [
     'getDailyChallengesService',
     () => getDailyChallengesService('k1'),
     'stories/daily-challenge/kid/k1',
+    '/stories/daily-challenge/kid/:id',
   ],
 ];
 
@@ -71,7 +78,7 @@ beforeEach(() => {
   configureLogger({ environment: 'test' });
 });
 
-describe.each(services)('%s errors', (_name, call, url) => {
+describe.each(services)('%s errors', (_name, call, url, path) => {
   it('keep the caller-facing message, status and body', async () => {
     get.mockRejectedValueOnce(httpError(url, 401));
     const err = (await caught(call)) as Record<string, unknown>;
@@ -92,7 +99,9 @@ describe.each(services)('%s errors', (_name, call, url) => {
       string,
       { tags: Record<string, string> },
     ];
-    expect(message).toMatch(/^Expected failure: unauthorised GET \//);
+    expect(get).toHaveBeenCalledWith(url);
+    expect(message).toBe(`Expected failure: unauthorised GET ${path}`);
+    expect(hint.tags['http.path']).toBe(path);
     expect(hint.tags['http.status']).toBe('401');
     expect(JSON.stringify(sentry.captureMessage.mock.calls)).not.toContain(
       'kid@example.com'
@@ -107,8 +116,8 @@ describe.each(services)('%s errors', (_name, call, url) => {
     expect(isExpectedFailure(err)).toBe(true);
     logger.error('failed', err, { expected: isExpectedFailure(err) });
     expect(sentry.captureException).not.toHaveBeenCalled();
-    expect(sentry.captureMessage.mock.calls[0]?.[0]).toMatch(
-      /^Expected failure: network error GET \//
+    expect(sentry.captureMessage.mock.calls[0]?.[0]).toBe(
+      `Expected failure: network error GET ${path}`
     );
   });
 });

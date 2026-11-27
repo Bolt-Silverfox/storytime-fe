@@ -37,6 +37,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   configureLogger({ environment: undefined });
 });
@@ -1572,6 +1573,40 @@ describe('round 9: one sanitiser before every sink', () => {
       sentry.captureException.mock.calls,
       sentry.captureMessage.mock.calls,
     ]);
+
+  it('masks every pair of a Cookie header', () => {
+    for (const text of [
+      'Cookie: theme=dark; account=SECRETVALUE',
+      'set-cookie: a=1; account=SECRETVALUE; Path=/',
+    ]) {
+      expect(redact(text)).not.toContain('SECRETVALUE');
+    }
+    expect(redact('cookie=a1b2c3; page=2')).toContain('page=2');
+  });
+
+  it('applies redaction to the logger scope', () => {
+    const scoped = createLogger('kid@example.com');
+    scoped.warn('w');
+    scoped.error('e', new Error('x'));
+    expect(everything()).not.toContain('kid@example.com');
+    createLogger('API').error('e', new Error('x'));
+    const hint = sentry.captureException.mock.calls.at(-1)?.[1] as {
+      tags: Record<string, string>;
+    };
+    expect(hint.tags.scope).toBe('API');
+  });
+
+  it('a large error leaves room for the caller context', () => {
+    const err = new Error('e');
+    for (let i = 0; i < 12; i++) {
+      (err as unknown as Record<string, string>)[`p${i}`] = 'x'.repeat(8_000);
+    }
+    logger.error('m', err, { context: { kidId: 'k1' } });
+    const hint = sentry.captureException.mock.calls[0][1] as {
+      extra: Record<string, unknown>;
+    };
+    expect(hint.extra.kidId).toBe('k1');
+  });
 
   it('masks an embedded quote in a twice-serialised password', () => {
     const twice = JSON.stringify(

@@ -2643,7 +2643,7 @@ describe('untrusted error text is never forwarded', () => {
     expect(fieldsMatching(sinks(), 'Kq7Lm')).toEqual([]);
   });
 
-  it('reduces a URL in error data to its origin, normalised path and allow-listed query keys', () => {
+  it('reduces a URL in error data to its normalised path and allow-listed query keys', () => {
     logger.error(
       'm',
       new Error('e', {
@@ -2652,10 +2652,82 @@ describe('untrusted error text is never forwarded', () => {
         },
       })
     );
-    expect(exception().cause).toEqual({
-      url: 'https://api.example.com/stories/:id?page',
-    });
+    expect(exception().cause).toEqual({ url: '/stories/:id?page' });
     expect(fieldsMatching(sinks(), 'Kq7Lm')).toEqual([]);
+  });
+});
+
+describe('thrown values: only allow-listed structure', () => {
+  const exception = () => sentry.captureException.mock.calls[0][0] as Error;
+
+  it('keeps known error names and codes only', () => {
+    logger.error(
+      'm',
+      Object.assign(new Error('e'), { name: 'Kq7LmError', code: 'KQ7LM_REF' })
+    );
+    logger.error(
+      'n',
+      Object.assign(new TypeError('e'), { code: 'ERR_NETWORK' })
+    );
+    expect(exception().name).toBe('Error');
+    expect(exception()).not.toHaveProperty('code');
+    const second = sentry.captureException.mock.calls[1][0] as Error;
+    expect(second.name).toBe('TypeError');
+    expect((second as unknown as { code: string }).code).toBe('ERR_NETWORK');
+    logger.error('h', { ...makeAxiosError(500, '/kids'), code: 'KQ7LM_REF' });
+    expect(JSON.stringify(sentry.captureMessage.mock.calls)).not.toContain(
+      'KQ7LM'
+    );
+  });
+
+  it('drops home directories and page paths from frame locations', () => {
+    const err = new Error('e');
+    err.stack = [
+      'Error: e',
+      '    at a (file:///Users/kq7lm/app/lib/x.ts:1:2)',
+      '    at b (/home/kq7lm/app/lib/y.ts:3:4)',
+      '    at c (https://app.example.com/story/kq7lm:5:6)',
+      '    at d (https://app.example.com/_next/static/chunks/main.js:7:8)',
+    ].join('\n');
+    logger.error('m', err);
+    expect(exception().stack).toBe(
+      [
+        'Error: [omitted]',
+        '    at a (file:///~/app/lib/x.ts:1:2)',
+        '    at b (/~/app/lib/y.ts:3:4)',
+        '    at c (https://app.example.com/story/:id:5:6)',
+        '    at d (https://app.example.com/_next/static/chunks/main.js:7:8)',
+      ].join('\n')
+    );
+  });
+
+  it('keeps a headerless stack whose frame contains the message text', () => {
+    const err = new Error('app.js');
+    err.stack = 'load@https://app.example.com/app.js:10:5';
+    logger.error('m', err);
+    expect(exception().stack).toBe(err.stack);
+  });
+
+  it('does not keep identifying keys of thrown objects', () => {
+    logger.error(
+      'm',
+      new Error('e', {
+        cause: { 'kq7lm@example.com': 1, 'Ada Lovelace': 2, status: 3 },
+      })
+    );
+    expect(exception().cause).toEqual({
+      '[key 0]': 1,
+      '[key 1]': 2,
+      status: 3,
+    });
+  });
+
+  it('treats a message-bearing object passed to warn as a thrown value', () => {
+    logger.warn('w', { message: 'No kid named Kq7Lm', status: null });
+    expect(spies.warn.mock.calls[0]).toContainEqual({
+      message: '[omitted]',
+      status: null,
+    });
   });
 });
 
@@ -2766,9 +2838,6 @@ describe('property: no generated secret reaches any sink', () => {
     ],
   ];
 
-  const isAxiosShaped = (value: unknown) =>
-    typeof value === 'object' && value !== null && 'isAxiosError' in value;
-
   const fill = (value: unknown, s: string): unknown => {
     if (typeof value === 'string') {
       return value.replaceAll('%s', s);
@@ -2798,7 +2867,7 @@ describe('property: no generated secret reaches any sink', () => {
         logger.error('failed', make(secret), { context: ctx });
         logger.error('failed', make(secret), { context: ctx, expected: true });
         const thrown = make(secret);
-        if (thrown instanceof Error || isAxiosShaped(thrown)) {
+        if (typeof thrown !== 'string') {
           logger.warn('warned', thrown, ctx);
           logger.debug('debugged', thrown, ctx);
         }
@@ -2838,6 +2907,7 @@ describe('caller text: value ends', () => {
     ['authorization=Bearer opaque page=3', 'authorization=[REDACTED] page=3'],
     ['authorization=Custom Kq7Lm page=3', 'authorization=[REDACTED] page=3'],
     ['authorization=Custom a=Kq7Lm, b=Zx4Wv', 'authorization=[REDACTED]'],
+    ['authorization=Custom a=Kq7Lm', 'authorization=[REDACTED]'],
     [
       'authorization=Digest username="a", response="Kq7Lm" page=3',
       'authorization=[REDACTED] page=3',

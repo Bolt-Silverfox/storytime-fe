@@ -216,7 +216,7 @@ const SUBSCRIPT = /\[[^[\]]*\]|%5[Bb](?:(?!%5[BbDd])[\s\S])*%5[Dd]/y;
 // same token boundaries and can share the memo below. A lone "[" is a filler
 // too, so "password[[a]]=x" and "password[%5D=x" still reach their "=".
 const SEP_FILLER = /\\*["'`]|[\][]|%5[Dd]|\s/y;
-const SEP_OPENER = /[\\"'`\][]|%5[BbDd]/y;
+const SEP_OPENER = /[^\S\r\n]*(?:[\\"'`\][]|%5[BbDd])/y;
 const SEP_CHAR = /([=＝])|(%3[Dd])|%3[Aa]|[:：]/y;
 const TRAIL_SPACE = /\s*/y;
 
@@ -674,12 +674,16 @@ const ERROR_SKIP = new Set([
 
 const PARSE_FAILURE = 'Input could not be parsed';
 
-const withoutHeader = (stack: string) => {
+const withoutHeader = (stack: string, message: unknown) => {
   if (!stack.startsWith('SyntaxError')) {
     return stack;
   }
-  const frames = stack.search(/\n[ \t]*at /);
-  return `SyntaxError: ${PARSE_FAILURE}${frames === -1 ? '' : stack.slice(frames)}`;
+  const header = `SyntaxError: ${message}`;
+  return `SyntaxError: ${PARSE_FAILURE}${
+    typeof message === 'string' && stack.startsWith(header)
+      ? stack.slice(header.length)
+      : ''
+  }`;
 };
 
 /**
@@ -699,9 +703,8 @@ function cleanError(
   const name = safeRead(() => source.name, THREW);
   // JSON.parse and response.json() quote the input they rejected.
   const parseFailure = name === 'SyntaxError';
-  const message = parseFailure
-    ? PARSE_FAILURE
-    : safeRead(() => source.message, THREW);
+  const rawMessage = safeRead(() => source.message, THREW);
+  const message = parseFailure ? PARSE_FAILURE : rawMessage;
   record.name =
     typeof name === 'string'
       ? cleanString(walk, name)
@@ -717,7 +720,9 @@ function cleanError(
   if (isError) {
     const stack = safeRead(() => source.stack, undefined);
     const shownStack =
-      parseFailure && typeof stack === 'string' ? withoutHeader(stack) : stack;
+      parseFailure && typeof stack === 'string'
+        ? withoutHeader(stack, rawMessage)
+        : stack;
     record.stack =
       typeof shownStack === 'string' && shownStack
         ? cleanString(walk, shownStack)

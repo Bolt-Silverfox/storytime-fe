@@ -744,6 +744,13 @@ describe('round 3: key-name scan (table tests)', () => {
     expect(redact("note: token: 'abc 123' done")).not.toMatch(/abc 123/);
   });
 
+  it.each(['{"pin ": "2468"}', "{'code\t': '2468'}"])(
+    'treats a quoted key with trailing space as explicit: %s',
+    (input) => {
+      expect(redact(input)).not.toContain('2468');
+    }
+  );
+
   it('masks percent-encoded separators', () => {
     expect(redact('cb?token%3Dabc123%26page%3D2')).not.toContain('abc123');
     expect(redact('cb?token%3Dabc123%26page%3D2')).toContain('page%3D2');
@@ -1857,6 +1864,13 @@ describe('parse errors', () => {
     const copy = sentry.captureException.mock.calls[0][0] as Error;
     expect(copy.stack).not.toContain('Ada');
     expect(copy.stack).toMatch(/^SyntaxError: /);
+  });
+
+  it('drops quoted input that spans lines and looks like a frame', () => {
+    logger.error('x', parseError('!\n at Ada'));
+    const copy = sentry.captureException.mock.calls[0][0] as Error;
+    expect(copy.stack).not.toContain('Ada');
+    expect(copy.stack).toContain('JSON.parse');
   });
 
   it('keeps frame-only stacks', () => {

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -60,5 +61,23 @@ describe('forgot-password page', () => {
     await waitFor(() => expect(requestReset).toHaveBeenCalled());
     await new Promise((r) => setTimeout(r, 20));
     expect(requestReset).toHaveBeenCalledTimes(1);
+  });
+  it('does not navigate when the request settles after the page has gone, but still drops the old session', async () => {
+    saveResetSession({ token: '11111111', email: 'old@example.com' });
+    let resolve: (v: { message: string }) => void = () => {};
+    requestReset.mockReturnValue(
+      new Promise((r) => {
+        resolve = r;
+      })
+    );
+    const { unmount } = render(<Page />);
+    await requestCodeFor('new@example.com');
+    await waitFor(() => expect(requestReset).toHaveBeenCalled());
+    unmount();
+    await act(async () => {
+      resolve({ message: 'sent' });
+    });
+    expect(push).not.toHaveBeenCalled();
+    expect(readResetSession()).toBeNull();
   });
 });

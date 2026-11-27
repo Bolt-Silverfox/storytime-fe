@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/auth-context';
+import { useMountedRef } from '@/hooks/use-mounted-ref';
 import { clearResetSession } from '@/lib/reset-session';
 import { requestPasswordResetService } from '@/lib/services';
 import { StepBackButton } from '../register/components/step-back';
@@ -35,6 +36,7 @@ const Page = () => {
 
   const [isLoading, setIsLoading] = useState(false);
   const submitting = useRef(false);
+  const mounted = useMountedRef();
 
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
@@ -53,6 +55,9 @@ const Page = () => {
     try {
       const res = await requestPasswordResetService(data.email);
       clearResetSession();
+      if (!mounted.current) {
+        return;
+      }
       setRegistrationData({
         ...registrationData,
         email: data.email,
@@ -66,6 +71,9 @@ const Page = () => {
       // biome-ignore lint/suspicious/noExplicitAny: the caught value is untyped; only .message is read below
     } catch (error: any) {
       submitting.current = false;
+      if (!mounted.current) {
+        return;
+      }
       toast.error('Something went wrong', {
         description: error?.message || 'Failed to send password reset email.',
       });

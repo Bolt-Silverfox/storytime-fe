@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { PasswordInputToggle } from '@/components/ui/password-input-toggle';
+import { useMountedRef } from '@/hooks/use-mounted-ref';
 import {
   clearResetSession,
   type ResetSession,
@@ -67,6 +68,7 @@ export const CreateNewPasswordContent = () => {
   const [passwordType, setPasswordType] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const submitting = useRef(false);
+  const mounted = useMountedRef();
 
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
@@ -102,12 +104,18 @@ export const CreateNewPasswordContent = () => {
       });
 
       clearResetSession();
+      if (!mounted.current) {
+        return;
+      }
       toast.success(response.message);
       router.push('/create-new-password/success');
       // biome-ignore lint/suspicious/noExplicitAny: the caught value is untyped; only .message is read below
     } catch (err: any) {
       submitting.current = false;
-      toast.error(err.message || 'Something went wrong');
+      if (!mounted.current) {
+        return;
+      }
+      toast.error(err?.message || 'Something went wrong');
     } finally {
       setIsLoading(false);
     }

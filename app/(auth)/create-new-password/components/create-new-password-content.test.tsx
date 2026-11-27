@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -131,5 +132,23 @@ describe('CreateNewPasswordContent', () => {
     await waitFor(() => expect(resetPasswordService).toHaveBeenCalled());
     await new Promise((r) => setTimeout(r, 20));
     expect(resetPasswordService).toHaveBeenCalledTimes(1);
+  });
+  it('clears the stored values but does not navigate when the reset settles after the page has gone', async () => {
+    saveResetSession({ token: '12345678', email: 'a@b.co' });
+    let resolve: (v: { message: string }) => void = () => {};
+    resetPasswordService.mockReturnValue(
+      new Promise((r) => {
+        resolve = r;
+      })
+    );
+    const { unmount } = render(<CreateNewPasswordContent />);
+    await submitNewPassword();
+    await waitFor(() => expect(resetPasswordService).toHaveBeenCalled());
+    unmount();
+    await act(async () => {
+      resolve({ message: 'ok' });
+    });
+    expect(push).not.toHaveBeenCalled();
+    expect(readResetSession()).toBeNull();
   });
 });

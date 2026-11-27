@@ -1,16 +1,20 @@
 // @vitest-environment jsdom
 import {
+  act,
   cleanup,
   fireEvent,
   render,
   screen,
   waitFor,
 } from '@testing-library/react';
+import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { readResetSession } from '@/lib/reset-session';
+import { readResetSession, saveResetSession } from '@/lib/reset-session';
 
 const push = vi.hoisted(() => vi.fn());
 const validate = vi.hoisted(() => vi.fn());
+const requestReset = vi.hoisted(() => vi.fn());
+const sendVerification = vi.hoisted(() => vi.fn());
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -18,7 +22,8 @@ vi.mock('@/context/auth-context', () => ({
   useAuth: () => ({ registrationData: { email: 'kid@example.com' } }),
 }));
 vi.mock('@/lib/services', () => ({
-  sendVerificationEmailService: vi.fn(),
+  sendVerificationEmailService: sendVerification,
+  requestPasswordResetService: requestReset,
   validateResetTokenService: validate,
 }));
 
@@ -34,6 +39,11 @@ describe('forgot-password verify page', () => {
     window.sessionStorage.clear();
     validate.mockReset();
     validate.mockResolvedValue({ message: 'ok' });
+    requestReset.mockReset();
+    requestReset.mockResolvedValue({ message: 'sent' });
+    sendVerification.mockReset();
+    vi.mocked(toast.error).mockReset();
+    vi.mocked(toast.success).mockReset();
     globalThis.ResizeObserver ??= class {
       observe() {}
       unobserve() {}
@@ -41,7 +51,18 @@ describe('forgot-password verify page', () => {
     } as unknown as typeof ResizeObserver;
     document.elementFromPoint = () => null;
   });
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  async function enterCode(code: string) {
+    fireEvent.change(input(), { target: { value: code } });
+    await waitFor(() =>
+      expect((submit() as HTMLButtonElement).disabled).toBe(false)
+    );
+  }
 
   it('renders 8 slots', () => {
     render(<Page />);
@@ -130,5 +151,65 @@ describe('forgot-password verify page', () => {
     await waitFor(() => expect(validate).toHaveBeenCalled());
     expect(push).not.toHaveBeenCalled();
     expect(readResetSession()).toBeNull();
+  });
+
+  it('stays on the page with a storage error when the session cannot be saved', async () => {
+    saveResetSession({ token: '11111111', email: 'old@example.com' });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('QuotaExceededError');
+    });
+    render(<Page />);
+    await enterCode('12345678');
+    fireEvent.click(submit());
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(push).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(readResetSession()).toBeNull();
+    expect(input()).toBeTruthy();
+    expect(String(vi.mocked(toast.error).mock.calls[0][0])).toMatch(/storage/i);
+  });
+
+  it('validates the code once when submitted twice in quick succession', async () => {
+    validate.mockReturnValue(new Promise(() => {}));
+    render(<Page />);
+    await enterCode('12345678');
+    fireEvent.click(submit());
+    fireEvent.click(submit());
+    await waitFor(() => expect(validate).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(validate).toHaveBeenCalledTimes(1);
+  });
+
+  it('resends a password reset code, not an email verification code', async () => {
+    vi.useFakeTimers();
+    render(<Page />);
+    for (let i = 0; i < 60; i++) {
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+    }
+    const resend = screen.getByRole('button', { name: 'Resend OTP' });
+    expect((resend as HTMLButtonElement).disabled).toBe(false);
+    await act(async () => {
+      fireEvent.click(resend);
+    });
+    expect(requestReset).toHaveBeenCalledWith('kid@example.com');
+    expect(sendVerification).not.toHaveBeenCalled();
+  });
+
+  it('requests one new code when Resend is pressed twice before the first request returns', async () => {
+    vi.useFakeTimers();
+    requestReset.mockReturnValue(new Promise(() => {}));
+    render(<Page />);
+    for (let i = 0; i < 60; i++) {
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+    }
+    const resend = screen.getByRole('button', { name: 'Resend OTP' });
+    fireEvent.click(resend);
+    fireEvent.click(resend);
+    await act(async () => {});
+    expect(requestReset).toHaveBeenCalledTimes(1);
   });
 });

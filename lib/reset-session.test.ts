@@ -23,6 +23,21 @@ describe('reset session', () => {
     expect(readResetSession()).not.toBeNull();
   });
 
+  it('reports a successful write', () => {
+    expect(saveResetSession({ token: '12345678', email: 'a@b.co' })).toBe(true);
+  });
+
+  it('reports a failed write and drops the older session', () => {
+    saveResetSession({ token: '11111111', email: 'old@b.co' });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('QuotaExceededError');
+    });
+    expect(saveResetSession({ token: '22222222', email: 'new@b.co' })).toBe(
+      false
+    );
+    expect(readResetSession()).toBeNull();
+  });
+
   it('returns null when nothing is stored', () => {
     expect(readResetSession()).toBeNull();
   });
@@ -50,9 +65,9 @@ describe('reset session', () => {
     vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
       throw new Error('blocked');
     });
-    expect(() =>
-      saveResetSession({ token: '12345678', email: 'a@b.co' })
-    ).not.toThrow();
+    expect(saveResetSession({ token: '12345678', email: 'a@b.co' })).toBe(
+      false
+    );
     expect(readResetSession()).toBeNull();
     expect(() => clearResetSession()).not.toThrow();
   });

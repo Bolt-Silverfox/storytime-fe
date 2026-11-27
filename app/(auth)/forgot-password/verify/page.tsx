@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -29,7 +29,7 @@ import {
 } from '@/lib/reset-code';
 import { saveResetSession } from '@/lib/reset-session';
 import {
-  sendVerificationEmailService,
+  requestPasswordResetService,
   validateResetTokenService,
 } from '@/lib/services';
 import { maskEmail } from '@/lib/utils';
@@ -46,6 +46,7 @@ const Page = () => {
   const { registrationData } = useAuth();
   const [timeLeft, setTimeLeft] = useState(60);
   const [isLoading, setIsLoading] = useState(false);
+  const submitting = useRef(false);
 
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
@@ -61,16 +62,15 @@ const Page = () => {
   }, [timeLeft]);
 
   async function handleResend() {
+    setTimeLeft(60);
     try {
-      const response = await sendVerificationEmailService(
+      const response = await requestPasswordResetService(
         registrationData?.email ?? ''
       );
       toast.success(response.message);
       // biome-ignore lint/suspicious/noExplicitAny: the caught value is untyped; only .message is read below
     } catch (error: any) {
-      toast.error(error.message || 'Could not send verification email');
-    } finally {
-      setTimeLeft(60);
+      toast.error(error.message || 'Could not send a new reset code');
     }
   }
 
@@ -83,16 +83,28 @@ const Page = () => {
       return;
     }
 
+    if (submitting.current) {
+      return;
+    }
+    submitting.current = true;
     setIsLoading(true);
 
     try {
       const response = await validateResetTokenService({ token, email });
 
+      if (!saveResetSession({ token, email })) {
+        toast.error('This browser blocked site storage', {
+          description:
+            'Allow storage for this site or leave private browsing, then verify the code again.',
+        });
+        submitting.current = false;
+        return;
+      }
       toast.success(response.message);
-      saveResetSession({ token, email });
       router.push('/create-new-password');
       // biome-ignore lint/suspicious/noExplicitAny: the caught value is untyped; only .message is read below
     } catch (error: any) {
+      submitting.current = false;
       toast.error('OTP verification failed', {
         description: error?.message || 'An unexpected error occurred.',
       });

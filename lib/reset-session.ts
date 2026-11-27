@@ -2,10 +2,14 @@ const KEY = 'storytime.resetSession';
 
 export type ResetSession = { token: string; email: string };
 
-export function saveResetSession(session: ResetSession): void {
+export function saveResetSession(session: ResetSession): boolean {
   try {
     window.sessionStorage.setItem(KEY, JSON.stringify(session));
-  } catch {}
+    return true;
+  } catch {
+    clearResetSession();
+    return false;
+  }
 }
 
 export function readResetSession(): ResetSession | null {

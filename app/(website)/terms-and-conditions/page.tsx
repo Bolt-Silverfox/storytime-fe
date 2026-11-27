@@ -1,6 +1,14 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern';
 import { termsSections } from '@/lib/data';
+import { pageMetadata } from '@/lib/page-metadata';
+
+export const metadata = pageMetadata({
+  title: 'Terms and conditions — Storytime',
+  description:
+    'The terms and conditions for using Storytime, including accounts, subscriptions, acceptable use and parental responsibilities.',
+  path: '/terms-and-conditions',
+});
 
 const Page = () => {
   return (

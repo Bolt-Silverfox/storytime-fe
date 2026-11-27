@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   READ_ALONG_DEFAULT_KEY,
@@ -79,4 +85,27 @@ describe('StoryView read-along default', () => {
     expect(sw.getAttribute('aria-checked')).toBe('false');
     expect(localStorage.getItem(READ_ALONG_DEFAULT_KEY)).toBeNull();
   });
+
+  it.each([
+    { stored: null, changedTo: 'false', open: 'true' },
+    { stored: false, changedTo: 'true', open: 'false' },
+  ])(
+    'keeps the open story at $open when another tab sets the default to $changedTo',
+    async ({ stored, changedTo, open }) => {
+      if (stored !== null) {
+        setReadAlongDefault(stored);
+      }
+      const sw = await openReader();
+      act(() => {
+        localStorage.setItem(READ_ALONG_DEFAULT_KEY, changedTo);
+        window.dispatchEvent(
+          new StorageEvent('storage', {
+            key: READ_ALONG_DEFAULT_KEY,
+            newValue: changedTo,
+          })
+        );
+      });
+      expect(sw.getAttribute('aria-checked')).toBe(open);
+    }
+  );
 });

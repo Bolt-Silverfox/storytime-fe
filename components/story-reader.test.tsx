@@ -933,9 +933,12 @@ describe('finishing the story from the last page', () => {
     it('retries saving the completion after it failed, and announces the result', async () => {
       const record = vi.mocked(services.recordUserProgressService);
       record.mockReset();
-      record
-        .mockRejectedValueOnce(new Error('offline'))
-        .mockResolvedValueOnce(undefined as never);
+      let saved: () => void = () => undefined;
+      record.mockRejectedValueOnce(new Error('offline')).mockReturnValueOnce(
+        new Promise<never>((resolve) => {
+          saved = () => resolve(undefined as never);
+        })
+      );
       renderReader(false);
       await toLastPage();
       fireEvent.click(screen.getByRole('button', { name: 'Finish story' }));
@@ -944,6 +947,14 @@ describe('finishing the story from the last page', () => {
       );
       fireEvent.click(screen.getByRole('button', { name: 'Finish story' }));
       await waitFor(() => expect(record).toHaveBeenCalledTimes(2));
+      const saving = screen.getByRole('button', { name: 'Saving…' });
+      expect(saving.getAttribute('aria-disabled')).toBe('true');
+      expect(screen.queryByRole('alert')).toBeNull();
+      fireEvent.click(saving);
+      expect(record).toHaveBeenCalledTimes(2);
+      await act(async () => {
+        saved();
+      });
       expect(
         (
           await screen.findByText('✓ Added to your completed stories')

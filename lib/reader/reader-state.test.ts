@@ -296,13 +296,14 @@ describe('every combination of four clips', () => {
       firstUsable !== -1 && states[firstUsable] === 'ready'
         ? firstUsable
         : null;
+    const selected = start ?? firstReadyClip(ready);
 
     describe(states.join(','), () => {
       it('narration opens on the first clip that has not failed, once it is ready', () => {
         expect(narrationStart(ready, failed)).toBe(start);
       });
 
-      for (const hasAudio of [false, true]) {
+      for (const hasAudio of selected === null ? [false] : [false, true]) {
         it(`Play with the text hidden ${hasAudio ? 'plays the selected clip' : 'waits for a clip to be selected'}`, () => {
           expect(
             playEnabled({
@@ -311,7 +312,7 @@ describe('every combination of four clips', () => {
               textVisible: false,
               singleFile: false,
               page: 0,
-              currentClip: start ?? 0,
+              currentClip: selected ?? 0,
               clipTotal: 4,
               ready,
               failed,
@@ -331,7 +332,7 @@ describe('every combination of four clips', () => {
                 textVisible: true,
                 singleFile: false,
                 page,
-                currentClip: hasAudio ? (start ?? 0) : 0,
+                currentClip: hasAudio ? (selected ?? 0) : 0,
                 clipTotal: 4,
                 ready,
                 failed,

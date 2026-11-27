@@ -78,6 +78,30 @@ export const alignClip = (a: {
   return { kind: a.failed.has(target) ? 'failed' : 'unavailable', target };
 };
 
+export const playEnabled = (a: {
+  isPlaying: boolean;
+  hasAudio: boolean;
+  textVisible: boolean;
+  singleFile: boolean;
+  page: number;
+  currentClip: number;
+  clipTotal: number;
+  ready: ReadonlySet<number>;
+  failed: ReadonlySet<number>;
+}): boolean => {
+  if (a.isPlaying) {
+    return true;
+  }
+  if (a.singleFile || !a.textVisible) {
+    return a.hasAudio;
+  }
+  const { kind, target } = alignClip(a);
+  if (kind === 'switch' || (kind === 'ok' && a.ready.has(target))) {
+    return true;
+  }
+  return (kind === 'ok' || kind === 'unavailable') && a.hasAudio;
+};
+
 export type ClipEnd = 'advance' | 'wait' | 'failed' | 'stop' | 'finish';
 
 // What to do when the clip `current` finishes playing.

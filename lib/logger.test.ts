@@ -1305,6 +1305,12 @@ describe('round 8: percent-encoded magic-link fragment', () => {
   ])('masks %s', (text) => {
     expect(redact(text)).not.toContain(linkToken);
   });
+
+  it('masks a token whose characters are percent-escaped', () => {
+    const out = redact('next=%2Fauth%2Fmagic%23t%3D%5A%78%39abc%26x=1');
+    expect(out).not.toMatch(/%5A|%78|%39|abc/);
+    expect(out).toContain('%26x=1');
+  });
 });
 
 describe('round 8: axios summaries keep only string codes', () => {
@@ -1514,5 +1520,14 @@ describe('round 8: bounded work', () => {
     ];
     expect(captured.errors.length).toBeLessThan(500);
     expect(Object.keys(captured).length).toBeLessThan(500);
+  });
+
+  it('counts a repeated member against the member limit', () => {
+    const shared = new Error('shared');
+    logger.error('agg', new AggregateError(Array(5_000).fill(shared), 'many'));
+    const [captured] = sentry.captureException.mock.calls[0] as [
+      Error & { errors: unknown[] },
+    ];
+    expect(captured.errors.length).toBeLessThan(500);
   });
 });

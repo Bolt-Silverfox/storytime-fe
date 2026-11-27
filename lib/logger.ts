@@ -201,7 +201,8 @@ const SCHEME_BASIC =
 const EMAIL =
   /[A-Za-z0-9._%+-]{1,64}(?:@|%40)[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){0,5}\.[A-Za-z]{2,24}/g;
 const FRAGMENT_TOKEN = /([#&])t=[^\s&#"'<>]+/g;
-const ENCODED_FRAGMENT_TOKEN = /(%2[36])t(%3D)[\w-]+/gi;
+const ENCODED_FRAGMENT_TOKEN =
+  /(%2[36])t(%3D)(?:[\w-]|%(?!2[36])[\dA-F]{2})+/gi;
 
 // Independent final pass: find sensitive key NAMES anywhere (after a label, a
 // URL "?", "&", "#", a quote, ...), then mask the value that follows. It does
@@ -687,12 +688,10 @@ function safeErrorCopy(
           break;
         }
         const m = safeRead(() => members[i], '[unreadable]');
-        errors.push(
-          m instanceof Error && !seen.has(m)
-            ? safeErrorCopy(m, depth + 1, seen, copies)
-            : redact(m)
-        );
-        if (!(m instanceof Error)) {
+        if (m instanceof Error && !seen.has(m)) {
+          errors.push(safeErrorCopy(m, depth + 1, seen, copies));
+        } else {
+          errors.push(redact(m));
           copies.left--;
         }
       }

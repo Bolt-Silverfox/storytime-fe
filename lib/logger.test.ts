@@ -2466,8 +2466,8 @@ describe('shared objects are not circular', () => {
     ];
     expect(hint.extra.kidId).toBe('k1');
     expect(exception.cause).toEqual({
-      kidId: '[omitted]',
-      token: '[REDACTED]',
+      '[key 0]': '[omitted]',
+      '[key 1]': '[REDACTED]',
     });
     expect(fieldsMatching(sentry.captureException.mock.calls, 'Kq7Lm')).toEqual(
       []
@@ -2602,14 +2602,16 @@ describe('untrusted error text is never forwarded', () => {
       name: 'FirebaseError',
       code: 'messaging/permission-blocked',
       detail: 'Kq7Lm',
-      attempt: 2,
+      status: 503,
+      AdaLovelace: 2,
     });
     logger.error('m', err);
     const copy = exception() as unknown as Record<string, unknown>;
     expect(copy.name).toBe('FirebaseError');
     expect(copy.code).toBe('messaging/permission-blocked');
-    expect(copy.attempt).toBe(2);
+    expect(copy.status).toBe(503);
     expect(copy).not.toHaveProperty('detail');
+    expect(copy).not.toHaveProperty('AdaLovelace');
     logger.error(
       'n',
       Object.assign(new Error('y'), { name: 'Kq7Lm', code: 'Kq7Lm-9' })
@@ -2652,7 +2654,7 @@ describe('untrusted error text is never forwarded', () => {
         },
       })
     );
-    expect(exception().cause).toEqual({ url: '/stories/:id?page' });
+    expect(exception().cause).toEqual({ '[key 0]': '/stories/:id?page' });
     expect(fieldsMatching(sinks(), 'Kq7Lm')).toEqual([]);
   });
 });
@@ -2671,6 +2673,11 @@ describe('thrown values: only allow-listed structure', () => {
     );
     expect(exception().name).toBe('Error');
     expect(exception()).not.toHaveProperty('code');
+    logger.error(
+      'c',
+      Object.assign(new Error('e'), { code: 'customer/ada-lovelace' })
+    );
+    expect(sentry.captureException.mock.calls[2][0]).not.toHaveProperty('code');
     const second = sentry.captureException.mock.calls[1][0] as Error;
     expect(second.name).toBe('TypeError');
     expect((second as unknown as { code: string }).code).toBe('ERR_NETWORK');
@@ -2688,6 +2695,7 @@ describe('thrown values: only allow-listed structure', () => {
       '    at b (/home/kq7lm/app/lib/y.ts:3:4)',
       '    at c (https://app.example.com/story/kq7lm:5:6)',
       '    at d (https://app.example.com/_next/static/chunks/main.js:7:8)',
+      '    at e (https://app.example.com/stories/AdaLovelace/reader.js:9:1)',
     ].join('\n');
     logger.error('m', err);
     expect(exception().stack).toBe(
@@ -2697,6 +2705,7 @@ describe('thrown values: only allow-listed structure', () => {
         '    at b (/~/app/lib/y.ts:3:4)',
         '    at c (https://app.example.com/story/:id:5:6)',
         '    at d (https://app.example.com/_next/static/chunks/main.js:7:8)',
+        '    at e (https://app.example.com/stories/:id/reader.js:9:1)',
       ].join('\n')
     );
   });
@@ -2712,7 +2721,7 @@ describe('thrown values: only allow-listed structure', () => {
     logger.error(
       'm',
       new Error('e', {
-        cause: { 'kq7lm@example.com': 1, 'Ada Lovelace': 2, status: 3 },
+        cause: { 'kq7lm@example.com': 1, AdaLovelace: 2, status: 3 },
       })
     );
     expect(exception().cause).toEqual({

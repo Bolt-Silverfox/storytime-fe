@@ -919,11 +919,31 @@ const ERROR_CODES = new Set([
   'ETIMEDOUT',
   'ENOTFOUND',
   'EAI_AGAIN',
+  'messaging/permission-blocked',
+  'messaging/permission-default',
+  'messaging/unsupported-browser',
+  'messaging/failed-service-worker-registration',
+  'messaging/token-subscribe-failed',
+  'messaging/token-unsubscribe-failed',
+  'messaging/token-update-failed',
+  'messaging/invalid-vapid-key',
+  'app/no-app',
+  'app/duplicate-app',
+  'installations/request-failed',
 ]);
-const NAMESPACED_CODE = /^[a-z][a-z0-9-]{0,31}\/[a-z0-9-]{1,63}$/;
 const isKnownCode = (code: unknown): code is string =>
-  typeof code === 'string' &&
-  (ERROR_CODES.has(code) || NAMESPACED_CODE.test(code));
+  typeof code === 'string' && ERROR_CODES.has(code);
+const STRUCTURAL_KEYS = new Set([
+  'status',
+  'statusCode',
+  'code',
+  'errno',
+  'name',
+  'message',
+  'type',
+  'lineNumber',
+  'columnNumber',
+]);
 const QUERY_KEYS = new Set([
   'page',
   'limit',
@@ -962,10 +982,19 @@ const MAX_FRAMES = 50;
 const MAX_FRAME_LINE = 1_000;
 const FRAME_LOCATION = /^(\S{1,800}?):(\d{1,7}):(\d{1,7})$/;
 const HOME_DIR = /^((?:file:\/\/)?)\/(?:Users|home)\/[^/]+(?=\/)/i;
-const WEB_FILE = /^(https?:\/\/[^/]+)(\/.*)?$/i;
+const WEB_FILE = /^(https?:\/\/[^/]+)(\/.*)$/i;
 const V8_FRAME =
   /^\s*at (?:((?:async |new )?[\w$.<>[\]]{1,120}) \((\S{1,820}|<anonymous>|native)\)|(\S{1,820}))$/;
 const GECKO_FRAME = /^([\w$.<>/[\]*]{0,120})@(\S{0,820})$/;
+
+function webPath(path: string): string {
+  const slash = path.lastIndexOf('/');
+  const last = path.slice(slash + 1);
+  const dir = normalisePath(path.slice(0, slash)) ?? '';
+  return FILE_NAME.test(last)
+    ? `${dir}/${last}`.replace(/^\/\//, '/')
+    : (normalisePath(path) ?? '');
+}
 
 function frameLocation(location: string): string | undefined {
   if (location === '<anonymous>' || location === 'native' || location === '') {
@@ -981,8 +1010,8 @@ function frameLocation(location: string): string | undefined {
     .replace(HOME_DIR, '$1/~');
   const web = WEB_FILE.exec(file);
   const shown =
-    web && !(web[2].startsWith('/_next/') || FILE_NAME.test(web[2]))
-      ? `${web[1]}${normalisePath(web[2])}`
+    web && !web[2].startsWith('/_next/static/')
+      ? `${web[1]}${webPath(web[2])}`
       : file;
   return `${shown}:${m[2]}:${m[3]}`;
 }
@@ -1085,8 +1114,6 @@ function cleanProp(
     : clean(value, depth, walk, untrusted);
 }
 
-const STRUCTURAL_KEY = /^[A-Za-z_$][\w$]{0,31}$/;
-
 const hasOwnMessage = (value: object) =>
   safeRead(
     () =>
@@ -1162,7 +1189,7 @@ function cleanNode(
     const key = keys[i];
     put(
       out,
-      asThrown && !STRUCTURAL_KEY.test(key)
+      asThrown && !STRUCTURAL_KEYS.has(key)
         ? emit(walk, `[key ${i}]`)
         : cleanString(walk, key),
       isSensitiveKey(key)
@@ -1243,7 +1270,7 @@ function cleanError(
       if (walk.out <= 0) {
         break;
       }
-      if (ERROR_SKIP.has(key) || isSensitiveKey(key)) {
+      if (ERROR_SKIP.has(key) || !STRUCTURAL_KEYS.has(key)) {
         continue;
       }
       const prop = safeRead(() => source[key], undefined);

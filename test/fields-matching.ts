@@ -1,9 +1,25 @@
 type Needle = string | RegExp;
 
-const matches = (text: string, needle: Needle) =>
-  typeof needle === 'string' ? text.includes(needle) : needle.test(text);
+const matches = (text: string, needle: Needle): boolean => {
+  if (typeof needle === 'string') {
+    return text.includes(needle);
+  }
+  needle.lastIndex = 0;
+  return needle.test(text);
+};
+
+const readOwn = (node: object, key: PropertyKey): unknown => {
+  try {
+    return Reflect.get(node, key);
+  } catch {
+    return undefined;
+  }
+};
 
 export function fieldsMatching(value: unknown, needle: Needle): string[] {
+  if (matches('', needle)) {
+    throw new Error('fieldsMatching: the needle matches every string');
+  }
   const hits: string[] = [];
   const seen = new WeakSet<object>();
   const visit = (node: unknown, path: string): void => {
@@ -44,11 +60,7 @@ export function fieldsMatching(value: unknown, needle: Needle): string[] {
     for (const key of Reflect.ownKeys(node)) {
       const label = `${path}.${String(key)}`;
       visit(key, `${label}<key>`);
-      const descriptor = Object.getOwnPropertyDescriptor(node, key);
-      visit(
-        descriptor && 'value' in descriptor ? descriptor.value : undefined,
-        label
-      );
+      visit(readOwn(node, key), label);
     }
   };
   visit(value, '$');

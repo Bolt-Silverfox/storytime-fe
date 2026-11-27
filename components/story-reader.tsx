@@ -17,6 +17,7 @@ import {
   alignClip,
   clipEndAction,
   clipForPage,
+  firstReadyClip,
   initialReaderState,
   readerReducer,
 } from '@/lib/reader/reader-state';
@@ -132,8 +133,7 @@ const StoryReader = ({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  // Story audio is generated per-paragraph; we play the clips in sequence.
-  const playlistRef = useRef<string[]>([]);
+  const readyClipsRef = useRef<Map<number, string>>(new Map());
   const clipIndexRef = useRef(0);
   const isPlayingRef = useRef(false);
   // Total paragraphs expected + which failed, read inside the (once-mounted)
@@ -266,7 +266,7 @@ const StoryReader = ({
       // guests, so nothing regresses where `audioUrl` is populated.
       if (isGuest && guestAudioUrl) {
         setAudioError(null);
-        playlistRef.current = [guestAudioUrl];
+        readyClipsRef.current = new Map([[0, guestAudioUrl]]);
         clipIndexRef.current = 0;
         setAudioUrl(guestAudioUrl);
         return;
@@ -289,7 +289,7 @@ const StoryReader = ({
       setAudioSounding(false);
       setCurrentClip(0);
       setIsPlaying(false);
-      playlistRef.current = [];
+      readyClipsRef.current = new Map();
       clipIndexRef.current = 0;
       totalCountRef.current = 0;
       failedIndicesRef.current = new Set();
@@ -342,13 +342,7 @@ const StoryReader = ({
         );
         totalCountRef.current = total;
 
-        // Only the contiguous run of ready clips from index 0 is playable in
-        // order; a gap means we wait for that paragraph before playing past it.
-        const playlist: string[] = [];
-        for (let i = 0; readyByIndex.has(i); i += 1) {
-          playlist.push(readyByIndex.get(i) as string);
-        }
-        playlistRef.current = playlist;
+        readyClipsRef.current = new Map(readyByIndex);
 
         // Full ordered paragraph list (text + audio state) for the read-along.
         const known = [
@@ -368,25 +362,25 @@ const StoryReader = ({
         setAudioParagraphs(paras);
         setFailedIndices(failed);
 
-        // Enable playback the moment the first clip is ready (bug 1).
-        if (playlist.length > 0 && !hasSetInitialAudioRef.current) {
+        const first = firstReadyClip(new Set(readyByIndex.keys()));
+        if (first !== null && !hasSetInitialAudioRef.current) {
           hasSetInitialAudioRef.current = true;
           setAudioLoading(false);
-          clipIndexRef.current = 0;
-          setCurrentClip(0);
-          setAudioUrl(playlist[0]);
+          clipIndexRef.current = first;
+          setCurrentClip(first);
+          setAudioUrl(readyByIndex.get(first) as string);
         }
 
         // Auto-advance was waiting for the next clip and it just arrived.
         if (
           waitingForNextRef.current &&
-          playlist.length > clipIndexRef.current + 1
+          readyByIndex.has(clipIndexRef.current + 1)
         ) {
           waitingForNextRef.current = false;
           const next = clipIndexRef.current + 1;
           clipIndexRef.current = next;
           setCurrentClip(next);
-          setAudioUrl(playlist[next]);
+          setAudioUrl(readyByIndex.get(next) as string);
           if (isCheckedRef.current) {
             dispatch({ type: 'clip', clip: next, from: next - 1 });
           }
@@ -401,7 +395,12 @@ const StoryReader = ({
 
         const stillGenerating = accounted < total;
         setAudioGenerating(stillGenerating);
-        return { playlist, accounted, total, failedSize: failed.size };
+        return {
+          readyCount: readyByIndex.size,
+          accounted,
+          total,
+          failedSize: failed.size,
+        };
       };
 
       try {
@@ -445,7 +444,7 @@ const StoryReader = ({
         }
 
         // Real failure ONLY when nothing at all is playable AND something failed.
-        if (snap.playlist.length === 0 && snap.failedSize > 0) {
+        if (snap.readyCount === 0 && snap.failedSize > 0) {
           setAudioError('We couldn’t prepare the audio for this story.');
           releaseWaiting();
           setAudioGenerating(false);
@@ -521,9 +520,9 @@ const StoryReader = ({
       const next = current + 1;
       const action = clipEndAction({
         current,
-        readyCount: playlistRef.current.length,
+        ready: new Set(readyClipsRef.current.keys()),
+        failed: failedIndicesRef.current,
         clipTotal: totalCountRef.current,
-        nextFailed: failedIndicesRef.current.has(next),
         pageCount: readerRef.current.count,
         textVisible: isCheckedRef.current,
         singleFile: singleFileRef.current,
@@ -531,7 +530,7 @@ const StoryReader = ({
       if (action === 'advance') {
         clipIndexRef.current = next;
         setCurrentClip(next);
-        setAudioUrl(playlistRef.current[next]);
+        setAudioUrl(readyClipsRef.current.get(next) ?? null);
         // Turn the page with the narration (only if the reader is on it).
         if (isCheckedRef.current) {
           dispatch({ type: 'clip', clip: next, from: current });
@@ -562,11 +561,12 @@ const StoryReader = ({
       // The narration has played through: finish the story and rewind the
       // narration (and the page, if it was following) so a replay starts over.
       setStoryFinished(true);
-      clipIndexRef.current = 0;
-      setCurrentClip(0);
-      setAudioUrl(playlistRef.current[0] ?? null);
+      const first = firstReadyClip(new Set(readyClipsRef.current.keys())) ?? 0;
+      clipIndexRef.current = first;
+      setCurrentClip(first);
+      setAudioUrl(readyClipsRef.current.get(first) ?? null);
       if (isCheckedRef.current && !singleFileRef.current) {
-        dispatch({ type: 'clip', clip: 0, from: current });
+        dispatch({ type: 'clip', clip: first, from: current });
       }
     };
 
@@ -675,16 +675,17 @@ const StoryReader = ({
   // Point the narration at the clip that belongs to `page` (clip N is page N).
   // 'switched' → the clip changed (the <audio> src updates on the next render);
   // 'ok' → already there; 'unavailable' → that clip isn't generated yet;
-  // 'none' → the page has no narration (beyond the capped clips).
+  // 'failed' → that clip failed; 'none' → the page has no narration (beyond
+  // the capped clips).
   const alignAudioToPage = (
     page: number
-  ): 'switched' | 'ok' | 'unavailable' | 'none' => {
-    const list = playlistRef.current;
+  ): 'switched' | 'ok' | 'unavailable' | 'failed' | 'none' => {
     const { kind, target } = alignClip({
       page,
       currentClip: clipIndexRef.current,
       clipTotal: totalCountRef.current,
-      readyCount: list.length,
+      ready: new Set(readyClipsRef.current.keys()),
+      failed: failedIndicesRef.current,
       singleFile: singleFileRef.current,
     });
     if (kind !== 'switch') {
@@ -693,7 +694,7 @@ const StoryReader = ({
     clipIndexRef.current = target;
     waitingForNextRef.current = false;
     setCurrentClip(target);
-    setAudioUrl(list[target]);
+    setAudioUrl(readyClipsRef.current.get(target) ?? null);
     return 'switched';
   };
 
@@ -723,7 +724,7 @@ const StoryReader = ({
     let aligned: ReturnType<typeof alignAudioToPage> = 'ok';
     if (isChecked) {
       aligned = alignAudioToPage(readerRef.current.page);
-      if (aligned === 'none') {
+      if (aligned === 'none' || aligned === 'failed') {
         return;
       }
       if (aligned === 'unavailable') {
@@ -764,8 +765,10 @@ const StoryReader = ({
   const pageClip = clipForPage(reader.page, clipCount);
   // Long stories only narrate their first clips; later pages have no audio.
   const pageNoAudio = useAudioParagraphs && pageClip === null && !audioLoading;
+  const pageFailed =
+    useAudioParagraphs && pageClip !== null && failedIndices.has(pageClip);
 
-  const playBlocked = isChecked && pageNoAudio && !isPlaying;
+  const playBlocked = isChecked && (pageNoAudio || pageFailed) && !isPlaying;
 
   if (loading) {
     return (
@@ -1011,9 +1014,7 @@ const StoryReader = ({
                       No narration for this page. Go back to listen to the
                       narrated part of the story.
                     </span>
-                  ) : useAudioParagraphs &&
-                    pageClip !== null &&
-                    failedIndices.has(pageClip) ? (
+                  ) : pageFailed ? (
                     <span className='mt-1 flex items-center gap-2 px-2 text-sm text-red-500 font-abeezee'>
                       Audio unavailable
                       <button

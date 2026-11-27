@@ -22,6 +22,8 @@ const guest = vi.hoisted(() => ({
   story: {} as Record<string, unknown>,
   clips: 0,
   pending: 0,
+  failed: [] as number[],
+  generating: [] as number[],
   gate: null as Promise<void> | null,
 }));
 
@@ -40,14 +42,20 @@ vi.mock('@/lib/services', () => {
       audioUrl: `${i}.mp3`,
       text: `t${i}`,
     }));
+    const pending = guest.pending + guest.generating.length;
     return {
-      status: guest.pending ? 'processing' : 'completed',
-      completedParagraphs: paras,
+      status: pending ? 'processing' : 'completed',
+      completedParagraphs: paras.filter(
+        (p) =>
+          !(
+            guest.failed.includes(p.index) || guest.generating.includes(p.index)
+          )
+      ),
       allParagraphs: paras,
-      failedParagraphs: [],
-      pendingParagraphs: guest.pending,
+      failedParagraphs: guest.failed,
+      pendingParagraphs: pending,
       totalQueued: n + guest.pending,
-      ...(guest.pending ? { batchJobId: 'job-1' } : {}),
+      ...(pending ? { batchJobId: 'job-1' } : {}),
     };
   };
   return {
@@ -431,5 +439,126 @@ describe('synth wave animation', () => {
     });
     await waitFor(() => expect(audioEl()).toBeTruthy());
     expect(playing()).toBe('false');
+  });
+});
+
+describe('a clip in the middle of the narration failed or is still generating', () => {
+  const pageShown = (n: number) =>
+    expect(screen.getAllByText(`Page ${n} of 6`).length).toBeGreaterThan(0);
+  const openReadAlong = async () => {
+    renderReader();
+    await waitFor(() => screen.getByRole('switch'));
+    fireEvent.click(screen.getByRole('switch'));
+    await waitReady();
+  };
+
+  beforeEach(() => {
+    guest.clips = 4;
+    guest.pending = 0;
+    guest.story = { id: 'story-1', title: 'T', textContent: TEXT };
+  });
+  afterEach(() => {
+    guest.failed = [];
+    guest.generating = [];
+  });
+
+  it('Play on a page after the failed clip narrates that page and carries on', async () => {
+    guest.failed = [1];
+    await openReadAlong();
+    await turnTo(2);
+    pageShown(3);
+    expect(screen.queryByText(/Audio unavailable/)).toBeNull();
+    expect(playButton().disabled).toBe(false);
+    fireEvent.click(playButton());
+    await waitFor(() => expect(played).toEqual(['2.mp3']));
+    pageShown(3);
+    await endAudio();
+    await waitFor(() => expect(played).toEqual(['2.mp3', '3.mp3']));
+    pageShown(4);
+  });
+
+  it('Play on a page after a clip still generating narrates that page', async () => {
+    guest.generating = [1];
+    await openReadAlong();
+    await turnTo(2);
+    fireEvent.click(playButton());
+    await waitFor(() => expect(played).toEqual(['2.mp3']));
+    pageShown(3);
+  });
+
+  it('turning onto a page after the failed clip while playing follows with the narration', async () => {
+    guest.failed = [1];
+    await openReadAlong();
+    fireEvent.click(playButton());
+    expect(played).toEqual(['0.mp3']);
+    await turnTo(2);
+    await waitFor(() => expect(played).toEqual(['0.mp3', '2.mp3']));
+    pageShown(3);
+  });
+
+  it('on the failed page offers the retry, keeps the page and plays nothing', async () => {
+    guest.failed = [1];
+    await openReadAlong();
+    await turnTo(1);
+    pageShown(2);
+    expect(screen.getByText(/Audio unavailable/)).toBeTruthy();
+    expect(playButton().disabled).toBe(true);
+    fireEvent.click(playButton());
+    expect(played).toEqual([]);
+    pageShown(2);
+  });
+
+  it('narration reaching the failed clip stops and offers a retry instead of skipping silently', async () => {
+    guest.failed = [1];
+    await openReadAlong();
+    fireEvent.click(playButton());
+    await endAudio();
+    expect(played).toEqual(['0.mp3']);
+    expect(
+      screen.getByText(/Some of the audio couldn’t be prepared/)
+    ).toBeTruthy();
+    expect(doneIds()).toEqual([]);
+  });
+});
+
+describe('the first clip failed', () => {
+  beforeEach(() => {
+    guest.clips = 4;
+    guest.pending = 0;
+    guest.failed = [0];
+    guest.story = { id: 'story-1', title: 'T', textContent: TEXT };
+  });
+  afterEach(() => {
+    guest.failed = [];
+  });
+
+  it('still lets the ready clips play, from the first ready one, and replays from it', async () => {
+    renderReader();
+    await waitReady();
+    expect(
+      screen.queryByText(/couldn’t prepare the audio for this story/)
+    ).toBeNull();
+    fireEvent.click(playButton());
+    expect(played).toEqual(['1.mp3']);
+    await endAudio();
+    await endAudio();
+    await waitFor(() => expect(played).toEqual(['1.mp3', '2.mp3', '3.mp3']));
+    await endAudio();
+    expect(doneIds()).toContain('story-1');
+    fireEvent.click(playButton());
+    expect(played[played.length - 1]).toBe('1.mp3');
+  });
+
+  it('with read-along on, Play on page 2 narrates page 2', async () => {
+    renderReader();
+    await waitFor(() => screen.getByRole('switch'));
+    fireEvent.click(screen.getByRole('switch'));
+    await waitFor(() => expect(audioEl()).toBeTruthy());
+    expect(playButton().disabled).toBe(true);
+    await turnTo(1);
+    expect(playButton().disabled).toBe(false);
+    fireEvent.click(playButton());
+    await waitFor(() => expect(played).toEqual(['1.mp3']));
+    expect(screen.getAllByText('Page 2 of 6').length).toBeGreaterThan(0);
   });
 });

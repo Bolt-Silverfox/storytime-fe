@@ -31,7 +31,13 @@ export const pageForClip = (clip: number, pageCount: number): number =>
 export const clipForPage = (page: number, clipCount: number): number | null =>
   Number.isInteger(page) && page >= 0 && page < clipCount ? page : null;
 
-export type AlignKind = 'ok' | 'switch' | 'unavailable' | 'none';
+export const firstReadyClip = (ready: ReadonlySet<number>): number | null =>
+  ready.size > 0 ? Math.min(...ready) : null;
+
+const knownClipCount = (clipTotal: number, ready: ReadonlySet<number>) =>
+  clipTotal || (ready.size > 0 ? Math.max(...ready) + 1 : 0);
+
+export type AlignKind = 'ok' | 'switch' | 'unavailable' | 'failed' | 'none';
 
 // What Play (or a page turn) should do to the narration for `page`.
 // A single stored narration file is one clip for the whole story: pages are
@@ -41,23 +47,24 @@ export const alignClip = (a: {
   page: number;
   currentClip: number;
   clipTotal: number;
-  readyCount: number;
+  ready: ReadonlySet<number>;
+  failed: ReadonlySet<number>;
   singleFile: boolean;
 }): { kind: AlignKind; target: number } => {
   if (a.singleFile) {
     return { kind: 'ok', target: a.currentClip };
   }
-  const target = clipForPage(a.page, a.clipTotal || a.readyCount);
+  const target = clipForPage(a.page, knownClipCount(a.clipTotal, a.ready));
   if (target === null) {
     return { kind: 'none', target: a.currentClip };
   }
   if (target === a.currentClip) {
     return { kind: 'ok', target };
   }
-  if (target >= a.readyCount) {
-    return { kind: 'unavailable', target };
+  if (a.ready.has(target)) {
+    return { kind: 'switch', target };
   }
-  return { kind: 'switch', target };
+  return { kind: a.failed.has(target) ? 'failed' : 'unavailable', target };
 };
 
 export type ClipEnd = 'advance' | 'wait' | 'failed' | 'stop' | 'finish';
@@ -65,9 +72,9 @@ export type ClipEnd = 'advance' | 'wait' | 'failed' | 'stop' | 'finish';
 // What to do when the clip `current` finishes playing.
 export const clipEndAction = (a: {
   current: number;
-  readyCount: number;
+  ready: ReadonlySet<number>;
+  failed: ReadonlySet<number>;
   clipTotal: number;
-  nextFailed: boolean;
   pageCount: number;
   textVisible: boolean;
   singleFile: boolean;
@@ -77,14 +84,14 @@ export const clipEndAction = (a: {
     return 'finish';
   }
   const next = a.current + 1;
-  if (next < a.readyCount) {
+  if (a.ready.has(next)) {
     return 'advance';
   }
-  if (next < a.clipTotal && !a.nextFailed) {
-    return 'wait';
-  }
-  if (a.nextFailed) {
+  if (a.failed.has(next)) {
     return 'failed';
+  }
+  if (next < a.clipTotal) {
+    return 'wait';
   }
   // Out of clips. Long stories narrate only their first pages: with the text
   // on screen, stop on the next page and let the reader carry on; with the

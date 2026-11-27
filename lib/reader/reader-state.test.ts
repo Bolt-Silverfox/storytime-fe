@@ -3,6 +3,7 @@ import {
   alignClip,
   clipEndAction,
   clipForPage,
+  firstReadyClip,
   initialReaderState,
   pageForClip,
   progressPercent,
@@ -131,11 +132,14 @@ describe('swipeDirection', () => {
   });
 });
 
+const clips = (...i: number[]) => new Set(i);
+
 describe('alignClip (what Play / a page turn does to the narration)', () => {
   const base = {
     currentClip: 0,
     clipTotal: 4,
-    readyCount: 4,
+    ready: clips(0, 1, 2, 3),
+    failed: clips(),
     singleFile: false,
   };
   it('single stored narration file: never maps pages to clips (a)', () => {
@@ -145,7 +149,7 @@ describe('alignClip (what Play / a page turn does to the narration)', () => {
           ...base,
           page,
           clipTotal: 0,
-          readyCount: 1,
+          ready: clips(0),
           singleFile: true,
         }).kind
       ).toBe('ok');
@@ -159,19 +163,39 @@ describe('alignClip (what Play / a page turn does to the narration)', () => {
     expect(alignClip({ ...base, page: 0 })).toEqual({ kind: 'ok', target: 0 });
   });
   it('unavailable when the clip is not ready, none past the clips', () => {
-    expect(alignClip({ ...base, page: 3, readyCount: 2 }).kind).toBe(
+    expect(alignClip({ ...base, page: 3, ready: clips(0, 1) }).kind).toBe(
       'unavailable'
     );
     expect(alignClip({ ...base, page: 4 }).kind).toBe('none');
+  });
+  it('switches to a ready clip after a failed or still-generating one', () => {
+    expect(
+      alignClip({ ...base, page: 2, ready: clips(0, 2, 3), failed: clips(1) })
+    ).toEqual({ kind: 'switch', target: 2 });
+    expect(alignClip({ ...base, page: 2, ready: clips(0, 2, 3) })).toEqual({
+      kind: 'switch',
+      target: 2,
+    });
+  });
+  it('failed when the page clip failed', () => {
+    expect(
+      alignClip({ ...base, page: 1, ready: clips(0, 2, 3), failed: clips(1) })
+        .kind
+    ).toBe('failed');
+  });
+  it('with no clip count yet, a ready clip still counts as narration', () => {
+    expect(
+      alignClip({ ...base, clipTotal: 0, page: 2, ready: clips(0, 2) }).kind
+    ).toBe('switch');
   });
 });
 
 describe('clipEndAction (what happens when a clip ends)', () => {
   const base = {
     current: 0,
-    readyCount: 4,
+    ready: clips(0, 1, 2, 3),
+    failed: clips(),
     clipTotal: 4,
-    nextFailed: false,
     pageCount: 4,
     textVisible: true,
     singleFile: false,
@@ -179,18 +203,28 @@ describe('clipEndAction (what happens when a clip ends)', () => {
   it('advances while the next clip is ready', () => {
     expect(clipEndAction(base)).toBe('advance');
   });
+  it('advances from a clip played after a gap', () => {
+    expect(
+      clipEndAction({
+        ...base,
+        current: 2,
+        ready: clips(0, 2, 3),
+        failed: clips(1),
+      })
+    ).toBe('advance');
+  });
   it('waits for a clip still generating, flags a failed one', () => {
-    expect(clipEndAction({ ...base, readyCount: 1 })).toBe('wait');
-    expect(clipEndAction({ ...base, readyCount: 1, nextFailed: true })).toBe(
-      'failed'
-    );
+    expect(clipEndAction({ ...base, ready: clips(0) })).toBe('wait');
+    expect(
+      clipEndAction({ ...base, ready: clips(0, 2, 3), failed: clips(1) })
+    ).toBe('failed');
   });
   it('single file: finishes the story when the file ends, even with many pages (b)', () => {
     expect(
       clipEndAction({
         ...base,
         current: 0,
-        readyCount: 1,
+        ready: clips(0),
         clipTotal: 0,
         pageCount: 9,
         singleFile: true,
@@ -207,5 +241,15 @@ describe('clipEndAction (what happens when a clip ends)', () => {
     expect(
       clipEndAction({ ...base, current: 3, pageCount: 6, textVisible: false })
     ).toBe('finish');
+  });
+});
+
+describe('firstReadyClip (where narration starts and replays from)', () => {
+  it('is the lowest ready clip, skipping a failed start', () => {
+    expect(firstReadyClip(clips(0, 1))).toBe(0);
+    expect(firstReadyClip(clips(3, 1, 2))).toBe(1);
+  });
+  it('is null when nothing is ready', () => {
+    expect(firstReadyClip(clips())).toBeNull();
   });
 });

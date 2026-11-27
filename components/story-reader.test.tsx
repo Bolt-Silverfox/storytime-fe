@@ -25,6 +25,9 @@ const guest = vi.hoisted(() => ({
   failed: [] as number[],
   generating: [] as number[],
   gate: null as Promise<void> | null,
+  status: null as string | null,
+  jobId: 'job-1',
+  failPollFor: null as string | null,
 }));
 
 vi.mock('next/image', () => ({
@@ -44,7 +47,7 @@ vi.mock('@/lib/services', () => {
     }));
     const pending = guest.pending + guest.generating.length;
     return {
-      status: pending ? 'processing' : 'completed',
+      status: guest.status ?? (pending ? 'processing' : 'completed'),
       completedParagraphs: paras.filter(
         (p) =>
           !(
@@ -55,7 +58,7 @@ vi.mock('@/lib/services', () => {
       failedParagraphs: guest.failed,
       pendingParagraphs: pending,
       totalQueued: n + guest.pending,
-      ...(pending ? { batchJobId: 'job-1' } : {}),
+      ...(pending ? { batchJobId: guest.jobId } : {}),
     };
   };
   return {
@@ -65,7 +68,14 @@ vi.mock('@/lib/services', () => {
       await guest.gate;
       return batch();
     }),
-    getGuestStoryAudioBatchStatusService: vi.fn(async () => batch()),
+    getGuestStoryAudioBatchStatusService: vi.fn(
+      async (_storyId: string, jobId: string) => {
+        if (jobId === guest.failPollFor) {
+          throw new Error('poll failed');
+        }
+        return batch();
+      }
+    ),
     startStoryAudioBatchService: vi.fn(),
     getStoryAudioBatchStatusService: vi.fn(),
     recordUserProgressService: vi.fn(),
@@ -75,9 +85,12 @@ vi.mock('@/lib/services', () => {
   };
 });
 
+import { saveReadingPosition } from '@/lib/progress-store';
+import { pagesSignature, resolvePages } from '@/lib/reader/paginate';
+import * as services from '@/lib/services';
 import StoryReader from './story-reader';
 
-const renderReader = () =>
+const renderReader = (isGuest = true, mode = 'plain') =>
   render(
     <QueryClientProvider client={new QueryClient()}>
       <StoryReader
@@ -86,9 +99,9 @@ const renderReader = () =>
         description='D'
         voice='Storyteller'
         setStep={() => undefined}
-        mode='plain'
+        mode={mode}
         storyId='story-1'
-        isGuest
+        isGuest={isGuest}
       />
     </QueryClientProvider>
   );
@@ -583,5 +596,360 @@ describe('the first clip is still generating', () => {
     expect(playButton().disabled).toBe(true);
     fireEvent.click(playButton());
     expect(played).toEqual([]);
+  });
+});
+
+const pageShownIs = (n: number) =>
+  expect(screen.getAllByText(`Page ${n} of 6`).length).toBeGreaterThan(0);
+const batchApplied = async () => {
+  await waitFor(() =>
+    expect(services.startGuestStoryAudioBatchService).toHaveBeenCalled()
+  );
+  await act(async () => {
+    await vi.mocked(services.startGuestStoryAudioBatchService).mock.results[0]
+      ?.value;
+  });
+};
+let jobSeq = 0;
+const nextPoll = async () => {
+  const polls = vi.mocked(services.getGuestStoryAudioBatchStatusService);
+  const mine = () =>
+    polls.mock.calls.flatMap((call, i) =>
+      call[1] === guest.jobId ? [polls.mock.results[i]?.value] : []
+    );
+  const before = mine().length;
+  await waitFor(() => expect(mine().length).toBeGreaterThan(before), {
+    timeout: 3500,
+  });
+  await act(async () => {
+    await Promise.allSettled(mine());
+  });
+};
+const restorePage = (page: number) =>
+  saveReadingPosition(
+    'story-1',
+    page,
+    6,
+    pagesSignature(resolvePages(undefined, TEXT))
+  );
+const resetGuest = () => {
+  guest.clips = 0;
+  guest.pending = 0;
+  guest.failed = [];
+  guest.generating = [];
+  guest.status = null;
+  guest.gate = null;
+  guest.failPollFor = null;
+  jobSeq += 1;
+  guest.jobId = `job-${jobSeq}`;
+};
+
+describe('the first clip is still generating while later clips are ready', () => {
+  beforeEach(() => {
+    vi.mocked(services.startGuestStoryAudioBatchService).mockClear();
+    vi.mocked(services.getGuestStoryAudioBatchStatusService).mockClear();
+    resetGuest();
+    guest.clips = 4;
+    guest.generating = [0];
+    guest.story = { id: 'story-1', title: 'T', textContent: TEXT };
+  });
+  afterEach(resetGuest);
+
+  it('turning to a ready page enables Play and narrates that page', async () => {
+    renderReader();
+    fireEvent.click(await screen.findByRole('switch'));
+    await batchApplied();
+    expect(playButton().disabled).toBe(true);
+    await turnTo(1);
+    pageShownIs(2);
+    expect(playButton().disabled).toBe(false);
+    fireEvent.click(playButton());
+    await waitFor(() => expect(played).toEqual(['1.mp3']));
+    pageShownIs(2);
+  });
+
+  it('opening on a saved page whose clip is ready lets Play narrate it', async () => {
+    restorePage(2);
+    renderReader();
+    fireEvent.click(await screen.findByRole('switch'));
+    await batchApplied();
+    pageShownIs(3);
+    expect(playButton().disabled).toBe(false);
+    fireEvent.click(playButton());
+    await waitFor(() => expect(played).toEqual(['2.mp3']));
+    pageShownIs(3);
+  });
+
+  it('keeps the page the reader chose when the first clip arrives later', async () => {
+    renderReader();
+    fireEvent.click(await screen.findByRole('switch'));
+    await batchApplied();
+    await turnTo(1);
+    fireEvent.click(playButton());
+    await waitFor(() => expect(played).toEqual(['1.mp3']));
+    guest.generating = [];
+    await nextPoll();
+    expect(audioEl().getAttribute('src')).toBe('1.mp3');
+    pageShownIs(2);
+  });
+
+  it('with the text hidden, starts the narration once the first clip is ready', async () => {
+    renderReader();
+    await batchApplied();
+    expect(playButton().disabled).toBe(true);
+    guest.generating = [];
+    await nextPoll();
+    expect(playButton().disabled).toBe(false);
+    expect(screen.queryByText(/Preparing audio/)).toBeNull();
+    fireEvent.click(playButton());
+    expect(played).toEqual(['0.mp3']);
+  });
+
+  it('with the text hidden, starts on the next clip once the first one fails', async () => {
+    renderReader();
+    await batchApplied();
+    guest.generating = [];
+    guest.failed = [0];
+    await nextPoll();
+    expect(playButton().disabled).toBe(false);
+    fireEvent.click(playButton());
+    expect(played).toEqual(['1.mp3']);
+  });
+
+  it('when the batch ends without the first clip, the ready clips still play', async () => {
+    guest.status = 'failed';
+    renderReader();
+    await batchApplied();
+    expect(screen.queryByText(/Preparing audio/)).toBeNull();
+    expect(playButton().disabled).toBe(false);
+    fireEvent.click(playButton());
+    expect(played).toEqual(['1.mp3']);
+  });
+
+  it('when a status poll fails, the ready clips still play', async () => {
+    guest.failPollFor = guest.jobId;
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    renderReader();
+    await batchApplied();
+    await nextPoll();
+    expect(screen.getByText('Failed to load audio')).toBeTruthy();
+    expect(screen.queryByText(/Preparing audio/)).toBeNull();
+    expect(playButton().disabled).toBe(false);
+    fireEvent.click(playButton());
+    expect(played).toEqual(['1.mp3']);
+  });
+});
+
+type Clip = 'ready' | 'generating' | 'failed';
+const clipCombos = (n: number): Clip[][] =>
+  n === 0
+    ? [[]]
+    : clipCombos(n - 1).flatMap((rest) =>
+        (['ready', 'generating', 'failed'] as const).map((c) => [c, ...rest])
+      );
+
+describe('every combination of three clips for six pages', () => {
+  beforeEach(() => {
+    vi.mocked(services.startGuestStoryAudioBatchService).mockClear();
+    resetGuest();
+    guest.story = { id: 'story-1', title: 'T', textContent: TEXT };
+  });
+  afterEach(resetGuest);
+
+  const setUp = (states: Clip[]) => {
+    guest.clips = 3;
+    guest.failed = states.flatMap((s, i) => (s === 'failed' ? [i] : []));
+    guest.generating = states.flatMap((s, i) =>
+      s === 'generating' ? [i] : []
+    );
+    const first = states.findIndex((s) => s !== 'failed');
+    return first !== -1 && states[first] === 'ready' ? first : null;
+  };
+
+  for (const states of clipCombos(3)) {
+    it(`${states.join(',')}, text hidden`, async () => {
+      const start = setUp(states);
+      renderReader();
+      await batchApplied();
+      expect(playButton().disabled).toBe(start === null);
+      expect(screen.queryAllByText(/Preparing audio/).length > 0).toBe(
+        states.includes('generating')
+      );
+      expect(
+        screen.queryByText(/couldn’t prepare the audio for this story/) !== null
+      ).toBe(states.every((s) => s === 'failed'));
+      if (start !== null) {
+        fireEvent.click(playButton());
+        expect(played).toEqual([`${start}.mp3`]);
+      }
+    });
+
+    for (let page = 0; page < 3; page += 1) {
+      const clip = states[page];
+      it(`${states.join(',')}, text shown on page ${page + 1}`, async () => {
+        const start = setUp(states);
+        restorePage(page);
+        renderReader();
+        fireEvent.click(await screen.findByRole('switch'));
+        await batchApplied();
+        pageShownIs(page + 1);
+        const enabled =
+          clip === 'ready' || (clip === 'generating' && start !== null);
+        expect(playButton().disabled).toBe(!enabled);
+        expect(screen.queryByText(/Audio unavailable/) !== null).toBe(
+          clip === 'failed'
+        );
+        fireEvent.click(playButton());
+        if (!enabled) {
+          expect(played).toEqual([]);
+          return;
+        }
+        const narrated = clip === 'ready' ? page : (start as number);
+        await waitFor(() => expect(played).toEqual([`${narrated}.mp3`]));
+        pageShownIs(narrated + 1);
+      });
+    }
+  }
+});
+
+describe('finishing the story from the last page', () => {
+  const positions = () =>
+    JSON.parse(window.localStorage.getItem('readerPositions') ?? '{}');
+  const toLastPage = async () => {
+    fireEvent.click(await screen.findByRole('switch'));
+    await waitFor(() => screen.getAllByText(/^Page 1 of 6$/));
+    await turnTo(5);
+    pageShownIs(6);
+  };
+
+  beforeEach(() => {
+    resetGuest();
+    guest.story = { id: 'story-1', title: 'T', textContent: TEXT };
+  });
+  afterEach(resetGuest);
+
+  const guestShapes: [string, () => void][] = [
+    [
+      'more pages than clips',
+      () => {
+        guest.clips = 4;
+      },
+    ],
+    [
+      'no narration clips at all',
+      () => {
+        guest.clips = 0;
+      },
+    ],
+    [
+      'every clip failed',
+      () => {
+        guest.clips = 4;
+        guest.failed = [0, 1, 2, 3];
+      },
+    ],
+    [
+      'a single stored narration file',
+      () => {
+        guest.story = { ...guest.story, audioUrl: 'full.mp3' };
+      },
+    ],
+  ];
+
+  for (const [shape, arrange] of guestShapes) {
+    it(`a guest can finish a story with ${shape}`, async () => {
+      arrange();
+      renderReader();
+      await toLastPage();
+      expect(positions()).not.toEqual({});
+      fireEvent.click(screen.getByRole('button', { name: 'Finish story' }));
+      expect(doneIds()).toContain('story-1');
+      expect(positions()).toEqual({});
+      expect(screen.queryByRole('button', { name: 'Finish story' })).toBeNull();
+      expect(
+        screen.getByText('You finished the story!').getAttribute('role')
+      ).toBe('status');
+    });
+  }
+
+  it('a guest who narrated the clips and read on to the last page can finish', async () => {
+    guest.clips = 4;
+    renderReader();
+    fireEvent.click(await screen.findByRole('switch'));
+    await waitReady();
+    fireEvent.click(playButton());
+    for (let i = 0; i < 4; i += 1) {
+      await endAudio();
+    }
+    pageShownIs(5);
+    expect(doneIds()).toEqual([]);
+    await turnTo(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Finish story' }));
+    expect(doneIds()).toContain('story-1');
+  });
+
+  it('a guest on an interactive story with a quiz finishes through the quiz', async () => {
+    guest.clips = 4;
+    guest.story = {
+      ...guest.story,
+      questions: [
+        {
+          id: 'q',
+          storyId: 'story-1',
+          question: 'Q?',
+          options: ['x', 'y'],
+          correctOption: 0,
+        },
+      ],
+    };
+    renderReader(true, 'interactive');
+    await toLastPage();
+    expect(screen.queryByRole('button', { name: 'Finish story' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Take the quiz/ }));
+    expect(doneIds()).toContain('story-1');
+    expect(screen.getByText('Q?')).toBeTruthy();
+  });
+
+  describe('signed in', () => {
+    beforeEach(() => {
+      guest.clips = 4;
+      vi.mocked(services.getStoryByIdService).mockResolvedValue(guest.story);
+      vi.mocked(services.startStoryAudioBatchService).mockImplementation(() =>
+        vi.mocked(services.startGuestStoryAudioBatchService)('story-1')
+      );
+    });
+
+    it('offers one Finish story action on the last page', async () => {
+      vi.mocked(services.recordUserProgressService).mockResolvedValue(
+        undefined as never
+      );
+      renderReader(false);
+      await toLastPage();
+      expect(
+        screen.getAllByRole('button', { name: 'Finish story' })
+      ).toHaveLength(1);
+    });
+
+    it('retries saving the completion after it failed, and announces the result', async () => {
+      const record = vi.mocked(services.recordUserProgressService);
+      record.mockReset();
+      record
+        .mockRejectedValueOnce(new Error('offline'))
+        .mockResolvedValueOnce(undefined as never);
+      renderReader(false);
+      await toLastPage();
+      fireEvent.click(screen.getByRole('button', { name: 'Finish story' }));
+      expect((await screen.findByRole('alert')).textContent).toMatch(
+        /Couldn.t save progress/
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Finish story' }));
+      await waitFor(() => expect(record).toHaveBeenCalledTimes(2));
+      expect(
+        (
+          await screen.findByText('✓ Added to your completed stories')
+        ).getAttribute('role')
+      ).toBe('status');
+      expect(screen.queryByRole('alert')).toBeNull();
+    });
   });
 });

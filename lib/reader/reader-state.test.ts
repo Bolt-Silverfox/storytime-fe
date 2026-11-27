@@ -7,6 +7,7 @@ import {
   initialReaderState,
   narrationStart,
   pageForClip,
+  playEnabled,
   progressPercent,
   readerReducer,
   swipeDirection,
@@ -273,5 +274,138 @@ describe('narrationStart (the clip narration opens on)', () => {
   it('waits for an earlier clip still generating instead of skipping it', () => {
     expect(narrationStart(clips(1, 2), clips())).toBeNull();
     expect(narrationStart(clips(2), clips(0))).toBeNull();
+  });
+});
+
+type ClipState = 'ready' | 'generating' | 'failed';
+const STATES: ClipState[] = ['ready', 'generating', 'failed'];
+const combos = (n: number): ClipState[][] =>
+  n === 0
+    ? [[]]
+    : combos(n - 1).flatMap((rest) => STATES.map((s) => [s, ...rest]));
+const setsOf = (states: ClipState[]) => ({
+  ready: new Set(states.flatMap((s, i) => (s === 'ready' ? [i] : []))),
+  failed: new Set(states.flatMap((s, i) => (s === 'failed' ? [i] : []))),
+});
+
+describe('every combination of four clips', () => {
+  for (const states of combos(4)) {
+    const { ready, failed } = setsOf(states);
+    const firstUsable = states.findIndex((s) => s !== 'failed');
+    const start =
+      firstUsable !== -1 && states[firstUsable] === 'ready'
+        ? firstUsable
+        : null;
+
+    describe(states.join(','), () => {
+      it('narration opens on the first clip that has not failed, once it is ready', () => {
+        expect(narrationStart(ready, failed)).toBe(start);
+      });
+
+      for (const hasAudio of [false, true]) {
+        it(`Play with the text hidden ${hasAudio ? 'plays the selected clip' : 'waits for a clip to be selected'}`, () => {
+          expect(
+            playEnabled({
+              isPlaying: false,
+              hasAudio,
+              textVisible: false,
+              singleFile: false,
+              page: 0,
+              currentClip: start ?? 0,
+              clipTotal: 4,
+              ready,
+              failed,
+            })
+          ).toBe(hasAudio);
+        });
+
+        for (let page = 0; page < 6; page += 1) {
+          const clip = states[page];
+          const expected =
+            clip === 'ready' || (clip === 'generating' && hasAudio);
+          it(`Play on page ${page + 1} with ${hasAudio ? 'a' : 'no'} clip selected is ${expected ? 'enabled' : 'disabled'}`, () => {
+            expect(
+              playEnabled({
+                isPlaying: false,
+                hasAudio,
+                textVisible: true,
+                singleFile: false,
+                page,
+                currentClip: hasAudio ? (start ?? 0) : 0,
+                clipTotal: 4,
+                ready,
+                failed,
+              })
+            ).toBe(expected);
+          });
+        }
+      }
+
+      for (let current = 0; current < 4; current += 1) {
+        if (states[current] !== 'ready') {
+          continue;
+        }
+        const next = states[current + 1];
+        for (const textVisible of [false, true]) {
+          const expected =
+            next === 'ready'
+              ? 'advance'
+              : next === 'failed'
+                ? 'failed'
+                : next === 'generating'
+                  ? 'wait'
+                  : textVisible
+                    ? 'stop'
+                    : 'finish';
+          it(`clip ${current} ending with the text ${textVisible ? 'shown' : 'hidden'} on 6 pages: ${expected}`, () => {
+            expect(
+              clipEndAction({
+                current,
+                ready,
+                failed,
+                clipTotal: 4,
+                pageCount: 6,
+                textVisible,
+                singleFile: false,
+              })
+            ).toBe(expected);
+          });
+        }
+      }
+    });
+  }
+
+  it('Pause is always available while narrating', () => {
+    expect(
+      playEnabled({
+        isPlaying: true,
+        hasAudio: true,
+        textVisible: true,
+        singleFile: false,
+        page: 5,
+        currentClip: 3,
+        clipTotal: 4,
+        ready: clips(0, 1, 2, 3),
+        failed: clips(),
+      })
+    ).toBe(true);
+  });
+
+  it('a single stored file plays from any page once loaded', () => {
+    for (const hasAudio of [false, true]) {
+      expect(
+        playEnabled({
+          isPlaying: false,
+          hasAudio,
+          textVisible: true,
+          singleFile: true,
+          page: 4,
+          currentClip: 0,
+          clipTotal: 0,
+          ready: clips(0),
+          failed: clips(),
+        })
+      ).toBe(hasAudio);
+    }
   });
 });

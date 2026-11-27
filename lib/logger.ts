@@ -176,13 +176,14 @@ function isSensitiveKey(key: string): boolean {
 const JWT = /eyJ[\w-]{3,200}\.[\w-]{1,20000}\.[\w-]{0,2000}/g;
 // "Authorization: <scheme> <token>" with any scheme (or none).
 const AUTH_HEADER =
-  /(authorization["']?\s*[:=]\s*)(?:"[^"]{0,2000}"|'[^']{0,2000}'|(?:[A-Za-z][\w.-]{0,30}\s+)?[^\s,;"'&]+)/gi;
+  /(authorization["']?\s*[:=]\s*)(?:"(?:[^"\\]|\\.){0,2000}"|'(?:[^'\\]|\\.){0,2000}'|(?:[A-Za-z][\w.-]{0,30}\s+)?[^\s,;"'&]+)/gi;
 // Header lines (Cookie: a=1; b=2, Authorization: Digest a="1", b="2") carry
 // several pairs whose names are not secret-looking: mask to the end of the line.
 const AUTH_HEADER_LINE =
-  /(authorization["']?\s*:\s*)(?:"[^"\r\n]{0,8000}"|'[^'\r\n]{0,8000}'|[^\s"'`][^\r\n]*)/gi;
+  /(authorization["']?\s*:\s*)(?:"(?:[^"\\\r\n]|\\.){0,8000}"|'(?:[^'\\\r\n]|\\.){0,8000}'|[^\s"'`][^\r\n]*)/gi;
 const COOKIE_HEADER =
-  /(\b(?:set-)?cookie["']?\s*:\s*)(?:"[^"\r\n]{0,8000}"|'[^'\r\n]{0,8000}'|[^\s"'`][^\r\n"'`]*)/gi;
+  /(\b(?:set-)?cookie["']?\s*:\s*)(?:"(?:[^"\\\r\n]|\\.){0,8000}"|'(?:[^'\\\r\n]|\\.){0,8000}'|\[\s*"(?:[^"\\\r\n]|\\.){0,8000}"(?:\s*,\s*"(?:[^"\\\r\n]|\\.){0,8000}"){0,50}\s*\]|(?:\\+["'`]|[^\s"'`\\[{])(?:=\\*(["'`])(?:(?!\2)[^\r\n]){0,200}\2|[^\r\n"'`\\]|\\[^\r\nnr"'`]|['`](?=[^\s,;"'`\\]))*)/gi;
+const UNICODE_SEPARATOR = /\\u00(22|27|60|3[ad])/gi;
 // Scheme-prefixed credentials. The value must look like a credential, so
 // "a token of friendship" and "Basic information" stay readable. A
 // capitalised "Bearer" is the scheme name and is masked whatever follows.
@@ -477,6 +478,9 @@ function redactString(input: string, budget: Walk): string {
   }
   value = redactKeyNames(
     value
+      .replace(UNICODE_SEPARATOR, (_, hex: string) =>
+        String.fromCharCode(Number.parseInt(hex, 16))
+      )
       .replace(JWT, REDACTED)
       .replace(AUTH_HEADER_LINE, `$1${REDACTED}`)
       .replace(AUTH_HEADER, `$1${REDACTED}`)

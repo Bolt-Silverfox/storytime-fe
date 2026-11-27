@@ -2017,6 +2017,81 @@ describe('round 10: bounded work', () => {
   });
 });
 
+describe('round 11: every serialised header form', () => {
+  const SECRET = 'SECRETVALUE';
+  const cookie = `pref="a"; theme=${SECRET}; Path=/; HttpOnly`;
+  const digest = `Digest u="a", response=${SECRET}`;
+  const forms = (name: string, value: string) => [
+    `${name}: ${value}`,
+    JSON.stringify({ [name]: value, next: 1 }),
+    JSON.stringify(JSON.stringify({ [name]: value, next: 1 })),
+    JSON.stringify({ msg: `${name}: ${value}`, next: 1 }),
+    JSON.stringify({ msg: `${name}: "${value.replace(/"/g, "'")}"` }),
+    `{"${name}":${JSON.stringify([value, `x=${SECRET}`])}}`,
+    `${name}: '${value.replace(/"/g, "\\'")}'`,
+    `${name}%3A%20${encodeURIComponent(value)}`,
+    JSON.stringify({ [name]: value }).replace(/"/g, '\\u0022'),
+    `{"${name}\\u0022:\\u0022${value.replace(/"/g, '\\\\u0022')}"}`,
+    `${name}:\n  ${value}`,
+  ];
+  const inputs = [
+    ...['Cookie', 'Set-Cookie', 'cookie'].flatMap((n) => forms(n, cookie)),
+    ...['Authorization', 'Proxy-Authorization'].flatMap((n) =>
+      forms(n, digest)
+    ),
+    `Cookie: a=it's; theme=${SECRET}`,
+    `Cookie: a=\`x\`; theme=${SECRET}`,
+    `{"password\\u0022:\\u0022${SECRET}\\u0022}`,
+    `password\\u003d${SECRET}`,
+    `authorization=${JSON.stringify(digest)}, next=1`,
+    `{"x-api-key\\u0022:\\u0022${SECRET}"}`,
+  ];
+
+  it.each(inputs)('masks %s', (input) => {
+    expect(redact(input)).not.toContain(SECRET);
+  });
+
+  it('masks a quoted cookie value holding escaped quotes in a JSON body', () => {
+    const body = JSON.stringify({
+      cookie: `session="x"; theme=${SECRET}`,
+      next: 'keep',
+    });
+    expect(redact(body)).toBe('{"cookie":[REDACTED],"next":"keep"}');
+  });
+
+  it.each([
+    [
+      JSON.stringify({ msg: 'Cookie: a=1; b=2', next: 'keep' }),
+      '"next":"keep"',
+    ],
+    [
+      JSON.stringify({ msg: `Cookie: a="q"; b=${SECRET}`, next: 'keep' }),
+      '"next":"keep"',
+    ],
+    ["{h: 'Cookie: a=1', next: 'keep'}", "next: 'keep'"],
+    ['Cookie: a=1\r\nAccept: text/html', 'Accept: text/html'],
+    [JSON.stringify({ c: ['a=1'], next: 'keep' }), '"next":"keep"'],
+  ])('keeps the text after the header in %s', (input, kept) => {
+    expect(redact(input)).toContain(kept);
+  });
+
+  it.each([
+    ['quoted cookie value', 'cookie: a="'],
+    ['escaped quote', String.raw`cookie: \"a `],
+    ['array opener', 'cookie: ["a '],
+    ['unicode quote', String.raw`password\u0022:\u0022a `],
+  ])('64k chars of %s is not quadratic', (_name, piece) => {
+    const make = (chars: number) =>
+      `x${piece.repeat(Math.ceil(chars / piece.length))}`;
+    const small = make(8_000);
+    const large = make(64_000);
+    redact(small);
+    const t1 = best(() => redact(small));
+    const t2 = best(() => redact(large));
+    expect(t2).toBeLessThan(20 * t1 + 25);
+  });
+});
+
 describe('round 11: failure classification table', () => {
   const axiosConfig = { headers: new AxiosHeaders() } as never;
   const kinds: [string, () => unknown, boolean, boolean][] = [

@@ -104,7 +104,11 @@ jobs:
             echo "NEXT_PUBLIC_APPLE_SERVICE_ID=${{ vars.NEXT_PUBLIC_APPLE_SERVICE_ID }}"
             echo "NEXT_PUBLIC_APPLE_REDIRECT_URI=${{ vars.NEXT_PUBLIC_APPLE_REDIRECT_URI }}"
             echo "NEXT_PUBLIC_SENTRY_DSN=${{ vars.NEXT_PUBLIC_SENTRY_DSN }}"
-            echo "NEXT_PUBLIC_SENTRY_ENV=${{ vars.NEXT_PUBLIC_SENTRY_ENV }}"
+            # instrumentation-client.ts reads NEXT_PUBLIC_SENTRY_ENVIRONMENT. The
+            # per-environment variable is still named NEXT_PUBLIC_SENTRY_ENV, so
+            # prefer it: the repo-level NEXT_PUBLIC_SENTRY_ENVIRONMENT is
+            # "production" and would otherwise mislabel this environment.
+            echo "NEXT_PUBLIC_SENTRY_ENVIRONMENT=${{ vars.NEXT_PUBLIC_SENTRY_ENV || vars.NEXT_PUBLIC_SENTRY_ENVIRONMENT }}"
           } >> .env
 
       - name: Build application

@@ -39,7 +39,26 @@ const activatesOnSpace = (target: EventTarget | null): boolean => {
   return (
     !!el &&
     typeof el.closest === 'function' &&
-    !!el.closest('button, a[href], summary, [role="button"], [role="switch"]')
+    !!el.closest('button, summary, [role="button"], [role="switch"]')
+  );
+};
+
+const onScrollbar = (e: PointerEvent): boolean => {
+  const el = e.target;
+  if (!(el instanceof Element)) {
+    return false;
+  }
+  const isViewport = el === document.documentElement;
+  const box = el.getBoundingClientRect();
+  const right = isViewport
+    ? el.clientWidth
+    : box.left + el.clientLeft + el.clientWidth;
+  const bottom = isViewport
+    ? el.clientHeight
+    : box.top + el.clientTop + el.clientHeight;
+  return (
+    (el.scrollHeight > el.clientHeight && e.clientX >= right) ||
+    (el.scrollWidth > el.clientWidth && e.clientY >= bottom)
   );
 };
 
@@ -151,19 +170,19 @@ const PageView = ({
   const lastUserScroll = useRef(Number.NEGATIVE_INFINITY);
   const lastOwnScroll = useRef(Number.NEGATIVE_INFINITY);
 
-  // Wheel, touch-drag, scroll keys and a held pointer (scrollbar drag) come
+  // Wheel, touch-drag, scroll keys and a scrollbar drag come
   // only from the user (scrollIntoView fires none of them), so they mark
   // manual scrolling without catching our own.
   useEffect(() => {
     const mark = () => {
       lastUserScroll.current = Date.now();
     };
-    let pointerHeld = false;
-    const onPointerDown = () => {
-      pointerHeld = true;
+    let draggingScrollbar = false;
+    const onPointerDown = (e: PointerEvent) => {
+      draggingScrollbar = onScrollbar(e);
     };
     const onPointerUp = () => {
-      pointerHeld = false;
+      draggingScrollbar = false;
     };
     const onKeyDown = (e: KeyboardEvent) => {
       if (
@@ -179,7 +198,7 @@ const PageView = ({
     // also do, so ignore those shortly after our own call.
     const onScroll = () => {
       if (
-        pointerHeld ||
+        draggingScrollbar ||
         Date.now() - lastOwnScroll.current > OWN_SCROLL_SETTLE_MS
       ) {
         mark();

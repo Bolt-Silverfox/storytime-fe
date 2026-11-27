@@ -116,4 +116,20 @@ describe('CreateNewPasswordContent', () => {
     expect(window.location.search).toBe('');
     expect(readResetSession()).toBeNull();
   });
+
+  it('submits the reset once when the button is pressed twice in quick succession', async () => {
+    saveResetSession({ token: '12345678', email: 'a@b.co' });
+    resetPasswordService.mockReturnValue(new Promise(() => {}));
+    render(<CreateNewPasswordContent />);
+    const [pw, confirm] = screen.getAllByPlaceholderText('Enter your password');
+    fireEvent.change(pw, { target: { value: PASSWORD } });
+    fireEvent.change(confirm, { target: { value: PASSWORD } });
+    const button = screen.getByRole('button', { name: 'Change password' });
+    await waitFor(() => expect(button.hasAttribute('disabled')).toBe(false));
+    fireEvent.click(button);
+    fireEvent.click(button);
+    await waitFor(() => expect(resetPasswordService).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(resetPasswordService).toHaveBeenCalledTimes(1);
+  });
 });

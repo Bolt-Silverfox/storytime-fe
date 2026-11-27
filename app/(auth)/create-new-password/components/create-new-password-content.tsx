@@ -2,7 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -66,6 +66,7 @@ export const CreateNewPasswordContent = () => {
   const [session, setSession] = useState<ResetSession | null>(null);
   const [passwordType, setPasswordType] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const submitting = useRef(false);
 
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
@@ -86,9 +87,10 @@ export const CreateNewPasswordContent = () => {
   }, [router]);
 
   async function onSubmit(data: z.infer<typeof FormSchema>) {
-    if (!session) {
+    if (!session || submitting.current) {
       return;
     }
+    submitting.current = true;
     const { token, email } = session;
     setIsLoading(true);
 
@@ -104,6 +106,7 @@ export const CreateNewPasswordContent = () => {
       router.push('/create-new-password/success');
       // biome-ignore lint/suspicious/noExplicitAny: the caught value is untyped; only .message is read below
     } catch (err: any) {
+      submitting.current = false;
       toast.error(err.message || 'Something went wrong');
     } finally {
       setIsLoading(false);

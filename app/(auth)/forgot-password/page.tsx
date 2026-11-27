@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/auth-context';
+import { clearResetSession } from '@/lib/reset-session';
 import { requestPasswordResetService } from '@/lib/services';
 import { StepBackButton } from '../register/components/step-back';
 
@@ -33,6 +34,7 @@ const Page = () => {
   const { registrationData, setRegistrationData } = useAuth();
 
   const [isLoading, setIsLoading] = useState(false);
+  const submitting = useRef(false);
 
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
@@ -43,9 +45,14 @@ const Page = () => {
   });
 
   async function onSubmit(data: z.infer<typeof FormSchema>) {
+    if (submitting.current) {
+      return;
+    }
+    submitting.current = true;
     setIsLoading(true);
     try {
       const res = await requestPasswordResetService(data.email);
+      clearResetSession();
       setRegistrationData({
         ...registrationData,
         email: data.email,
@@ -58,6 +65,7 @@ const Page = () => {
       router.push('/forgot-password/verify');
       // biome-ignore lint/suspicious/noExplicitAny: the caught value is untyped; only .message is read below
     } catch (error: any) {
+      submitting.current = false;
       toast.error('Something went wrong', {
         description: error?.message || 'Failed to send password reset email.',
       });

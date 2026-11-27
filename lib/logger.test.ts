@@ -1972,3 +1972,36 @@ describe('round 10: credential words inside subscripts and acronyms', () => {
     ).toEqual([]);
   });
 });
+
+describe('round 10: bounded work', () => {
+  it('a subscript chain before a long run of trailing spaces is not quadratic', () => {
+    const chain = `x${'[token]'.repeat(4_500)}=`;
+    const spaces = ' '.repeat(32_000);
+    const noValue = `${chain}${spaces}`;
+    const withValue = `${chain}v${spaces}`;
+    expect(noValue.length).toBeLessThan(64_000);
+    redact(withValue);
+    const linear = best(() => redact(withValue));
+    const t = best(() => redact(noValue));
+    expect(t).toBeLessThan(5 * linear + 10);
+  });
+
+  it('charges empty containers against the output budget', () => {
+    const tree = Array.from({ length: 100 }, () =>
+      Array.from({ length: 100 }, () => Array.from({ length: 100 }, () => []))
+    );
+    expect(JSON.stringify(redact(tree)).length).toBeLessThan(200_000);
+    const objects = Array.from({ length: 100 }, () =>
+      Array.from({ length: 100 }, () => Array.from({ length: 100 }, () => ({})))
+    );
+    expect(JSON.stringify(redact(objects)).length).toBeLessThan(200_000);
+  });
+
+  it('keeps small empty containers', () => {
+    expect(redact({ list: [], map: {}, nested: [[], [{}]] })).toEqual({
+      list: [],
+      map: {},
+      nested: [[], [{}]],
+    });
+  });
+});

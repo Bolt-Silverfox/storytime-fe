@@ -228,26 +228,38 @@ interface Separator {
   percentEncoded: boolean;
 }
 
+interface SepChar {
+  end: number;
+  assigns: boolean;
+  percentEncoded: boolean;
+}
+
+interface SepMemo {
+  chain: Map<number, number>;
+  sepChar: Map<number, SepChar | null>;
+}
+
 /**
  * The separator that follows a key at `from`, or null.
  *
- * Linear by construction and never gives up early: `memo` maps every token
- * boundary already walked to where its walk ended, so a later key found inside
- * a subscript chain stops at the first boundary an earlier walk reached
- * instead of re-parsing the chain. Each boundary is tokenised at most once per
- * string; there is no work budget that could run out and skip masking.
+ * Linear by construction and never gives up early: `memo.chain` maps every
+ * token boundary already walked to where its walk ended, so a later key found
+ * inside a subscript chain stops at the first boundary an earlier walk reached
+ * instead of re-parsing the chain, and `memo.sepChar` keeps the separator and
+ * the whitespace after it for that end. Each boundary is tokenised at most once
+ * per string; there is no work budget that could run out and skip masking.
  */
 function parseSep(
   input: string,
   from: number,
-  memo: Map<number, number>
+  memo: SepMemo
 ): Separator | null {
   SEP_OPENER.lastIndex = from;
   const opened = SEP_OPENER.test(input);
   let i = from;
   const visited: number[] = [];
   for (;;) {
-    const known = memo.get(i);
+    const known = memo.chain.get(i);
     if (known !== undefined) {
       i = known;
       break;
@@ -265,18 +277,33 @@ function parseSep(
     i += m[0].length;
   }
   for (const v of visited) {
-    memo.set(v, i);
+    memo.chain.set(v, i);
   }
-  SEP_CHAR.lastIndex = i;
+  let sep = memo.sepChar.get(i);
+  if (sep === undefined) {
+    sep = sepCharAt(input, i);
+    memo.sepChar.set(i, sep);
+  }
+  return (
+    sep && {
+      end: sep.end,
+      explicit: opened || sep.assigns,
+      percentEncoded: sep.percentEncoded,
+    }
+  );
+}
+
+function sepCharAt(input: string, at: number): SepChar | null {
+  SEP_CHAR.lastIndex = at;
   const c = SEP_CHAR.exec(input);
   if (!c) {
     return null;
   }
-  i += c[0].length;
-  TRAIL_SPACE.lastIndex = i;
+  const afterSep = at + c[0].length;
+  TRAIL_SPACE.lastIndex = afterSep;
   return {
-    end: i + (TRAIL_SPACE.exec(input)?.[0].length ?? 0),
-    explicit: opened || c[1] !== undefined || c[2] !== undefined,
+    end: afterSep + (TRAIL_SPACE.exec(input)?.[0].length ?? 0),
+    assigns: c[1] !== undefined || c[2] !== undefined,
     percentEncoded: c[0].startsWith('%'),
   };
 }
@@ -390,14 +417,14 @@ function valueSpan(
 
 function redactKeyNames(input: string): string {
   KEY_SCAN.lastIndex = 0;
-  const chainMemo = new Map<number, number>();
+  const sepMemo: SepMemo = { chain: new Map(), sepChar: new Map() };
   let out = '';
   let pos = 0;
   for (let m = KEY_SCAN.exec(input); m; m = KEY_SCAN.exec(input)) {
     const [, before, key] = m;
     const keyEnd = m.index + before.length + key.length;
     const cls = classifyKey(key);
-    const sep = cls ? parseSep(input, keyEnd, chainMemo) : null;
+    const sep = cls ? parseSep(input, keyEnd, sepMemo) : null;
     const span =
       cls && sep && shouldMask(cls, key, sep, input)
         ? valueSpan(
@@ -633,6 +660,7 @@ function cleanNode(value: unknown, depth: number, walk: Walk): unknown {
   if (isError || isHttp) {
     return cleanError(value, isError, isHttp, depth, walk);
   }
+  walk.out -= 2;
   if (Array.isArray(value)) {
     const items: unknown[] = [];
     for (let i = 0; i < value.length; i++) {

@@ -312,6 +312,7 @@ const StoryReader = ({
       setFailedIndices(new Set());
       setAudioParagraphs([]);
       setAudioUrl(null);
+      resetClock();
       setAudioSounding(false);
       setCurrentClip(0);
       setIsPlaying(false);
@@ -418,6 +419,7 @@ const StoryReader = ({
           clipIndexRef.current = next;
           setCurrentClip(next);
           setAudioUrl(readyByIndex.get(next) as string);
+          resetClock();
           if (isCheckedRef.current) {
             dispatch({ type: 'clip', clip: next, from: next - 1 });
           }

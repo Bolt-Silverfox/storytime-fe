@@ -1259,3 +1259,131 @@ describe('finishing the story from the last page', () => {
     });
   });
 });
+
+describe('read-along highlight when the narrated clip changes', () => {
+  const SENTENCES = ['a', 'b', 'c', 'd', 'e', 'f']
+    .map((p) => `${words(9, p)}.`)
+    .join(' ');
+  const seen: (string | null)[] = [];
+  let tracking = false;
+  const record = () => {
+    if (tracking) {
+      seen.push(
+        document
+          .querySelector('[data-active="true"]')
+          ?.getAttribute('data-sentence') ?? null
+      );
+    }
+  };
+  const setClock = async (time: number, duration: number) => {
+    const el = audioEl();
+    Object.defineProperty(el, 'duration', {
+      value: duration,
+      configurable: true,
+    });
+    Object.defineProperty(el, 'currentTime', {
+      value: time,
+      configurable: true,
+      writable: true,
+    });
+    await act(async () => {
+      fireEvent.loadedMetadata(el);
+      fireEvent.timeUpdate(el);
+    });
+  };
+  const srcChangeRewindsElement = () => {
+    const el = audioEl();
+    Object.defineProperty(el, 'currentTime', { value: 0, configurable: true });
+    Object.defineProperty(el, 'duration', {
+      value: Number.NaN,
+      configurable: true,
+    });
+  };
+  const activeSentences = () =>
+    Array.from(document.querySelectorAll('[data-active="true"]')).map((e) =>
+      e.textContent?.slice(0, 2)
+    );
+
+  beforeEach(() => {
+    vi.mocked(services.startGuestStoryAudioBatchService).mockClear();
+    vi.mocked(services.getGuestStoryAudioBatchStatusService).mockClear();
+    resetGuest();
+    guest.clips = 2;
+    guest.story = { id: 'story-1', title: 'T', textContent: SENTENCES };
+  });
+  afterEach(() => {
+    tracking = false;
+    seen.length = 0;
+    vi.restoreAllMocks();
+    resetGuest();
+  });
+
+  const playFirstClipToItsEnd = async () => {
+    renderReader(true, 'plain', record);
+    fireEvent.click(await screen.findByRole('switch'));
+    await batchApplied();
+    fireEvent.click(playButton());
+    await waitFor(() => expect(played).toEqual(['0.mp3']));
+    await setClock(29, 30);
+    expect(activeSentences()).toEqual(['c0']);
+  };
+
+  const scenarios: {
+    name: string;
+    generating: number[];
+    change: () => Promise<void>;
+    page: number;
+  }[] = [
+    {
+      name: 'the next clip arrives after the narration waited for it',
+      generating: [1],
+      page: 2,
+      change: async () => {
+        await endAudio();
+        srcChangeRewindsElement();
+        guest.generating = [];
+        tracking = true;
+        await nextPoll();
+      },
+    },
+    {
+      name: 'Try again prepares the audio afresh',
+      generating: [],
+      page: 1,
+      change: async () => {
+        vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(() =>
+          Promise.reject(new Error('nope'))
+        );
+        fireEvent.click(playButton());
+        fireEvent.click(playButton());
+        const retry = await screen.findByRole('button', { name: /try again/i });
+        let release: () => void = () => undefined;
+        guest.gate = new Promise<void>((r) => {
+          release = r;
+        });
+        fireEvent.click(retry);
+        await waitFor(() => expect(audioEl()).toBeNull());
+        tracking = true;
+        await act(async () => {
+          release();
+        });
+        await waitFor(() => expect(audioEl()).toBeTruthy());
+      },
+    },
+  ];
+
+  it.each(scenarios)(
+    'never lights a stale sentence when $name',
+    async ({ generating, change, page }) => {
+      guest.generating = generating;
+      await playFirstClipToItsEnd();
+      await change();
+      tracking = false;
+      expect(screen.getAllByText(`Page ${page} of 2`).length).toBeGreaterThan(
+        0
+      );
+      expect(seen.length).toBeGreaterThan(0);
+      expect(seen.filter((i) => i !== null && i !== '0')).toEqual([]);
+    }
+  );
+});

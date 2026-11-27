@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { AxiosError, AxiosHeaders } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fieldsMatching } from '@/test/fields-matching';
 
 const get = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/axios', () => ({ default: { get } }));
@@ -103,9 +104,15 @@ describe.each(services)('%s errors', (_name, call, url, path) => {
     expect(message).toBe(`Expected failure: unauthorised GET ${path}`);
     expect(hint.tags['http.path']).toBe(path);
     expect(hint.tags['http.status']).toBe('401');
-    expect(JSON.stringify(sentry.captureMessage.mock.calls)).not.toContain(
-      'kid@example.com'
+    expect(sentry.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({ level: 'warning', message: 'failed' })
     );
+    expect(
+      fieldsMatching(
+        [sentry.captureMessage.mock.calls, sentry.addBreadcrumb.mock.calls],
+        'kid@example.com'
+      )
+    ).toEqual([]);
   });
 
   it('keep ERR_NETWORK when there is no response', async () => {

@@ -1908,3 +1908,67 @@ describe('parse errors', () => {
     expect(copy.message).not.toContain('Ada');
   });
 });
+
+describe('round 10: credential words inside subscripts and acronyms', () => {
+  const SECRET = 'S3cr3tV4lue99';
+  const maskedKeys = [
+    'form[otp]',
+    'form[pwd]',
+    '[otp]',
+    'otp[]',
+    'otp[0]',
+    'kid[otp][]',
+    'a.b[otp]',
+    'user.otp.',
+    'userPWDHash',
+    'IBANNumber',
+    'OTPValue',
+    'cvc',
+    'card_cvc',
+    'pw',
+    'admin_pw',
+  ];
+  const keptKeys = ['form[otp_sent]', 'otp_sent[0]', 'pwa', 'cvcount', 'pwr'];
+
+  it.each(maskedKeys)('masks the value of object key %s', (key) => {
+    const out = redact({ [key]: SECRET }) as Record<string, unknown>;
+    expect(out[key]).toBe('[REDACTED]');
+  });
+
+  it.each(maskedKeys)('masks %s in key=value and JSON text', (key) => {
+    expect(redact(`${key}=${SECRET}`)).toBe(`${key}=[REDACTED]`);
+    expect(redact(`{"${key}":"${SECRET}"}`)).toBe(`{"${key}":"[REDACTED]"}`);
+  });
+
+  it.each(keptKeys)('keeps the value of object key %s', (key) => {
+    const out = redact({ [key]: 'kept' }) as Record<string, unknown>;
+    expect(out[key]).toBe('kept');
+  });
+
+  it('masks a subscripted credential key in every sink', () => {
+    const err = Object.assign(new Error('e'), { 'form[otp]': SECRET });
+    logger.error('x', err, {
+      context: { 'form[otp]': SECRET },
+      tags: { 'form[otp]': SECRET },
+    });
+    logger.warn('w', { 'form[otp]': SECRET });
+    const [copy, hint] = sentry.captureException.mock.calls[0] as [
+      Record<string, unknown>,
+      { extra: Record<string, unknown>; tags: Record<string, string> },
+    ];
+    expect(copy['form[otp]']).toBeUndefined();
+    expect(hint.extra['form[otp]']).toBe('[REDACTED]');
+    expect(hint.tags['form[otp]']).toBeUndefined();
+    expect(
+      fieldsMatching(
+        [
+          sentry.captureException.mock.calls,
+          sentry.addBreadcrumb.mock.calls,
+          spies.error.mock.calls,
+          spies.warn.mock.calls,
+        ],
+        SECRET
+      )
+    ).toEqual([]);
+  });
+});

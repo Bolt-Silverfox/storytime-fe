@@ -91,7 +91,7 @@ const SENSITIVE_STEMS = [
 // Unambiguous short credential words: matched as a whole key OR as one word
 // (segment) of a longer key (db_pwd, user_otp), never as a substring
 // ("classname" must not match "ssn").
-const SENSITIVE_WORDS = new Set(['otp', 'pwd', 'ssn', 'iban']);
+const SENSITIVE_WORDS = new Set(['otp', 'pwd', 'pw', 'ssn', 'iban', 'cvc']);
 // A sensitive word only counts when it ends the key ("db_pwd", "user_otp") or
 // is followed only by these ("iban_number"); "otp_sent", "pwd_changed_at" and
 // "ssn_last4_hint" describe the credential rather than hold it.
@@ -140,8 +140,10 @@ const normaliseKey = (key: string) => key.toLowerCase().replace(/[\s_.-]/g, '');
 const keyWords = (key: string) =>
   key
     .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/([A-Z])([A-Z][a-z])/g, '$1_$2')
     .toLowerCase()
-    .split(/[\s_.\-[\]]+/);
+    .split(/[\s_.\-[\]]+/)
+    .filter((word) => word !== '' && !/^\d+$/.test(word));
 
 function hasCredentialWord(words: string[]): boolean {
   for (let i = words.length - 1; i >= 0; i--) {

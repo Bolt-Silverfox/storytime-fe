@@ -174,9 +174,6 @@ function isSensitiveKey(key: string): boolean {
 // Header and payload are length-bounded so a run of "eyJ" cannot make the
 // match quadratic.
 const JWT = /eyJ[\w-]{3,200}\.[\w-]{1,20000}\.[\w-]{0,2000}/g;
-// "Authorization: <scheme> <token>" with any scheme (or none).
-const AUTH_HEADER =
-  /(authorization["']?\s*[:=]\s*)(?:"(?:[^"\\]|\\.){0,2000}"|'(?:[^'\\]|\\.){0,2000}'|(?:[A-Za-z][\w.-]{0,30}\s+)?[^\s,;"'&]+)/gi;
 // Header lines (Cookie: a=1; b=2, Authorization: Digest a="1", b="2") carry
 // several pairs whose names are not secret-looking: mask to the end of the line.
 const AUTH_HEADER_LINE =
@@ -226,6 +223,7 @@ const TRAIL_SPACE = /\s*/y;
 interface Separator {
   end: number;
   explicit: boolean;
+  assigns: boolean;
   percentEncoded: boolean;
 }
 
@@ -289,6 +287,7 @@ function parseSep(
     sep && {
       end: sep.end,
       explicit: opened || sep.assigns,
+      assigns: sep.assigns,
       percentEncoded: sep.percentEncoded,
     }
   );
@@ -309,15 +308,195 @@ function sepCharAt(input: string, at: number): SepChar | null {
   };
 }
 const FILE_NAME = /\.(?:m?[jt]sx?|map|css|html?)$/i;
-// Unquoted values run to the next delimiter, with NO length cap, so a long
-// token is never cut in the middle and left half-visible. Queries split on a
-// literal "&" before decoding, so "%26" ends a value only after an encoded separator.
-const VALUE_RUN = /[^\s&#;,"'`()[\]{}<>]+/y;
-const ENCODED_VALUE_RUN = /(?:(?!%26)[^\s&#;,"'`()[\]{}<>])+/y;
-const VALUE_GROUP =
-  /\[[^\]\n]{0,2000}\]|\([^)\n]{0,2000}\)|\{[^}\n]{0,2000}\}|<[^>\n]{0,2000}>/y;
-const VALUE_UNCLOSED = /[[({<][^\s&#;,"'`]*/y;
 const VALUE_OPEN_QUOTE = /(\\*)(["'`])/y;
+
+type Grammar = 'query' | 'encoded' | 'assign' | 'param';
+const HARD_END: Record<Grammar, RegExp> = {
+  query: /[\s&#"`<>]/,
+  encoded: /[\s&#"`<>]/,
+  assign: /[\s&#;]/,
+  param: /[\s&,]/,
+};
+const ENCODED_END = /%2[36]/iy;
+const QUOTES = '"\'`';
+const OPENERS = '([{<';
+const CLOSERS = ')]}>';
+const CLOSING_RUN = /[\\"'`)\]}>]*/y;
+const AFTER_QUOTED_RUN = /[,:;&]/;
+const AFTER_COMMA = /["'`\\]/;
+
+const isUrlGrammar = (grammar: Grammar) =>
+  grammar === 'query' || grammar === 'encoded';
+
+function endsValueAt(input: string, at: number, grammar: Grammar): boolean {
+  if (at >= input.length || /\s/.test(input[at])) {
+    return true;
+  }
+  if (HARD_END[grammar].test(input[at])) {
+    return true;
+  }
+  ENCODED_END.lastIndex = at;
+  return grammar === 'encoded' && ENCODED_END.test(input);
+}
+
+function quotedEnd(input: string, at: number, limit = input.length): number {
+  const q = input[at];
+  let i = at + 1;
+  while (i < limit && input[i] !== q && input[i] !== '\n') {
+    i += input[i] === '\\' ? 2 : 1;
+  }
+  return Math.min(i + 1, limit);
+}
+
+function closingRunEnds(
+  input: string,
+  at: number,
+  runEnd: number,
+  grammar: Grammar
+): boolean {
+  if (endsValueAt(input, runEnd, grammar)) {
+    return true;
+  }
+  if (isUrlGrammar(grammar)) {
+    return false;
+  }
+  const run = input.slice(at, runEnd);
+  return /["'`]/.test(run) && AFTER_QUOTED_RUN.test(input[runEnd]);
+}
+
+const MAX_GROUP = 2_000;
+
+function groupEnd(input: string, at: number): number {
+  const limit = Math.min(input.length, at + MAX_GROUP);
+  const unclosed = new Set<string>();
+  let depth = 0;
+  for (let i = at; i < limit; i++) {
+    const c = input[i];
+    if (c === '\n' || c === '\r') {
+      return -1;
+    }
+    if (OPENERS.includes(c)) {
+      depth++;
+    } else if (CLOSERS.includes(c)) {
+      depth--;
+      if (depth === 0) {
+        return i + 1;
+      }
+    } else if (QUOTES.includes(c) && !unclosed.has(c)) {
+      const end = quotedEnd(input, i, limit);
+      if (input[end - 1] === c && end - 1 > i) {
+        i = end - 1;
+      } else {
+        unclosed.add(c);
+      }
+    }
+  }
+  return -1;
+}
+
+function unquotedEnd(input: string, from: number, grammar: Grammar): number {
+  let groups = true;
+  let i = from;
+  while (i < input.length && !endsValueAt(input, i, grammar)) {
+    const c = input[i];
+    if (OPENERS.includes(c) && groups) {
+      const end = groupEnd(input, i);
+      if (end !== -1) {
+        i = end;
+        continue;
+      }
+      groups = false;
+    } else if (c === ',' && i > from) {
+      const next = input[i + 1] ?? '';
+      if (
+        endsValueAt(input, i + 1, grammar) ||
+        (!isUrlGrammar(grammar) && AFTER_COMMA.test(next))
+      ) {
+        break;
+      }
+    } else if (i > from && (QUOTES + CLOSERS).includes(c)) {
+      CLOSING_RUN.lastIndex = i;
+      CLOSING_RUN.test(input);
+      const runEnd = CLOSING_RUN.lastIndex;
+      if (closingRunEnds(input, i, runEnd, grammar)) {
+        break;
+      }
+      i = runEnd;
+      continue;
+    } else if (c === '\\' && i > from) {
+      CLOSING_RUN.lastIndex = i;
+      CLOSING_RUN.test(input);
+      const runEnd = CLOSING_RUN.lastIndex;
+      if (
+        /["'`]/.test(input.slice(i, runEnd)) &&
+        closingRunEnds(input, i, runEnd, grammar)
+      ) {
+        break;
+      }
+      i = runEnd;
+      continue;
+    }
+    i++;
+  }
+  return i;
+}
+
+const AUTH_SCHEME = /[A-Za-z][\w.-]{0,30}[^\S\r\n]+/y;
+const PARAM_NAME = /[\w-]+[^\S\r\n]*=[^\S\r\n]*/y;
+const PARAM_GAP = /[^\S\r\n]*,[^\S\r\n]*/y;
+
+function paramEnd(input: string, at: number): number {
+  PARAM_NAME.lastIndex = at;
+  const start = PARAM_NAME.test(input) ? PARAM_NAME.lastIndex : at;
+  return QUOTES.includes(input[start] ?? '')
+    ? quotedEnd(input, start)
+    : unquotedEnd(input, start, 'param');
+}
+
+function paramFollows(input: string, at: number): boolean {
+  PARAM_GAP.lastIndex = at;
+  if (!PARAM_GAP.test(input)) {
+    return false;
+  }
+  PARAM_NAME.lastIndex = PARAM_GAP.lastIndex;
+  return PARAM_NAME.test(input);
+}
+
+function authSchemeEnd(input: string, from: number, grammar: Grammar): number {
+  AUTH_SCHEME.lastIndex = from;
+  let end: number;
+  if (AUTH_SCHEME.test(input)) {
+    end = paramEnd(input, AUTH_SCHEME.lastIndex);
+  } else {
+    end = unquotedEnd(input, from, grammar);
+    if (input.slice(from, end) !== REDACTED || !paramFollows(input, end)) {
+      return end;
+    }
+  }
+  for (;;) {
+    PARAM_GAP.lastIndex = end;
+    if (!PARAM_GAP.test(input)) {
+      return end;
+    }
+    end = paramEnd(input, PARAM_GAP.lastIndex);
+  }
+}
+
+function atLineStart(input: string, at: number): boolean {
+  let i = at;
+  while (input[i - 1] === ' ' || input[i - 1] === '\t') {
+    i--;
+  }
+  return i === 0 || input[i - 1] === '\n' || input[i - 1] === '\r';
+}
+
+function lineEnd(input: string, from: number): number {
+  let i = from;
+  while (i < input.length && input[i] !== '\n' && input[i] !== '\r') {
+    i++;
+  }
+  return i;
+}
 
 // Only the story-ish capitalised word "Token:" is treated as prose unless the
 // value looks like a credential. Real credential keys (password, secret,
@@ -376,12 +555,21 @@ function backslashesBefore(input: string, i: number): number {
   return k;
 }
 
-/** [start, end) of the value after `from`, or null. Linear: scans each char once. */
+interface ValueContext {
+  grammar: Grammar;
+  authScheme: boolean;
+  headerLine: boolean;
+}
+
 function valueSpan(
   input: string,
   from: number,
-  run: RegExp
+  ctx: ValueContext
 ): { start: number; end: number } | null {
+  if (ctx.headerLine) {
+    const end = lineEnd(input, from);
+    return end > from ? { start: from, end } : null;
+  }
   VALUE_OPEN_QUOTE.lastIndex = from;
   const open = VALUE_OPEN_QUOTE.exec(input);
   if (open) {
@@ -398,22 +586,42 @@ function valueSpan(
     const end = i === -1 ? input.length : i - level;
     return end > start ? { start, end } : null;
   }
-  let end = from;
-  for (;;) {
-    run.lastIndex = end;
-    end += run.exec(input)?.[0].length ?? 0;
-    VALUE_GROUP.lastIndex = end;
-    const group = VALUE_GROUP.exec(input);
-    if (!group) {
-      break;
-    }
-    end += group[0].length;
-  }
-  if (end === from) {
-    VALUE_UNCLOSED.lastIndex = from;
-    end += VALUE_UNCLOSED.exec(input)?.[0].length ?? 0;
-  }
+  const end = ctx.authScheme
+    ? authSchemeEnd(input, from, ctx.grammar)
+    : unquotedEnd(input, from, ctx.grammar);
   return end > from ? { start: from, end } : null;
+}
+
+const QUERY_BEFORE = /^(?:[?&#]|%(?:26|3[Ff]|23))$/;
+
+const SUBSCRIPT_GAP = /^(?:\]|%5[Dd])*(?:\[|%5[Bb])$/;
+
+interface Param {
+  start: number;
+  before: string;
+}
+
+function valueContext(
+  input: string,
+  key: string,
+  param: Param,
+  cls: KeyClass,
+  sep: Separator
+): ValueContext {
+  const grammar: Grammar = sep.percentEncoded
+    ? 'encoded'
+    : QUERY_BEFORE.test(param.before)
+      ? 'query'
+      : 'assign';
+  return {
+    grammar,
+    authScheme: normaliseKey(key).includes('authoriz'),
+    headerLine:
+      cls.credential &&
+      !sep.assigns &&
+      grammar === 'assign' &&
+      atLineStart(input, param.start),
+  };
 }
 
 function redactKeyNames(input: string): string {
@@ -421,18 +629,24 @@ function redactKeyNames(input: string): string {
   const sepMemo: SepMemo = { chain: new Map(), sepChar: new Map() };
   let out = '';
   let pos = 0;
+  let param: Param = { start: 0, before: '' };
+  let prevKeyEnd = -1;
   for (let m = KEY_SCAN.exec(input); m; m = KEY_SCAN.exec(input)) {
     const [, before, key] = m;
-    const keyEnd = m.index + before.length + key.length;
+    const keyStart = m.index + before.length;
+    const keyEnd = keyStart + key.length;
+    if (
+      prevKeyEnd < 0 ||
+      !SUBSCRIPT_GAP.test(input.slice(prevKeyEnd, keyStart))
+    ) {
+      param = { start: keyStart, before };
+    }
+    prevKeyEnd = keyEnd;
     const cls = classifyKey(key);
     const sep = cls ? parseSep(input, keyEnd, sepMemo) : null;
     const span =
       cls && sep && shouldMask(cls, key, sep, input)
-        ? valueSpan(
-            input,
-            sep.end,
-            sep.percentEncoded ? ENCODED_VALUE_RUN : VALUE_RUN
-          )
+        ? valueSpan(input, sep.end, valueContext(input, key, param, cls, sep))
         : null;
     if (!span || input.slice(span.start, span.end) === REDACTED) {
       // Not a secret: resume right after the key (not after its value) so a
@@ -484,7 +698,6 @@ function redactString(input: string, budget: Walk): string {
       })
       .replace(JWT, REDACTED)
       .replace(AUTH_HEADER_LINE, `$1${REDACTED}`)
-      .replace(AUTH_HEADER, `$1${REDACTED}`)
       .replace(COOKIE_HEADER, `$1${REDACTED}`)
       .replace(BEARER, `Bearer ${REDACTED}`)
       .replace(SCHEME_LONG, REDACTED)
@@ -571,7 +784,7 @@ const THREW = Symbol('threw');
 interface Walk {
   scan: number;
   out: number;
-  seen: WeakSet<object>;
+  active: WeakSet<object>;
   errors: WeakSet<object>;
   http: WeakMap<object, HttpFields>;
 }
@@ -579,7 +792,7 @@ interface Walk {
 const newWalk = (): Walk => ({
   scan: MAX_CALL_SCAN,
   out: MAX_OUTPUT,
-  seen: new WeakSet(),
+  active: new WeakSet(),
   errors: new WeakSet(),
   http: new WeakMap(),
 });
@@ -598,8 +811,10 @@ function emit(walk: Walk, marker: string): string {
   return marker;
 }
 
-const cleanString = (walk: Walk, value: string) =>
-  emit(walk, redactString(value, walk));
+function cleanString(walk: Walk, value: string): string {
+  walk.out -= 2;
+  return emit(walk, redactString(value, walk));
+}
 
 function put(target: object, key: string, value: unknown): void {
   Object.defineProperty(target, key, {
@@ -614,10 +829,20 @@ function clean(value: unknown, depth: number, walk: Walk): unknown {
   if (walk.out <= 0) {
     return emit(walk, TRUNCATED);
   }
+  if (value !== null && typeof value === 'object') {
+    if (walk.active.has(value)) {
+      return emit(walk, '[Circular]');
+    }
+    walk.active.add(value);
+  }
   try {
     return cleanNode(value, depth, walk);
   } catch {
     return emit(walk, UNSERIALIZABLE);
+  } finally {
+    if (value !== null && typeof value === 'object') {
+      walk.active.delete(value);
+    }
   }
 }
 
@@ -653,13 +878,9 @@ function cleanNode(value: unknown, depth: number, walk: Walk): unknown {
     walk.out -= 8;
     return null;
   }
-  if (walk.seen.has(value)) {
-    return emit(walk, '[Circular]');
-  }
   if (depth >= MAX_DEPTH) {
     return emit(walk, '[Truncated]');
   }
-  walk.seen.add(value);
   const isError = value instanceof Error;
   const isHttp = isAxiosLike(value);
   if (isError || isHttp) {
@@ -1141,7 +1362,7 @@ const OUTAGE_EVENT_INTERVAL_MS = 60_000;
 // outcome). Other /auth/* endpoints (auth/kids, auth/linked-accounts, ...) are
 // ordinary authenticated calls: a 401 there is worth one event per minute.
 const AUTH_PATH =
-  /(?:^|\/)(?:auth\/(?:login|logout|register|refresh|refresh-token|apple|google|send-verification|verify-email|request-password-reset|reset-password|validate-reset-token|change-password)|login|logout|oauth)(?:\/|$)/i;
+  /^\/(?:api\/v1\/)?auth\/(?:login|logout|register|refresh|refresh-token|apple|google|send-verification|verify-email|request-password-reset|reset-password|validate-reset-token|change-password)(?:\/|$)/i;
 const MAX_OUTAGE_KEYS = 200;
 const lastOutageEvent = new Map<string, number>();
 

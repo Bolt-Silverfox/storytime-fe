@@ -423,6 +423,11 @@ describe('captured messages and console are redacted', () => {
 
   it('breadcrumb data is redacted', () => {
     logger.warn('w', { password: 'pw1' });
+    expect(sentry.addBreadcrumb).toHaveBeenCalledOnce();
+    expect(sentry.addBreadcrumb.mock.calls[0][0]).toMatchObject({
+      message: 'w',
+      level: 'warning',
+    });
     expect(fieldsMatching(sentry.addBreadcrumb.mock.calls, 'pw1')).toEqual([]);
   });
 });
@@ -2170,5 +2175,350 @@ describe('round 11: failure classification table', () => {
     expect(isExpectedFailure(makeAxiosError(403), { statuses: [403] })).toBe(
       true
     );
+  });
+});
+
+describe('value grammar: no fragment of a secret survives in any context', () => {
+  const HEAD = 'Kq7Lm';
+  const TAIL = 'Zx4Wv';
+  const secrets = [
+    ',',
+    ';',
+    '&',
+    '=',
+    '"',
+    "'",
+    '\\"',
+    ' ',
+    'é,ü',
+    '%2C',
+    '%',
+    '#',
+    '(',
+    ')',
+    ':',
+    '[',
+    '),',
+    '],',
+    "''",
+    ")'",
+    "')",
+  ].map((c) => `${HEAD}${c}${TAIL}`);
+  const credentialKeys = [
+    'password',
+    'passwd',
+    'pwd',
+    'pw',
+    'token',
+    'access_token',
+    'client_secret',
+    'api_key',
+    'APIKey',
+    'X-Api-Key',
+    'otp',
+    'cvc',
+    'sessionid',
+    'authorization',
+    'user[password]',
+    'user%5Bpassword%5D',
+    'a[b][secret]',
+  ];
+  const explicitOnlyKeys = ['pin', 'code', 'key'];
+  const queryValue = (s: string) =>
+    s.replace(/[\s&#%+"<>`]/g, (c) => encodeURIComponent(c));
+  const plainValue = (s: string) =>
+    s.replace(/[\s&;#%"'`]/g, (c) => encodeURIComponent(c));
+  const singleQuoted = (s: string) =>
+    `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+
+  type Context = [
+    name: string,
+    build: (key: string, secret: string) => string,
+    kept: string,
+    keys: string[],
+  ];
+  const everyKey = [...credentialKeys, ...explicitOnlyKeys];
+  const contexts: Context[] = [
+    [
+      'url query, axios-style encoding',
+      (k, s) => `GET https://a.io/p?x=1&${k}=${queryValue(s)}&page=3#top`,
+      '&page=3#top',
+      everyKey,
+    ],
+    [
+      'url query, encodeURIComponent',
+      (k, s) => `https://a.io/p?${k}=${encodeURIComponent(s)}&page=3`,
+      '&page=3',
+      everyKey,
+    ],
+    [
+      'url fragment',
+      (k, s) => `https://a.io/cb#${k}=${queryValue(s)}&page=3`,
+      '&page=3',
+      everyKey,
+    ],
+    [
+      'url inside a url',
+      (k, s) =>
+        `next=${encodeURIComponent(`https://a.io/p?${k}=${queryValue(s)}&page=3`)} done`,
+      'page%3D3',
+      everyKey.filter((k) => !k.includes('%')),
+    ],
+    [
+      'form body',
+      (k, s) => `${k}=${plainValue(s)}&page=3`,
+      '&page=3',
+      everyKey,
+    ],
+    [
+      'unquoted assignment in a log line',
+      (k, s) => `login failed ${k}=${plainValue(s)} page=3`,
+      ' page=3',
+      everyKey,
+    ],
+    [
+      'unquoted assignment before a semicolon',
+      (k, s) => `${k}=${plainValue(s)}; page=3`,
+      '; page=3',
+      everyKey,
+    ],
+    [
+      'labelled value in prose',
+      (k, s) => `Login failed: ${k}: ${plainValue(s)} page=3`,
+      ' page=3',
+      credentialKeys.filter((k) => k !== 'authorization'),
+    ],
+    [
+      'header line',
+      (k, s) => `${k}: ${s}\nX-Request-Id: 7`,
+      '\nX-Request-Id: 7',
+      credentialKeys,
+    ],
+    [
+      'double-quoted assignment',
+      (k, s) => `${k}=${JSON.stringify(s)} page=3`,
+      ' page=3',
+      everyKey,
+    ],
+    [
+      'single-quoted assignment',
+      (k, s) => `${k}=${singleQuoted(s)} page=3`,
+      ' page=3',
+      everyKey,
+    ],
+    [
+      'JSON',
+      (k, s) => JSON.stringify({ [k]: s, page: 3 }),
+      '"page":3',
+      everyKey,
+    ],
+    [
+      'JSON inside a JSON string',
+      (k, s) => JSON.stringify(JSON.stringify({ [k]: s, page: 3 })),
+      String.raw`\"page\":3`,
+      everyKey,
+    ],
+    [
+      'python-style dict',
+      (k, s) => `{'${k}': ${singleQuoted(s)}, 'page': 3}`,
+      "'page': 3",
+      everyKey,
+    ],
+  ];
+
+  it.each(
+    contexts.flatMap(([name, build, kept, keys]) =>
+      keys.map((key) => [name, key, build, kept] as const)
+    )
+  )('%s, key %s', (_name, key, build, kept) => {
+    const leaks = secrets.flatMap((secret) => {
+      const input = build(key, secret);
+      const out = String(redact(input));
+      return out.includes(HEAD) || out.includes(TAIL) || !out.includes(kept)
+        ? [`${input}  ->  ${out}`]
+        : [];
+    });
+    expect(leaks.join('\n')).toBe('');
+  });
+
+  it.each(['Kq7Lm', 'Kq7Lm, Zx4Wv'])(
+    'masks every Digest parameter of an unquoted authorization assignment (%s)',
+    (piece) => {
+      const digest = `Digest username="bob", realm="r", nonce="${piece}", uri="/a", response="${piece}Zx4Wv", qop=auth, nc=00000001, cnonce=Zx4Wv`;
+      for (const input of [
+        `authorization=${digest} page=3`,
+        `proxy-authorization=${digest.replace(/"/g, '')} page=3`,
+        `headers authorization=${digest}; page=3`,
+        `authorization=${digest.replace('Digest ', 'Digest algorithm=SHA-256, ')} page=3`,
+        `authorization=${digest.replace(/=/g, ' = ')} page=3`,
+      ]) {
+        const out = String(redact(input));
+        expect(out).not.toMatch(/Kq7Lm|Zx4Wv|bob/);
+        expect(out).toMatch(/ page=3$/);
+      }
+    }
+  );
+
+  it('masks every parameter of an AWS4 signature assignment', () => {
+    const out = String(
+      redact(
+        'authorization=AWS4-HMAC-SHA256 Credential=Kq7Lm/20261127/us-east-1/s3/aws4_request, SignedHeaders=host;x-amz-date, Signature=Zx4Wv page=3'
+      )
+    );
+    expect(out).not.toMatch(/Kq7Lm|Zx4Wv/);
+    expect(out).toMatch(/ page=3$/);
+  });
+
+  it('keeps a single-token authorization assignment and its neighbours', () => {
+    expect(redact('authorization=Kq7Lm,Zx4Wv page=3')).toBe(
+      'authorization=[REDACTED] page=3'
+    );
+    expect(redact('authorization=Bearer Kq7Lm page=3')).toBe(
+      'authorization=[REDACTED] page=3'
+    );
+    expect(redact('authorization=Kq7Lm; page=3')).toBe(
+      'authorization=[REDACTED]; page=3'
+    );
+  });
+
+  it('keeps the closing quote and the rest of a JSON body after a query value', () => {
+    expect(
+      redact(JSON.stringify({ url: 'https://a.io/p?token=Kq7Lm', page: 3 }))
+    ).toBe('{"url":"https://a.io/p?token=[REDACTED]","page":3}');
+  });
+
+  it.each([
+    ['{"token":["Kq7Lm","Zx4Wv"],"page":3}', '"page":3'],
+    ["{'token': ['Kq7Lm', 'Zx4Wv'], 'page': 3}", "'page': 3"],
+    ['password=(Kq7Lm Zx4Wv) page=3', ' page=3'],
+    ['password={a: "Kq7Lm", b: [1, "Zx4Wv"]} page=3', ' page=3'],
+    ["password=(it's Kq7Lm Zx4Wv) page=3", ' page=3'],
+  ])('masks a whole grouped value: %s', (input, kept) => {
+    const out = String(redact(input));
+    expect(out).not.toMatch(/Kq7Lm|Zx4Wv/);
+    expect(out).toContain(kept);
+  });
+
+  it('keeps a closing bracket after an unquoted value', () => {
+    expect(redact('f(password=Kq7Lm) next')).toBe(
+      'f(password=[REDACTED]) next'
+    );
+    expect(redact('{password=Kq7Lm, user=bob}')).toBe(
+      '{password=[REDACTED], user=bob}'
+    );
+  });
+
+  it.each([
+    ['assignment value', 'password', '='],
+    ['query value', 'https://a.io/?password', '='],
+    ['labelled value', 'Failed: password', ': '],
+    ['header line', 'password', ': '],
+  ])('64k of a delimiter-rich %s is linear', (_name, prefix, sep) => {
+    const make = (chars: number) =>
+      `${prefix}${sep}${`a,b;c'd(e)f"g`.repeat(Math.ceil(chars / 13))}`;
+    const small = make(8_000);
+    const large = make(64_000);
+    redact(small);
+    const t1 = best(() => redact(small));
+    const t2 = best(() => redact(large));
+    expect(t2).toBeLessThan(20 * t1 + 25);
+  });
+
+  it.each([
+    ['unclosed groups', 'password=("x '],
+    ['groups of quotes', `token=('"\`x `],
+    ['deep groups', 'password=((((((((x '],
+  ])('64k of repeated %s is linear', (_name, piece) => {
+    const make = (chars: number) =>
+      piece.repeat(Math.ceil(chars / piece.length));
+    const small = make(8_000);
+    const large = make(64_000);
+    redact(small);
+    const t1 = best(() => redact(small));
+    const t2 = best(() => redact(large));
+    expect(t2).toBeLessThan(20 * t1 + 25);
+  });
+
+  it('64k of repeated Digest parameters is linear', () => {
+    const make = (n: number) =>
+      `authorization=Digest ${'a="b", c=d, '.repeat(n)}`;
+    const small = make(700);
+    const large = make(5_400);
+    redact(small);
+    const t1 = best(() => redact(small));
+    const t2 = best(() => redact(large));
+    expect(t2).toBeLessThan(20 * t1 + 25);
+  });
+});
+
+describe('shared objects are not circular', () => {
+  it('sanitises an object shared by the cause and the context at both places', () => {
+    const shared = { kidId: 'k1', token: 'Kq7Lm' };
+    logger.error('x', new Error('boom', { cause: shared }), {
+      context: shared,
+    });
+    const [exception, hint] = sentry.captureException.mock.calls[0] as [
+      Error,
+      { extra: Record<string, unknown> },
+    ];
+    expect(hint.extra.kidId).toBe('k1');
+    expect(exception.cause).toEqual({ kidId: 'k1', token: '[REDACTED]' });
+    expect(fieldsMatching(sentry.captureException.mock.calls, 'Kq7Lm')).toEqual(
+      []
+    );
+  });
+
+  it('sanitises a sibling repeated in one object and still marks true cycles', () => {
+    const leaf = { kidId: 'k1' };
+    const node: Record<string, unknown> = { a: leaf, b: leaf };
+    node.self = node;
+    expect(redact(node)).toEqual({
+      a: { kidId: 'k1' },
+      b: { kidId: 'k1' },
+      self: '[Circular]',
+    });
+  });
+
+  it('a shared DAG of empty strings stays within the output budget', () => {
+    const a = Array(100).fill('');
+    const b = Array(100).fill(a);
+    const out = JSON.stringify(redact(Array(100).fill(b)));
+    expect(out.length).toBeLessThan(200_000);
+    expect(out).toContain('[truncated]');
+  });
+
+  it('a wide shared DAG stays within the output budget', () => {
+    let level: unknown = { leaf: 'x'.repeat(100) };
+    for (let i = 0; i < 6; i++) {
+      level = Array(100).fill(level);
+    }
+    const t = performance.now();
+    const out = JSON.stringify(redact(level));
+    expect(performance.now() - t).toBeLessThan(1_000);
+    expect(out.length).toBeLessThan(200_000);
+    expect(out).toContain('[truncated]');
+  });
+});
+
+describe('auth actions are matched by route', () => {
+  it.each([
+    'auth/login',
+    '/auth/login',
+    'https://api.example.com/api/v1/auth/login',
+    '/api/v1/auth/refresh',
+    'auth/reset-password/Xy7Qz9',
+  ])('a 401 from %s is not an outage', (url) => {
+    logger.error('x', makeAxiosError(401, url), { expected: true });
+    expect(sentry.captureMessage).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'stories/login',
+    '/stories/logout',
+    '/api/v1/stories/oauth',
+    '/kids/auth/login',
+  ])('a 401 from %s is reported', (url) => {
+    logger.error('x', makeAxiosError(401, url), { expected: true });
+    expect(sentry.captureMessage).toHaveBeenCalledOnce();
   });
 });

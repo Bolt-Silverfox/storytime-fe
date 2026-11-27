@@ -22,12 +22,13 @@ import {
   InputOTPSlot,
 } from '@/components/ui/input-otp';
 import { useAuth } from '@/context/auth-context';
+import { useMountedRef } from '@/hooks/use-mounted-ref';
 import {
   RESET_CODE_LENGTH,
   ResetCodeSchema,
   sanitizeResetCode,
 } from '@/lib/reset-code';
-import { saveResetSession } from '@/lib/reset-session';
+import { clearResetSession, saveResetSession } from '@/lib/reset-session';
 import {
   requestPasswordResetService,
   validateResetTokenService,
@@ -46,7 +47,10 @@ const Page = () => {
   const { registrationData } = useAuth();
   const [timeLeft, setTimeLeft] = useState(60);
   const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
   const submitting = useRef(false);
+  const resending = useRef(false);
+  const mounted = useMountedRef();
 
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
@@ -62,15 +66,31 @@ const Page = () => {
   }, [timeLeft]);
 
   async function handleResend() {
+    const email = registrationData?.email;
+    if (!email) {
+      toast.error('Email is missing from context.');
+      return;
+    }
+    if (resending.current || submitting.current) {
+      return;
+    }
+    resending.current = true;
+    setIsResending(true);
     setTimeLeft(60);
     try {
-      const response = await requestPasswordResetService(
-        registrationData?.email ?? ''
-      );
-      toast.success(response.message);
+      const response = await requestPasswordResetService(email);
+      clearResetSession();
+      if (mounted.current) {
+        toast.success(response.message);
+      }
       // biome-ignore lint/suspicious/noExplicitAny: the caught value is untyped; only .message is read below
     } catch (error: any) {
-      toast.error(error.message || 'Could not send a new reset code');
+      if (mounted.current) {
+        toast.error(error?.message || 'Could not send a new reset code');
+      }
+    } finally {
+      resending.current = false;
+      setIsResending(false);
     }
   }
 
@@ -83,7 +103,7 @@ const Page = () => {
       return;
     }
 
-    if (submitting.current) {
+    if (submitting.current || resending.current) {
       return;
     }
     submitting.current = true;
@@ -91,6 +111,9 @@ const Page = () => {
 
     try {
       const response = await validateResetTokenService({ token, email });
+      if (!mounted.current) {
+        return;
+      }
 
       if (!saveResetSession({ token, email })) {
         toast.error('This browser blocked site storage', {
@@ -105,6 +128,9 @@ const Page = () => {
       // biome-ignore lint/suspicious/noExplicitAny: the caught value is untyped; only .message is read below
     } catch (error: any) {
       submitting.current = false;
+      if (!mounted.current) {
+        return;
+      }
       toast.error('OTP verification failed', {
         description: error?.message || 'An unexpected error occurred.',
       });
@@ -177,15 +203,16 @@ const Page = () => {
             variant='secondary'
             type='button'
             onClick={handleResend}
-            disabled={timeLeft > 0}
+            disabled={timeLeft > 0 || isResending}
+            aria-busy={isResending}
             className='py-2.5 px-6 rounded-[50px] !mx-auto max-w-max bg-surface border-hairline-warm shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] border text-strong'
           >
-            Resend OTP
+            {isResending ? 'Sending…' : 'Resend OTP'}
           </Button>
           <Button
             variant='primary'
             type='submit'
-            disabled={!form.formState.isValid}
+            disabled={!form.formState.isValid || isResending}
             className='w-full py-[15px] h-auto'
           >
             {!form.formState.isValid ? 'Proceed' : 'Verify email'}

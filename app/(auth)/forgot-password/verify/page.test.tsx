@@ -212,4 +212,110 @@ describe('forgot-password verify page', () => {
     await act(async () => {});
     expect(requestReset).toHaveBeenCalledTimes(1);
   });
+
+  function waitOutCountdown() {
+    for (let i = 0; i < 61; i++) {
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+    }
+  }
+
+  it('keeps Resend disabled and sends no second request while a resend is still pending after the countdown ends', async () => {
+    vi.useFakeTimers();
+    requestReset.mockReturnValue(new Promise(() => {}));
+    render(<Page />);
+    waitOutCountdown();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Resend OTP' }));
+    });
+    waitOutCountdown();
+    const resend = screen.getByRole('button', { name: /sending/i });
+    expect((resend as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => {
+      fireEvent.click(resend);
+    });
+    expect(requestReset).toHaveBeenCalledTimes(1);
+  });
+
+  it('enables Resend again once a failed resend settles and the countdown ends', async () => {
+    vi.useFakeTimers();
+    requestReset.mockRejectedValueOnce(new Error('down'));
+    render(<Page />);
+    waitOutCountdown();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Resend OTP' }));
+    });
+    waitOutCountdown();
+    const resend = screen.getByRole('button', { name: 'Resend OTP' });
+    expect((resend as HTMLButtonElement).disabled).toBe(false);
+    await act(async () => {
+      fireEvent.click(resend);
+    });
+    expect(requestReset).toHaveBeenCalledTimes(2);
+  });
+
+  it('drops the earlier reset session once a resend succeeds', async () => {
+    vi.useFakeTimers();
+    saveResetSession({ token: '11111111', email: 'kid@example.com' });
+    render(<Page />);
+    waitOutCountdown();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Resend OTP' }));
+    });
+    expect(toast.success).toHaveBeenCalledWith('sent');
+    expect(readResetSession()).toBeNull();
+  });
+
+  it('keeps the earlier reset session when the resend fails', async () => {
+    vi.useFakeTimers();
+    requestReset.mockRejectedValue(new Error('down'));
+    saveResetSession({ token: '11111111', email: 'kid@example.com' });
+    render(<Page />);
+    waitOutCountdown();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Resend OTP' }));
+    });
+    expect(toast.error).toHaveBeenCalledWith('down');
+    expect(readResetSession()).toEqual({
+      token: '11111111',
+      email: 'kid@example.com',
+    });
+  });
+
+  it('does not verify a code while a resend is pending', async () => {
+    requestReset.mockReturnValue(new Promise(() => {}));
+    vi.useFakeTimers();
+    render(<Page />);
+    waitOutCountdown();
+    vi.useRealTimers();
+    await enterCode('12345678');
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Resend OTP' }));
+    });
+    expect((submit() as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => {
+      fireEvent.submit(submit().closest('form') as HTMLFormElement);
+    });
+    expect(validate).not.toHaveBeenCalled();
+  });
+
+  it('neither stores the session nor navigates when verification settles after the page has gone', async () => {
+    let resolve: (v: { message: string }) => void = () => {};
+    validate.mockReturnValue(
+      new Promise((r) => {
+        resolve = r;
+      })
+    );
+    const { unmount } = render(<Page />);
+    await enterCode('12345678');
+    fireEvent.click(submit());
+    await waitFor(() => expect(validate).toHaveBeenCalled());
+    unmount();
+    await act(async () => {
+      resolve({ message: 'ok' });
+    });
+    expect(readResetSession()).toBeNull();
+    expect(push).not.toHaveBeenCalled();
+  });
 });

@@ -170,9 +170,10 @@ function isSensitiveKey(key: string): boolean {
 const JWT = /eyJ[\w-]{3,200}\.[\w-]{1,20000}\.[\w-]{0,2000}/g;
 // "Authorization: <scheme> <token>" with any scheme (or none).
 const AUTH_HEADER =
-  /(authorization["']?\s*[:=]\s*)(?:"[^"]{0,2000}"|'[^']{0,2000}'|(?:[A-Za-z]{1,20}\s+)?[^\s,;"'&]+)/gi;
+  /(authorization["']?\s*[:=]\s*)(?:"[^"]{0,2000}"|'[^']{0,2000}'|(?:[A-Za-z][\w.-]{0,30}\s+)?[^\s,;"'&]+)/gi;
 // A Cookie header holds several pairs whose names are not secret-looking.
-const COOKIE_HEADER = /(\b(?:set-)?cookie["']?\s*:\s*)[^\r\n"'`]+/gi;
+const COOKIE_HEADER =
+  /(\b(?:set-)?cookie["']?\s*:\s*)(?:"[^"\r\n]{0,8000}"|'[^'\r\n]{0,8000}'|[^\s"'`][^\r\n"'`]*)/gi;
 // Scheme-prefixed credentials. The value must look like a credential, so
 // "a token of friendship" and "Basic information" stay readable. A
 // capitalised "Bearer" is the scheme name and is masked whatever follows.

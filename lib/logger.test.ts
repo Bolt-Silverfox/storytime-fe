@@ -845,6 +845,8 @@ describe('round 4: linear time', () => {
     ['unclosed [', 'password[ '],
     ['sensitive subscript chain', '[token]'],
     ['sensitive subscript chain 2', '[password]'],
+    ['cookie header', 'cookie: "a '],
+    ['authorization scheme', 'authorization: a-b '],
   ];
   // 8k vs 64k characters: linear is ~8x, quadratic ~64x, so < 20x separates
   // them with room for scheduler noise.
@@ -1582,6 +1584,15 @@ describe('round 9: one sanitiser before every sink', () => {
       expect(redact(text)).not.toContain('SECRETVALUE');
     }
     expect(redact('cookie=a1b2c3; page=2')).toContain('page=2');
+  });
+
+  it.each([
+    '{"Cookie": "theme=dark; account=SECRETVALUE"}',
+    "{'set-cookie': 'account=SECRETVALUE'}",
+    'Authorization: Api-Key SECRETVALUE',
+    'authorization=X-Custom.v2 SECRETVALUE',
+  ])('masks the whole header value in %s', (text) => {
+    expect(redact(text)).not.toContain('SECRETVALUE');
   });
 
   it('applies redaction to the logger scope', () => {

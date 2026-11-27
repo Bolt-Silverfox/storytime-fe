@@ -59,4 +59,13 @@ describe('fieldsMatching', () => {
       '$.Symbol(k)',
     ]);
   });
+
+  it('labels Map values by entry index and still checks keys', () => {
+    const key = Object.create(null);
+    const value = new Map<unknown, unknown>([
+      [key, 'marker'],
+      ['marker key', 1],
+    ]);
+    expect(fieldsMatching(value, 'marker')).toEqual(['$<0>', '$<1:key>']);
+  });
 });

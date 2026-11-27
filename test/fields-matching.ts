@@ -47,9 +47,11 @@ export function fieldsMatching(value: unknown, needle: Needle): string[] {
       }
     }
     if (node instanceof Map) {
+      let index = 0;
       for (const [k, v] of node) {
-        visit(k, `${path}<key>`);
-        visit(v, `${path}<${String(k)}>`);
+        visit(k, `${path}<${index}:key>`);
+        visit(v, `${path}<${index}>`);
+        index++;
       }
     }
     if (node instanceof Set) {

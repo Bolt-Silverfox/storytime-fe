@@ -318,6 +318,22 @@ describe('PageView', () => {
       fireEvent.scroll(window);
     };
     const nextButton = () => screen.getByRole('button', { name: 'Next page' });
+    const html = document.documentElement;
+    const viewportScrollsAt = (width: number) => {
+      for (const [prop, value] of Object.entries({
+        clientWidth: width,
+        clientHeight: 800,
+        scrollHeight: 3000,
+      })) {
+        Object.defineProperty(html, prop, { value, configurable: true });
+      }
+    };
+    const pressAndScroll = (target: Element, clientX: number) => {
+      viewportScrollsAt(1000);
+      fireEvent.pointerDown(target, { clientX, clientY: 400 });
+      fireEvent.scroll(window);
+      fireEvent.pointerUp(target, { clientX, clientY: 400 });
+    };
     const inputs: {
       input: string;
       act: () => void;
@@ -346,10 +362,31 @@ describe('PageView', () => {
       ),
       {
         input: 'a scrollbar drag',
+        act: () => pressAndScroll(html, 1005),
+        within: 'pauses',
+        after: 'pauses',
+      },
+      {
+        input: 'a pointer held on the page while it scrolls',
+        act: () => pressAndScroll(html, 500),
+        within: 'follows',
+        after: 'pauses',
+      },
+      {
+        input: 'a pointer held on a button while the page scrolls',
+        act: () => pressAndScroll(nextButton(), 1005),
+        within: 'follows',
+        after: 'pauses',
+      },
+      {
+        input: 'Space on a focused link',
         act: () => {
-          fireEvent.pointerDown(document.documentElement);
+          const link = document.createElement('a');
+          link.href = '#';
+          document.body.append(link);
+          fireEvent.keyDown(link, { key: ' ' });
           fireEvent.scroll(window);
-          fireEvent.pointerUp(document.documentElement);
+          link.remove();
         },
         within: 'pauses',
         after: 'pauses',
@@ -413,8 +450,40 @@ describe('PageView', () => {
         rerender(<PageView {...props} activeSentence={1} />);
         expect(scroll).toHaveBeenCalledTimes(expected === 'follows' ? 2 : 1);
         vi.restoreAllMocks();
+        for (const prop of ['clientWidth', 'clientHeight', 'scrollHeight']) {
+          Reflect.deleteProperty(html, prop);
+        }
       }
     );
+
+    it('keeps following when our own scroll happens while a pointer rests on the page', () => {
+      const scroll = vi.fn();
+      HTMLElement.prototype.scrollIntoView = scroll;
+      let now = 12_000_000;
+      vi.spyOn(Date, 'now').mockImplementation(() => now);
+      const props = {
+        pages: ['One. Two. Three.'],
+        page: 0,
+        onNext: () => undefined,
+        onPrev: () => undefined,
+      };
+      viewportScrollsAt(1000);
+      const { rerender } = setup({ ...props, activeSentence: 0 });
+      now += 2000;
+      fireEvent.pointerDown(html, { clientX: 500, clientY: 400 });
+      rerender(<PageView {...props} activeSentence={1} />);
+      expect(scroll).toHaveBeenCalledTimes(2);
+      now += 300;
+      fireEvent.scroll(window);
+      fireEvent.pointerUp(html, { clientX: 500, clientY: 400 });
+      now += 500;
+      rerender(<PageView {...props} activeSentence={2} />);
+      expect(scroll).toHaveBeenCalledTimes(3);
+      vi.restoreAllMocks();
+      for (const prop of ['clientWidth', 'clientHeight', 'scrollHeight']) {
+        Reflect.deleteProperty(html, prop);
+      }
+    });
   });
 
   it('renders a friendly empty state with no pages', () => {

@@ -5,7 +5,13 @@ import type {
   SpanProcessor,
 } from '@opentelemetry/sdk-trace-base';
 
-const URL_ATTRIBUTES = ['http.target', 'http.url', 'url.full', 'url.path'];
+const URL_ATTRIBUTES = [
+  'http.target',
+  'http.url',
+  'url.full',
+  'url.path',
+  'next.span_name',
+];
 const QUERY_ATTRIBUTES = ['url.query', 'http.query'];
 
 function stripQuery(value: string): string {
@@ -41,6 +47,9 @@ export class QueryScrubbingSpanProcessor implements SpanProcessor {
       delete (span.attributes as Record<string, unknown>)[key];
     }
     Object.assign(span.attributes, scrubbed);
+    if (typeof span.name === 'string') {
+      (span as { name: string }).name = stripQuery(span.name);
+    }
     this.inner.onEnd(span);
   }
 

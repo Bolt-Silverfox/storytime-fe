@@ -54,4 +54,24 @@ describe('QueryScrubbingSpanProcessor', () => {
     expect(onEnd).toHaveBeenCalledTimes(1);
     expect(JSON.stringify(onEnd.mock.calls[0][0].attributes)).not.toContain(S);
   });
+
+  it('strips the query string from the span name and next.span_name', () => {
+    const onEnd = vi.fn();
+    const inner = {
+      onStart: vi.fn(),
+      onEnd,
+      forceFlush: vi.fn(),
+      shutdown: vi.fn(),
+    } as unknown as SpanProcessor;
+    const span = {
+      name: `GET /create-new-password?token=${S}`,
+      attributes: { 'next.span_name': `GET /create-new-password?token=${S}` },
+    } as unknown as ReadableSpan;
+    new QueryScrubbingSpanProcessor(inner).onEnd(span);
+    const exported = onEnd.mock.calls[0][0];
+    expect(exported.name).toBe('GET /create-new-password');
+    expect(exported.attributes['next.span_name']).toBe(
+      'GET /create-new-password'
+    );
+  });
 });

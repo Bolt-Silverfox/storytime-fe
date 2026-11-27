@@ -34,6 +34,17 @@ export const clipForPage = (page: number, clipCount: number): number | null =>
 export const firstReadyClip = (ready: ReadonlySet<number>): number | null =>
   ready.size > 0 ? Math.min(...ready) : null;
 
+export const narrationStart = (
+  ready: ReadonlySet<number>,
+  failed: ReadonlySet<number>
+): number | null => {
+  let start = 0;
+  while (failed.has(start)) {
+    start += 1;
+  }
+  return ready.has(start) ? start : null;
+};
+
 const knownClipCount = (clipTotal: number, ready: ReadonlySet<number>) =>
   clipTotal || (ready.size > 0 ? Math.max(...ready) + 1 : 0);
 

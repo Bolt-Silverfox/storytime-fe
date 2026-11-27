@@ -562,3 +562,26 @@ describe('the first clip failed', () => {
     expect(screen.getAllByText('Page 2 of 6').length).toBeGreaterThan(0);
   });
 });
+
+describe('the first clip is still generating', () => {
+  beforeEach(() => {
+    guest.clips = 4;
+    guest.pending = 0;
+    guest.generating = [0];
+    guest.story = { id: 'story-1', title: 'T', textContent: TEXT };
+  });
+  afterEach(() => {
+    guest.generating = [];
+  });
+
+  it('does not start the narration on a later clip', async () => {
+    renderReader();
+    await waitFor(() =>
+      expect(screen.getAllByText(/Preparing audio/i).length).toBeGreaterThan(0)
+    );
+    expect(audioEl()).toBeNull();
+    expect(playButton().disabled).toBe(true);
+    fireEvent.click(playButton());
+    expect(played).toEqual([]);
+  });
+});

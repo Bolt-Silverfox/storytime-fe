@@ -19,6 +19,7 @@ import {
   clipForPage,
   firstReadyClip,
   initialReaderState,
+  narrationStart,
   readerReducer,
 } from '@/lib/reader/reader-state';
 import {
@@ -362,7 +363,7 @@ const StoryReader = ({
         setAudioParagraphs(paras);
         setFailedIndices(failed);
 
-        const first = firstReadyClip(new Set(readyByIndex.keys()));
+        const first = narrationStart(new Set(readyByIndex.keys()), failed);
         if (first !== null && !hasSetInitialAudioRef.current) {
           hasSetInitialAudioRef.current = true;
           setAudioLoading(false);
@@ -561,7 +562,11 @@ const StoryReader = ({
       // The narration has played through: finish the story and rewind the
       // narration (and the page, if it was following) so a replay starts over.
       setStoryFinished(true);
-      const first = firstReadyClip(new Set(readyClipsRef.current.keys())) ?? 0;
+      const ready = new Set(readyClipsRef.current.keys());
+      const first =
+        narrationStart(ready, failedIndicesRef.current) ??
+        firstReadyClip(ready) ??
+        0;
       clipIndexRef.current = first;
       setCurrentClip(first);
       setAudioUrl(readyClipsRef.current.get(first) ?? null);

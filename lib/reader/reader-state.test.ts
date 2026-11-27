@@ -5,6 +5,7 @@ import {
   clipForPage,
   firstReadyClip,
   initialReaderState,
+  narrationStart,
   pageForClip,
   progressPercent,
   readerReducer,
@@ -251,5 +252,16 @@ describe('firstReadyClip (where narration starts and replays from)', () => {
   });
   it('is null when nothing is ready', () => {
     expect(firstReadyClip(clips())).toBeNull();
+  });
+});
+
+describe('narrationStart (the clip narration opens on)', () => {
+  it('is the first clip that has not failed, once it is ready', () => {
+    expect(narrationStart(clips(0, 1), clips())).toBe(0);
+    expect(narrationStart(clips(1, 2), clips(0))).toBe(1);
+  });
+  it('waits for an earlier clip still generating instead of skipping it', () => {
+    expect(narrationStart(clips(1, 2), clips())).toBeNull();
+    expect(narrationStart(clips(2), clips(0))).toBeNull();
   });
 });

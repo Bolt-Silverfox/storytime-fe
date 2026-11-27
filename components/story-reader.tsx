@@ -1,10 +1,28 @@
 import { useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { ensureGuestSession } from '@/lib/guest';
 import { GUEST_HISTORY_QUERY_KEY } from '@/lib/hooks/use-guest-history';
 import { STORY_QUOTA_QUERY_KEY } from '@/lib/hooks/use-story-quota';
-import { markDone, markReading } from '@/lib/progress-store';
+import {
+  clearReadingPosition,
+  getReadingPosition,
+  markDone,
+  markReading,
+  readerScope,
+  saveReadingPosition,
+} from '@/lib/progress-store';
+import { pagesSignature, resolvePages } from '@/lib/reader/paginate';
+import {
+  alignClip,
+  clipEndAction,
+  clipForPage,
+  firstReadyClip,
+  initialReaderState,
+  narrationStart,
+  playEnabled,
+  readerReducer,
+} from '@/lib/reader/reader-state';
 import {
   getGuestStoryAudioBatchStatusService,
   getGuestStoryService,
@@ -22,33 +40,8 @@ import movementSmall from '@/public/movement-small.png';
 import pause from '@/public/pause.svg';
 import play from '@/public/play.svg';
 import QuotaWall from './quota-wall';
+import PageView from './reader/page-view';
 import { Switch } from './ui/switch';
-
-// Turn the story text into readable paragraphs for read-along. Prefer explicit
-// newline breaks; when the backend sends one continuous block (common), group
-// sentences into small paragraphs so it isn't a wall of text.
-const splitIntoParagraphs = (text: string): string[] => {
-  const byNewline = text
-    .split(/\n{2,}|\r?\n/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-  if (byNewline.length > 1) {
-    return byNewline;
-  }
-  const sentences = text.match(/[^.!?]+[.!?]+["')\]]*\s*/g) ?? [text];
-  const perParagraph = 3;
-  const groups: string[] = [];
-  for (let i = 0; i < sentences.length; i += perParagraph) {
-    const group = sentences
-      .slice(i, i + perParagraph)
-      .join(' ')
-      .trim();
-    if (group) {
-      groups.push(group);
-    }
-  }
-  return groups.length > 0 ? groups : [text];
-};
 
 interface Question {
   id: string;
@@ -65,10 +58,15 @@ interface Story {
   description: string;
   coverImageUrl: string;
   textContent?: string;
+  // Backend >= v1.7.0 sends the page split; older backends don't.
+  pages?: string[];
   isInteractive?: boolean;
   questions?: Question[];
   [key: string]: unknown;
 }
+
+const FOCUS_RING =
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2';
 
 const StoryReader = ({
   img,
@@ -116,12 +114,17 @@ const StoryReader = ({
   const [completion, setCompletion] = useState<
     'idle' | 'saving' | 'done' | 'error'
   >('idle');
+  const [completionAttempt, setCompletionAttempt] = useState(0);
 
   // Audio states
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   // True only while the initial batch request is in flight (before any clip is
   // playable). Once the first paragraph has audio, playback is enabled.
   const [audioLoading, setAudioLoading] = useState(false);
+  // True only while the <audio> element is actually producing sound (set by its
+  // `playing` event, not the Play button), so the synth image never animates
+  // over silence (buffering, paused, ended, errored, switching clips).
+  const [audioSounding, setAudioSounding] = useState(false);
   // True while more paragraphs are still generating in the background (pending,
   // none failed). Drives a calm "Preparing audio…" indicator, never an error.
   const [audioGenerating, setAudioGenerating] = useState(false);
@@ -136,8 +139,7 @@ const StoryReader = ({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  // Story audio is generated per-paragraph; we play the clips in sequence.
-  const playlistRef = useRef<string[]>([]);
+  const readyClipsRef = useRef<Map<number, string>>(new Map());
   const clipIndexRef = useRef(0);
   const isPlayingRef = useRef(false);
   // Total paragraphs expected + which failed, read inside the (once-mounted)
@@ -157,6 +159,61 @@ const StoryReader = ({
   );
   const [currentClip, setCurrentClip] = useState(0);
   const queryClient = useQueryClient();
+  // Paged reading: which page is showing. Pages come from the API when present,
+  // else we paginate the story text with the same rule.
+  const [reader, dispatch] = useReducer(readerReducer, initialReaderState);
+  const readerRef = useRef(reader);
+  readerRef.current = reader;
+  const pages = useMemo(
+    () => resolvePages(story?.pages, story?.textContent),
+    [story]
+  );
+  const pagesSig = useMemo(() => pagesSignature(pages), [pages]);
+  // The page is only "visible" (and only worth persisting / following the
+  // narration) while read-along is on.
+  const isCheckedRef = useRef(false);
+  isCheckedRef.current = isChecked;
+  // A guest story with one stored narration file: a single clip for the whole
+  // story, so pages are not mapped to clips and the file ending ends the story.
+  const singleFileRef = useRef(false);
+  singleFileRef.current = isGuest && !!guestAudioUrl;
+  const positionScopeRef = useRef<string | null>(null);
+
+  // Resume where the reader left off once the pages are known.
+  useEffect(() => {
+    if (!(storyId && pages.length > 0)) {
+      return;
+    }
+    positionScopeRef.current = readerScope();
+    dispatch({
+      type: 'init',
+      count: pages.length,
+      page: getReadingPosition(storyId, pages.length, pagesSig) ?? 0,
+    });
+  }, [storyId, pages, pagesSig]);
+
+  // Remember the position (per story) as pages turn. Only while the page is
+  // visible, so narration playing with the text hidden can't overwrite it.
+  useEffect(() => {
+    if (
+      storyId &&
+      reader.count > 0 &&
+      isChecked &&
+      !storyFinished &&
+      readerScope() === positionScopeRef.current
+    ) {
+      saveReadingPosition(storyId, reader.page, reader.count, pagesSig);
+    }
+  }, [storyId, reader.page, reader.count, pagesSig, isChecked, storyFinished]);
+
+  // Revealing the text while narration is playing shows the narrated page.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only react to the read-along switch; the rest is read via refs.
+  useEffect(() => {
+    // A single stored file has no per-page clips: nothing to follow.
+    if (isChecked && isPlayingRef.current && !singleFileRef.current) {
+      dispatch({ type: 'go', page: clipIndexRef.current });
+    }
+  }, [isChecked]);
 
   useEffect(() => {
     const fetchStory = async () => {
@@ -215,7 +272,7 @@ const StoryReader = ({
       // guests, so nothing regresses where `audioUrl` is populated.
       if (isGuest && guestAudioUrl) {
         setAudioError(null);
-        playlistRef.current = [guestAudioUrl];
+        readyClipsRef.current = new Map([[0, guestAudioUrl]]);
         clipIndexRef.current = 0;
         setAudioUrl(guestAudioUrl);
         return;
@@ -235,9 +292,10 @@ const StoryReader = ({
       setFailedIndices(new Set());
       setAudioParagraphs([]);
       setAudioUrl(null);
+      setAudioSounding(false);
       setCurrentClip(0);
       setIsPlaying(false);
-      playlistRef.current = [];
+      readyClipsRef.current = new Map();
       clipIndexRef.current = 0;
       totalCountRef.current = 0;
       failedIndicesRef.current = new Set();
@@ -252,6 +310,24 @@ const StoryReader = ({
       // the still-pending paragraphs as failed (retryable) without discarding
       // the ones that already have playable audio.
       let latestParagraphs: StoryAudioParagraph[] = [];
+
+      const openNarration = () => {
+        if (hasSetInitialAudioRef.current) {
+          return;
+        }
+        const first = narrationStart(
+          new Set(readyClipsRef.current.keys()),
+          failedIndicesRef.current
+        );
+        if (first === null) {
+          return;
+        }
+        hasSetInitialAudioRef.current = true;
+        setAudioLoading(false);
+        clipIndexRef.current = first;
+        setCurrentClip(first);
+        setAudioUrl(readyClipsRef.current.get(first) ?? null);
+      };
 
       // Release an auto-advance that was waiting for a clip that will never
       // arrive, so playback doesn't sit "playing" with nothing to play.
@@ -290,13 +366,7 @@ const StoryReader = ({
         );
         totalCountRef.current = total;
 
-        // Only the contiguous run of ready clips from index 0 is playable in
-        // order; a gap means we wait for that paragraph before playing past it.
-        const playlist: string[] = [];
-        for (let i = 0; readyByIndex.has(i); i += 1) {
-          playlist.push(readyByIndex.get(i) as string);
-        }
-        playlistRef.current = playlist;
+        readyClipsRef.current = new Map(readyByIndex);
 
         // Full ordered paragraph list (text + audio state) for the read-along.
         const known = [
@@ -316,25 +386,21 @@ const StoryReader = ({
         setAudioParagraphs(paras);
         setFailedIndices(failed);
 
-        // Enable playback the moment the first clip is ready (bug 1).
-        if (playlist.length > 0 && !hasSetInitialAudioRef.current) {
-          hasSetInitialAudioRef.current = true;
-          setAudioLoading(false);
-          clipIndexRef.current = 0;
-          setCurrentClip(0);
-          setAudioUrl(playlist[0]);
-        }
+        openNarration();
 
         // Auto-advance was waiting for the next clip and it just arrived.
         if (
           waitingForNextRef.current &&
-          playlist.length > clipIndexRef.current + 1
+          readyByIndex.has(clipIndexRef.current + 1)
         ) {
           waitingForNextRef.current = false;
           const next = clipIndexRef.current + 1;
           clipIndexRef.current = next;
           setCurrentClip(next);
-          setAudioUrl(playlist[next]);
+          setAudioUrl(readyByIndex.get(next) as string);
+          if (isCheckedRef.current) {
+            dispatch({ type: 'clip', clip: next, from: next - 1 });
+          }
         }
 
         // Still waiting, but the paragraph we're waiting on has failed: it will
@@ -346,7 +412,12 @@ const StoryReader = ({
 
         const stillGenerating = accounted < total;
         setAudioGenerating(stillGenerating);
-        return { playlist, accounted, total, failedSize: failed.size };
+        return {
+          readyCount: readyByIndex.size,
+          accounted,
+          total,
+          failedSize: failed.size,
+        };
       };
 
       try {
@@ -390,7 +461,7 @@ const StoryReader = ({
         }
 
         // Real failure ONLY when nothing at all is playable AND something failed.
-        if (snap.playlist.length === 0 && snap.failedSize > 0) {
+        if (snap.readyCount === 0 && snap.failedSize > 0) {
           setAudioError('We couldn’t prepare the audio for this story.');
           releaseWaiting();
           setAudioGenerating(false);
@@ -404,6 +475,7 @@ const StoryReader = ({
           );
           failedIndicesRef.current = missing;
           setFailedIndices(missing);
+          openNarration();
           releaseWaiting();
           setAudioError('Some of the audio couldn’t be prepared.');
           setAudioGenerating(false);
@@ -425,6 +497,7 @@ const StoryReader = ({
         // Keep the ref in sync: handleEnded reads it, not the state.
         failedIndicesRef.current = failedOnError;
         setFailedIndices(failedOnError);
+        openNarration();
         releaseWaiting();
         setAudioError(
           isGuest && (error as { status?: number | null })?.status === 429
@@ -462,34 +535,62 @@ const StoryReader = ({
     // At clip end, advance to the next paragraph; wait if it isn't ready yet;
     // stop (and reset) once the whole story has been read through.
     const handleEnded = () => {
-      const next = clipIndexRef.current + 1;
-      if (next < playlistRef.current.length) {
+      const current = clipIndexRef.current;
+      const next = current + 1;
+      const action = clipEndAction({
+        current,
+        ready: new Set(readyClipsRef.current.keys()),
+        failed: failedIndicesRef.current,
+        clipTotal: totalCountRef.current,
+        pageCount: readerRef.current.count,
+        textVisible: isCheckedRef.current,
+        singleFile: singleFileRef.current,
+      });
+      if (action === 'advance') {
         clipIndexRef.current = next;
         setCurrentClip(next);
-        setAudioUrl(playlistRef.current[next]);
+        setAudioUrl(readyClipsRef.current.get(next) ?? null);
+        // Turn the page with the narration (only if the reader is on it).
+        if (isCheckedRef.current) {
+          dispatch({ type: 'clip', clip: next, from: current });
+        }
         return;
       }
-      // The next clip isn't in the playlist yet. If that paragraph is still
-      // generating (not failed), hold and resume when polling delivers it —
-      // don't error and don't mark the story finished (bug 3).
-      if (next < totalCountRef.current && !failedIndicesRef.current.has(next)) {
+      // The next clip is still generating: hold and resume when polling
+      // delivers it — don't error and don't mark the story finished.
+      if (action === 'wait') {
         waitingForNextRef.current = true;
         setAudioGenerating(true);
         return;
       }
       // The next paragraph failed — surface a retry rather than a silent finish.
-      if (failedIndicesRef.current.has(next)) {
+      if (action === 'failed') {
         setIsPlaying(false);
         waitingForNextRef.current = false;
         setAudioError('Some of the audio couldn’t be prepared.');
         return;
       }
-      // Reached the end of the narration — the story has been read through.
       setIsPlaying(false);
+      // Clips cover only the first pages of a long story: stop on the next
+      // page, the story isn't finished.
+      if (action === 'stop') {
+        dispatch({ type: 'clip', clip: next, from: current });
+        return;
+      }
+      // The narration has played through: finish the story and rewind the
+      // narration (and the page, if it was following) so a replay starts over.
       setStoryFinished(true);
-      clipIndexRef.current = 0;
-      setCurrentClip(0);
-      setAudioUrl(playlistRef.current[0] ?? null);
+      const ready = new Set(readyClipsRef.current.keys());
+      const first =
+        narrationStart(ready, failedIndicesRef.current) ??
+        firstReadyClip(ready) ??
+        0;
+      clipIndexRef.current = first;
+      setCurrentClip(first);
+      setAudioUrl(readyClipsRef.current.get(first) ?? null);
+      if (isCheckedRef.current && !singleFileRef.current) {
+        dispatch({ type: 'clip', clip: first, from: current });
+      }
     };
 
     audio.addEventListener('timeupdate', updateTime);
@@ -512,6 +613,13 @@ const StoryReader = ({
     // ran once before any <audio> was rendered and never attached anything.
   }, [audioUrl]);
 
+  // A new or removed <audio> element starts silent: its predecessor's
+  // `playing` must not leak into it (unmounting fires no `emptied`).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset is keyed on the element changing, not read from it.
+  useEffect(() => {
+    setAudioSounding(false);
+  }, [audioUrl]);
+
   // When the current clip changes (next paragraph), resume playback if we were
   // already playing.
   useEffect(() => {
@@ -524,17 +632,22 @@ const StoryReader = ({
 
   // When the story is read through (or the reader taps Finish), record it as
   // completed in the user's library. Auth-only; guests can't track progress.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: completionAttempt is a deliberate trigger so Finish story retries a failed save; it isn't read in the body.
   useEffect(() => {
     if (!(storyFinished && storyId)) {
       return;
     }
     // Reflect completion on story cards immediately (works for guests too).
     markDone(storyId);
+    // Finished: the next visit starts from page one.
+    if (readerScope() === positionScopeRef.current) {
+      clearReadingPosition(storyId);
+    }
     if (isGuest) {
       return;
     }
     let active = true;
-    setCompletion((c) => (c === 'idle' ? 'saving' : c));
+    setCompletion((c) => (c === 'done' ? c : 'saving'));
     recordUserProgressService(storyId, 100, true)
       .then(() => {
         if (active) {
@@ -549,17 +662,12 @@ const StoryReader = ({
     return () => {
       active = false;
     };
-  }, [storyFinished, isGuest, storyId]);
+  }, [storyFinished, isGuest, storyId, completionAttempt]);
 
-  // Keep the highlighted paragraph in view as the narration advances.
-  useEffect(() => {
-    const hasAudioParas = audioParagraphs.length > 0;
-    if (!(hasAudioParas && isChecked) || typeof document === 'undefined') {
-      return;
-    }
-    const el = document.getElementById(`reading-para-${currentClip}`);
-    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, [currentClip, audioParagraphs, isChecked]);
+  const finishStory = () => {
+    setStoryFinished(true);
+    setCompletionAttempt((n) => n + 1);
+  };
 
   const getModeDescription = () => {
     switch (mode) {
@@ -593,21 +701,76 @@ const StoryReader = ({
     }
   };
 
+  // Point the narration at the clip that belongs to `page` (clip N is page N).
+  // 'switched' → the clip changed (the <audio> src updates on the next render);
+  // 'ok' → already there; 'unavailable' → that clip isn't generated yet;
+  // 'failed' → that clip failed; 'none' → the page has no narration (beyond
+  // the capped clips).
+  const alignAudioToPage = (
+    page: number
+  ): 'switched' | 'ok' | 'unavailable' | 'failed' | 'none' => {
+    const { kind, target } = alignClip({
+      page,
+      currentClip: clipIndexRef.current,
+      clipTotal: totalCountRef.current,
+      ready: new Set(readyClipsRef.current.keys()),
+      failed: failedIndicesRef.current,
+      singleFile: singleFileRef.current,
+    });
+    if (kind !== 'switch') {
+      return kind;
+    }
+    clipIndexRef.current = target;
+    hasSetInitialAudioRef.current = true;
+    waitingForNextRef.current = false;
+    setAudioLoading(false);
+    setCurrentClip(target);
+    setAudioUrl(readyClipsRef.current.get(target) ?? null);
+    return 'switched';
+  };
+
+  // Manual page turn: keep the narration on the page being read when its clip
+  // is ready. If it isn't, the narration carries on where it was and the
+  // reader keeps the page they chose (the narration never drags them back).
+  const turnPage = (action: 'next' | 'prev') => {
+    const target = readerReducer(readerRef.current, { type: action }).page;
+    dispatch({ type: action });
+    alignAudioToPage(target);
+  };
+
   const handlePlayPause = () => {
-    if (!(audioRef.current && audioUrl)) {
+    if (isPlaying) {
+      audioRef.current?.pause();
+      setIsPlaying(false);
       return;
     }
 
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      audioRef.current.play().catch((error) => {
-        console.error('Failed to play audio:', error);
-        setAudioError('Failed to play audio');
-      });
-      setIsPlaying(true);
+    // With the text hidden there is no visible page to start from: continue
+    // from the current clip. Otherwise read the page on screen; if its clip
+    // isn't ready yet, show the page that is being narrated instead.
+    let aligned: ReturnType<typeof alignAudioToPage> = 'ok';
+    if (isChecked) {
+      aligned = alignAudioToPage(readerRef.current.page);
+      if (aligned === 'none' || aligned === 'failed') {
+        return;
+      }
+      if (aligned === 'switched') {
+        // The new clip starts playing once the <audio> src updates.
+        setIsPlaying(true);
+        return;
+      }
+      if (aligned === 'unavailable' && audioUrl) {
+        dispatch({ type: 'go', page: clipIndexRef.current });
+      }
     }
+    if (!(audioRef.current && audioUrl)) {
+      return;
+    }
+    audioRef.current.play().catch((error) => {
+      console.error('Failed to play audio:', error);
+      setAudioError('Failed to play audio');
+    });
+    setIsPlaying(true);
   };
 
   const formatTime = (time: number) => {
@@ -622,24 +785,33 @@ const StoryReader = ({
   const displayTitle = story?.title || title;
   const displayDescription = story?.description || description;
   const displayImage = story?.coverImageUrl || img;
-  const displayContent = story?.textContent || 'Story content not available';
-  // Break the story into readable paragraphs for read-along.
-  const paragraphs = splitIntoParagraphs(displayContent);
-  // The read-along highlight follows the audio clips. The batch endpoint only
-  // returns paragraph text for the eager (first-generated) clips; later clips
-  // arrive from the status poll with an audioUrl but no text, so requiring every
-  // clip to carry text would keep the highlight off for the whole story while
-  // paragraphs are still generating. The backend also splits paragraphs by a
-  // different algorithm than splitIntoParagraphs, so per-index text can't be
-  // guaranteed to match; drive the highlight off the audio-aligned list whenever
-  // there's a playlist (i === currentClip), and fill any missing display text
-  // from the story's own paragraph split by index so nothing renders blank.
-  // Guests (no batch, single clip) leave audioParagraphs empty → plain fallback,
-  // no highlight.
+  // The narration is generated per page (backend TTS paragraphs == pages), so
+  // the read-along highlight marks the page whose clip is playing. Guests on a
+  // single stored narration file have no per-page clips → no highlight.
   const useAudioParagraphs = audioParagraphs.length > 0;
-  const readingParagraphs = useAudioParagraphs
-    ? audioParagraphs.map((p, i) => p.text || paragraphs[i] || '')
-    : paragraphs;
+  const clipCount = audioParagraphs.length;
+  // Clip N is page N, so the narrated page is simply the current clip.
+  const narratedPage = currentClip;
+  const pageClip = clipForPage(reader.page, clipCount);
+  // Long stories only narrate their first clips; later pages have no audio.
+  const pageNoAudio = useAudioParagraphs && pageClip === null && !audioLoading;
+  const pageFailed =
+    useAudioParagraphs && pageClip !== null && failedIndices.has(pageClip);
+
+  const canPlay = playEnabled({
+    isPlaying,
+    hasAudio: Boolean(audioUrl),
+    textVisible: isChecked,
+    singleFile: isGuest && Boolean(guestAudioUrl),
+    page: reader.page,
+    currentClip,
+    clipTotal: clipCount,
+    ready: new Set(
+      audioParagraphs.flatMap((p) => (p.audioUrl ? [p.index] : []))
+    ),
+    failed: failedIndices,
+  });
+  const hasQuiz = mode === 'interactive' && (story?.questions?.length ?? 0) > 0;
 
   if (loading) {
     return (
@@ -662,6 +834,9 @@ const StoryReader = ({
   }
 
   const currentQuestion = story?.questions?.[currentQuestionIndex];
+  // Sound is what moves the image, so it keeps moving while later paragraphs
+  // are still generating. Never without an <audio> element to be sounding.
+  const synthMoving = audioSounding && Boolean(audioUrl);
 
   return (
     <div>
@@ -671,7 +846,15 @@ const StoryReader = ({
           ref={audioRef}
           src={audioUrl}
           preload='metadata'
-          onError={() => setAudioError('Failed to load audio')}
+          onPlaying={() => setAudioSounding(true)}
+          onPause={() => setAudioSounding(false)}
+          onWaiting={() => setAudioSounding(false)}
+          onEmptied={() => setAudioSounding(false)}
+          onEnded={() => setAudioSounding(false)}
+          onError={() => {
+            setAudioSounding(false);
+            setAudioError('Failed to load audio');
+          }}
         >
           <track kind='captions' />
         </audio>
@@ -703,11 +886,13 @@ const StoryReader = ({
       <div className='flex flex-col items-center'>
         {!isChecked ? (
           <div className='flex flex-col items-center'>
-            <Image
-              src={movement}
-              alt=''
-              className='h-[9rem] max-w-full rounded-[3xl] mb-4 object-cover'
-            />
+            <div className='synth-wave mb-4' data-playing={synthMoving}>
+              <Image
+                src={movement}
+                alt=''
+                className='h-[9rem] max-w-full rounded-[3xl] object-cover'
+              />
+            </div>
             <div className='bg-surface flex justify-center items-center gap-3 shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] px-6 py-2.5 rounded-[3.125rem] border-[0.5px] border-solid border-hairline-warm'>
               <h5 className='text-strong text-right text-xl not-italic font-bold leading-6'>
                 {voice}
@@ -734,7 +919,9 @@ const StoryReader = ({
         ) : (
           <div className='flex flex-wrap items-center gap-4 justify-between w-full'>
             <div className='flex items-center gap-4'>
-              <Image src={movementSmall} alt='' className='' />
+              <div className='synth-wave' data-playing={synthMoving}>
+                <Image src={movementSmall} alt='' className='' />
+              </div>
               <small className='text-body text-base not-italic font-normal leading-5 font-abeezee mt-2'>
                 {audioLoading || audioGenerating
                   ? 'Preparing audio…'
@@ -854,78 +1041,94 @@ const StoryReader = ({
                 )}
               </div>
             ) : (
-              <div className='space-y-4 text-left'>
-                {readingParagraphs.map((para, i) => {
-                  const active = useAudioParagraphs && i === currentClip;
-                  // Per-paragraph audio state (only meaningful when the clips are
-                  // text-aligned): ready → playable, failed → retry, else loading.
-                  const paraFailed = useAudioParagraphs && failedIndices.has(i);
-                  const paraReady =
-                    !useAudioParagraphs || !!audioParagraphs[i]?.audioUrl;
-                  return (
-                    // biome-ignore lint/suspicious/noArrayIndexKey: paragraphs can repeat verbatim, so the index is what keeps the key unique
-                    <div key={`para-${i}-${para.slice(0, 12)}`}>
-                      <p
-                        id={`reading-para-${i}`}
-                        className={`text-lg not-italic font-normal leading-8 font-abeezee -mx-2 rounded-md px-2 transition-colors duration-300 ${
-                          active
-                            ? 'bg-reader-hl font-medium text-reader-hl-fg'
-                            : 'text-strong'
-                        }`}
-                      >
-                        {para}
-                      </p>
-                      {paraFailed ? (
-                        <span className='mt-1 flex items-center gap-2 px-2 text-sm text-red-500 font-abeezee'>
-                          Audio unavailable
-                          <button
-                            type='button'
-                            onClick={() => {
-                              setAudioError(null);
-                              setAudioRetry((n) => n + 1);
-                            }}
-                            className='rounded-full border border-brand px-3 py-1 text-xs font-semibold text-brand-text transition hover:bg-brand/5'
-                          >
-                            Retry
-                          </button>
-                        </span>
-                      ) : null}
-                      {!(paraReady || paraFailed) ? (
-                        <span className='mt-1 flex items-center gap-2 px-2 text-sm text-body font-abeezee'>
-                          <span className='inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#83E9FB] border-t-transparent' />
-                          Preparing audio…
-                        </span>
-                      ) : null}
-                    </div>
-                  );
-                })}
-                {mode === 'interactive' &&
-                  story?.questions &&
-                  story.questions.length > 0 && (
-                    <div className='pt-4 text-center'>
+              <PageView
+                pages={pages}
+                page={reader.page}
+                highlighted={
+                  isPlaying &&
+                  useAudioParagraphs &&
+                  reader.page === narratedPage
+                }
+                onNext={() => turnPage('next')}
+                onPrev={() => turnPage('prev')}
+                pageStatus={
+                  pageNoAudio ? (
+                    <span className='mt-1 block px-2 text-sm text-body font-abeezee'>
+                      No narration for this page. Go back to listen to the
+                      narrated part of the story.
+                    </span>
+                  ) : pageFailed ? (
+                    <span className='mt-1 flex items-center gap-2 px-2 text-sm text-red-500 font-abeezee'>
+                      Audio unavailable
                       <button
                         type='button'
-                        onClick={() => setStoryFinished(true)}
-                        className='rounded-full bg-brand px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90'
+                        onClick={() => {
+                          setAudioError(null);
+                          setAudioRetry((n) => n + 1);
+                        }}
+                        className={`rounded-full border border-brand px-3 py-1 text-xs font-semibold text-brand-text transition hover:bg-brand/5 ${FOCUS_RING}`}
+                      >
+                        Retry
+                      </button>
+                    </span>
+                  ) : useAudioParagraphs &&
+                    pageClip !== null &&
+                    !audioParagraphs[pageClip]?.audioUrl ? (
+                    <span className='mt-1 flex items-center gap-2 px-2 text-sm text-body font-abeezee'>
+                      <span
+                        aria-hidden='true'
+                        className='inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#83E9FB] border-t-transparent motion-reduce:animate-none'
+                      />
+                      Preparing audio…
+                    </span>
+                  ) : null
+                }
+                endActions={
+                  <div className='flex flex-col items-center gap-4'>
+                    {hasQuiz ? (
+                      <button
+                        type='button'
+                        onClick={finishStory}
+                        className={`rounded-full bg-brand px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90 ${FOCUS_RING}`}
                       >
                         Finished reading — Take the quiz
                       </button>
-                    </div>
-                  )}
-              </div>
+                    ) : isGuest ? (
+                      <>
+                        <button
+                          type='button'
+                          aria-disabled={storyFinished}
+                          onClick={() => {
+                            if (!storyFinished) {
+                              finishStory();
+                            }
+                          }}
+                          className={`rounded-full border border-brand px-6 py-3 font-abeezee text-sm font-semibold text-brand-text transition hover:bg-brand/5 aria-disabled:cursor-default aria-disabled:opacity-60 ${FOCUS_RING}`}
+                        >
+                          {storyFinished ? 'Story finished' : 'Finish story'}
+                        </button>
+                        <p
+                          role='status'
+                          className='font-abeezee text-sm font-semibold text-green-600 empty:hidden'
+                        >
+                          {storyFinished ? 'You finished the story!' : ''}
+                        </p>
+                      </>
+                    ) : null}
+                  </div>
+                }
+              />
             )}
           </div>
         )}
         <button
           type='button'
           onClick={handlePlayPause}
-          disabled={!audioUrl || audioLoading}
+          disabled={!canPlay}
           aria-label={isPlaying ? 'Pause' : 'Play'}
           aria-pressed={isPlaying}
           className={`mt-12 rounded-full transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 ${
-            !audioUrl || audioLoading
-              ? 'opacity-50 cursor-not-allowed'
-              : 'cursor-pointer'
+            canPlay ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'
           }`}
         >
           <Image src={isPlaying ? pause : play} alt='' />
@@ -939,30 +1142,38 @@ const StoryReader = ({
                 setAudioError(null);
                 setAudioRetry((n) => n + 1);
               }}
-              className='rounded-full border border-brand px-5 py-2 font-abeezee text-sm font-semibold text-brand-text transition hover:bg-brand/5'
+              className={`rounded-full border border-brand px-5 py-2 font-abeezee text-sm font-semibold text-brand-text transition hover:bg-brand/5 ${FOCUS_RING}`}
             >
               Try again
             </button>
           </div>
         )}
         {!isGuest && isChecked && (
-          <div className='mt-8 text-center'>
-            {completion === 'done' ? (
-              <p className='font-abeezee text-sm font-semibold text-green-600'>
-                ✓ Added to your completed stories
-              </p>
-            ) : (
-              <button
-                type='button'
-                onClick={() => setStoryFinished(true)}
-                disabled={completion === 'saving'}
-                className='rounded-full border border-brand px-6 py-3 font-abeezee text-sm font-semibold text-brand-text transition hover:bg-brand/5 disabled:opacity-60'
-              >
-                {completion === 'saving' ? 'Saving…' : 'Finish story'}
-              </button>
-            )}
+          <div className='mt-8 flex flex-col items-center gap-2 text-center'>
+            <button
+              type='button'
+              aria-disabled={completion === 'saving' || completion === 'done'}
+              onClick={() => {
+                if (completion !== 'saving' && completion !== 'done') {
+                  finishStory();
+                }
+              }}
+              className={`rounded-full border border-brand px-6 py-3 font-abeezee text-sm font-semibold text-brand-text transition hover:bg-brand/5 aria-disabled:cursor-default aria-disabled:opacity-60 ${FOCUS_RING}`}
+            >
+              {completion === 'saving'
+                ? 'Saving…'
+                : completion === 'done'
+                  ? 'Story finished'
+                  : 'Finish story'}
+            </button>
+            <p
+              role='status'
+              className='font-abeezee text-sm font-semibold text-green-600 empty:hidden'
+            >
+              {completion === 'done' ? '✓ Added to your completed stories' : ''}
+            </p>
             {completion === 'error' && (
-              <p className='mt-2 font-abeezee text-sm text-red-500'>
+              <p role='alert' className='font-abeezee text-sm text-red-500'>
                 Couldn&apos;t save progress. Please try again.
               </p>
             )}

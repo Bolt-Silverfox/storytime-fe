@@ -1,5 +1,6 @@
 import * as Sentry from '@sentry/nextjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fieldsMatching } from '@/test/fields-matching';
 
 vi.mock('@sentry/nextjs', () => ({
   captureException: vi.fn(),
@@ -38,13 +39,16 @@ describe('getUserFromStorage', () => {
         sentry.captureMessage.mock.calls.length
     ).toBe(1);
     expect(
-      JSON.stringify([
-        sentry.captureException.mock.calls,
-        sentry.captureMessage.mock.calls,
-        sentry.addBreadcrumb.mock.calls,
-        consoleError.mock.calls,
-      ])
-    ).not.toContain('Ada');
+      fieldsMatching(
+        [
+          sentry.captureException.mock.calls,
+          sentry.captureMessage.mock.calls,
+          sentry.addBreadcrumb.mock.calls,
+          consoleError.mock.calls,
+        ],
+        'Ada'
+      )
+    ).toEqual([]);
   });
 
   it('returns the stored profile when it parses', () => {

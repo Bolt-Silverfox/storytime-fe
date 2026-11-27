@@ -4,6 +4,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { configureLogger } from '@/lib/logger';
 import { getDailyChallengesService } from '@/lib/services';
+import { fieldsMatching } from '@/test/fields-matching';
 import DailyChallenge from './daily-challenge';
 
 vi.mock('@sentry/nextjs', () => ({
@@ -46,13 +47,16 @@ describe('DailyChallenge', () => {
         sentry.captureMessage.mock.calls.length
     ).toBe(1);
     expect(
-      JSON.stringify([
-        sentry.captureException.mock.calls,
-        sentry.captureMessage.mock.calls,
-        sentry.addBreadcrumb.mock.calls,
-        consoleError.mock.calls,
-      ])
-    ).not.toContain('Ada');
+      fieldsMatching(
+        [
+          sentry.captureException.mock.calls,
+          sentry.captureMessage.mock.calls,
+          sentry.addBreadcrumb.mock.calls,
+          consoleError.mock.calls,
+        ],
+        'Ada'
+      )
+    ).toEqual([]);
   });
 
   it('still reports a failed challenge request with its error', async () => {

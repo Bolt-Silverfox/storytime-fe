@@ -143,12 +143,17 @@ const keyWords = (key: string) =>
     .toLowerCase()
     .split(/[\s_.\-[\]]+/);
 
-const hasCredentialWord = (words: string[]) =>
-  words.some(
-    (w, i) =>
-      SENSITIVE_WORDS.has(w) &&
-      words.slice(i + 1).every((t) => TAIL_WORDS.has(t))
-  );
+function hasCredentialWord(words: string[]): boolean {
+  for (let i = words.length - 1; i >= 0; i--) {
+    if (SENSITIVE_WORDS.has(words[i])) {
+      return true;
+    }
+    if (!TAIL_WORDS.has(words[i])) {
+      return false;
+    }
+  }
+  return false;
+}
 
 const hasStem = (key: string) => {
   const k = normaliseKey(key);
@@ -157,12 +162,11 @@ const hasStem = (key: string) => {
 
 /** Object keys: any sensitive stem, a sensitive word, or a whole-key sensitive word. */
 function isSensitiveKey(key: string): boolean {
-  return (
-    hasStem(key) ||
-    SENSITIVE_EXACT.has(normaliseKey(key)) ||
-    hasCredentialWord(keyWords(key)) ||
-    keyWords(key).at(-1) === 'sid'
-  );
+  if (hasStem(key) || SENSITIVE_EXACT.has(normaliseKey(key))) {
+    return true;
+  }
+  const words = keyWords(key);
+  return hasCredentialWord(words) || words.at(-1) === 'sid';
 }
 
 // Header and payload are length-bounded so a run of "eyJ" cannot make the
@@ -212,11 +216,18 @@ const SUBSCRIPT = /\[[^[\]]*\]|%5[Bb](?:(?!%5[BbDd])[\s\S])*%5[Dd]/y;
 // same token boundaries and can share the memo below. A lone "[" is a filler
 // too, so "password[[a]]=x" and "password[%5D=x" still reach their "=".
 const SEP_FILLER = /\\*["'`]|[\][]|%5[Dd]|\s/y;
-const SEP_CHAR = /[=:：＝]|%3[DdAa]/y;
+const SEP_OPENER = /[\\"'`\][]|%5[BbDd]/y;
+const SEP_CHAR = /([=＝])|(%3[Dd])|%3[Aa]|[:：]/y;
 const TRAIL_SPACE = /\s*/y;
 
+interface Separator {
+  end: number;
+  explicit: boolean;
+  percentEncoded: boolean;
+}
+
 /**
- * End of the separator that follows a key at `from`, or -1.
+ * The separator that follows a key at `from`, or null.
  *
  * Linear by construction and never gives up early: `memo` maps every token
  * boundary already walked to where its walk ended, so a later key found inside
@@ -224,7 +235,13 @@ const TRAIL_SPACE = /\s*/y;
  * instead of re-parsing the chain. Each boundary is tokenised at most once per
  * string; there is no work budget that could run out and skip masking.
  */
-function parseSep(input: string, from: number, memo: Map<number, number>) {
+function parseSep(
+  input: string,
+  from: number,
+  memo: Map<number, number>
+): Separator | null {
+  SEP_OPENER.lastIndex = from;
+  const opened = SEP_OPENER.test(input);
   let i = from;
   const visited: number[] = [];
   for (;;) {
@@ -251,16 +268,22 @@ function parseSep(input: string, from: number, memo: Map<number, number>) {
   SEP_CHAR.lastIndex = i;
   const c = SEP_CHAR.exec(input);
   if (!c) {
-    return -1;
+    return null;
   }
   i += c[0].length;
   TRAIL_SPACE.lastIndex = i;
-  return i + (TRAIL_SPACE.exec(input)?.[0].length ?? 0);
+  return {
+    end: i + (TRAIL_SPACE.exec(input)?.[0].length ?? 0),
+    explicit: opened || c[1] !== undefined || c[2] !== undefined,
+    percentEncoded: c[0].startsWith('%'),
+  };
 }
 const FILE_NAME = /\.(?:m?[jt]sx?|map|css|html?)$/i;
 // Unquoted values run to the next delimiter, with NO length cap, so a long
-// token is never cut in the middle and left half-visible.
-const VALUE_RUN = /(?:(?!%26)[^\s&#;,"'`()[\]{}<>])+/y;
+// token is never cut in the middle and left half-visible. Queries split on a
+// literal "&" before decoding, so "%26" ends a value only after an encoded separator.
+const VALUE_RUN = /[^\s&#;,"'`()[\]{}<>]+/y;
+const ENCODED_VALUE_RUN = /(?:(?!%26)[^\s&#;,"'`()[\]{}<>])+/y;
 const VALUE_GROUP =
   /\[[^\]\n]{0,2000}\]|\([^)\n]{0,2000}\)|\{[^}\n]{0,2000}\}|<[^>\n]{0,2000}>/y;
 const VALUE_UNCLOSED = /[[({<][^\s&#;,"'`]*/y;
@@ -300,18 +323,19 @@ function classifyKey(key: string): KeyClass | null {
 function shouldMask(
   cls: KeyClass,
   key: string,
-  sep: string,
-  peek: () => string
+  sep: Separator,
+  input: string
 ): boolean {
-  const explicit =
-    /[=＝]|%3[Dd]/.test(sep) || /^[\\"'`\][]|^%5[BbDd]/.test(sep);
   if (!cls.credential && cls.bareOrAmbiguous) {
-    return explicit; // "code: be kind" / "sid: main" are prose; "code=abc" is a parameter
+    return sep.explicit; // "code: be kind" / "sid: main" are prose; "code=abc" is a parameter
   }
-  if (explicit) {
+  if (sep.explicit || key !== 'Token') {
     return true;
   }
-  return key === 'Token' ? looksLikeCredential(peek()) : true;
+  const next = input.slice(sep.end, sep.end + 200);
+  return looksLikeCredential(
+    next.replace(/^\\*["'`]/, '').split(/[\s&#;,"'`]/)[0]
+  );
 }
 
 function backslashesBefore(input: string, i: number): number {
@@ -325,8 +349,9 @@ function backslashesBefore(input: string, i: number): number {
 /** [start, end) of the value after `from`, or null. Linear: scans each char once. */
 function valueSpan(
   input: string,
-  from: number
-): { start: number; end: number; quote: string } | null {
+  from: number,
+  run: RegExp
+): { start: number; end: number } | null {
   VALUE_OPEN_QUOTE.lastIndex = from;
   const open = VALUE_OPEN_QUOTE.exec(input);
   if (open) {
@@ -341,12 +366,12 @@ function valueSpan(
       i = input.indexOf(q, i + 1);
     }
     const end = i === -1 ? input.length : i - level;
-    return end > start ? { start, end, quote: q } : null;
+    return end > start ? { start, end } : null;
   }
   let end = from;
   for (;;) {
-    VALUE_RUN.lastIndex = end;
-    end += VALUE_RUN.exec(input)?.[0].length ?? 0;
+    run.lastIndex = end;
+    end += run.exec(input)?.[0].length ?? 0;
     VALUE_GROUP.lastIndex = end;
     const group = VALUE_GROUP.exec(input);
     if (!group) {
@@ -358,7 +383,7 @@ function valueSpan(
     VALUE_UNCLOSED.lastIndex = from;
     end += VALUE_UNCLOSED.exec(input)?.[0].length ?? 0;
   }
-  return end > from ? { start: from, end, quote: '' } : null;
+  return end > from ? { start: from, end } : null;
 }
 
 function redactKeyNames(input: string): string {
@@ -370,16 +395,14 @@ function redactKeyNames(input: string): string {
     const [, before, key] = m;
     const keyEnd = m.index + before.length + key.length;
     const cls = classifyKey(key);
-    const sepEnd = cls ? parseSep(input, keyEnd, chainMemo) : -1;
-    const peek = () => {
-      const o = input.slice(sepEnd, sepEnd + 200);
-      return o.replace(/^\\*["'`]/, '').split(/[\s&#;,"'`]/)[0];
-    };
+    const sep = cls ? parseSep(input, keyEnd, chainMemo) : null;
     const span =
-      cls &&
-      sepEnd !== -1 &&
-      shouldMask(cls, key, input.slice(keyEnd, sepEnd), peek)
-        ? valueSpan(input, sepEnd)
+      cls && sep && shouldMask(cls, key, sep, input)
+        ? valueSpan(
+            input,
+            sep.end,
+            sep.percentEncoded ? ENCODED_VALUE_RUN : VALUE_RUN
+          )
         : null;
     if (!span || input.slice(span.start, span.end) === REDACTED) {
       // Not a secret: resume right after the key (not after its value) so a

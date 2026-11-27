@@ -749,6 +749,16 @@ describe('round 3: key-name scan (table tests)', () => {
     expect(redact('cb?token%3Dabc123%26page%3D2')).toContain('page%3D2');
   });
 
+  it.each([
+    ['https://app/r?password=ab%26cdSECRET&page=3', 'page=3'],
+    ['https://app/r?token=ab%26cdSECRET', ''],
+    ['password=a%26b%26cSECRET; next', '; next'],
+  ])('masks an encoded "&" inside a plain query value: %s', (input, kept) => {
+    const out = redact(input) as string;
+    expect(out).not.toContain('SECRET');
+    expect(out).toContain(kept);
+  });
+
   it('masks every line of a stack and nested causes', () => {
     const inner = new Error('token: abc123');
     const outer = new Error('Failed: password = hunter2', { cause: inner });
@@ -1514,9 +1524,22 @@ describe('round 8: disabled debug and info do no work', () => {
 describe('round 8: bounded work', () => {
   it('a no-value subscript chain is not quadratic', () => {
     const make = (chars: number) => `x${'[token]'.repeat(chars / 7)}= `;
-    const small = make(8_001);
-    const large = make(64_001);
+    const small = make(7_000);
+    const large = make(63_000);
+    expect(large.length).toBeLessThan(64_000);
     redact(small);
+    const t1 = best(() => redact(small));
+    const t2 = best(() => redact(large));
+    expect(t2).toBeLessThan(20 * t1 + 25);
+  });
+
+  it('a key made of many credential words is not quadratic', () => {
+    const make = (words: number) => ({
+      [`${'pwd_'.repeat(words)}changed`]: 'kept',
+    });
+    const small = make(8_000);
+    const large = make(64_000);
+    expect(JSON.stringify(redact(large))).toContain('kept');
     const t1 = best(() => redact(small));
     const t2 = best(() => redact(large));
     expect(t2).toBeLessThan(20 * t1 + 25);

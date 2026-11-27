@@ -50,6 +50,27 @@ describe('reading position persistence', () => {
     expect(getReadingPosition('a', 10, 'sig')).toBe(2);
   });
 
+  it('drops malformed stored entries on save and keeps valid ones', () => {
+    window.localStorage.setItem(
+      'readerPositions',
+      JSON.stringify({
+        'g:|null': null,
+        'g:|str': 'x',
+        'g:|num': 7,
+        'g:|noat': { page: 1, count: 5 },
+        'g:|badat': { page: 1, count: 5, at: 'soon' },
+        'g:|ok': { page: 2, count: 5, sig: 'sig', at: 5 },
+      })
+    );
+    expect(() => saveReadingPosition('a', 1, 5, 'sig')).not.toThrow();
+    const map = JSON.parse(
+      window.localStorage.getItem('readerPositions') ?? '{}'
+    );
+    expect(Object.keys(map).sort()).toEqual(['g:|a', 'g:|noat', 'g:|ok']);
+    expect(Number.isFinite(map['g:|a'].at)).toBe(true);
+    expect(map['g:|ok']).toEqual({ page: 2, count: 5, sig: 'sig', at: 5 });
+  });
+
   it('clear forgets the position', () => {
     saveReadingPosition('a', 3, 10, 'sig');
     clearReadingPosition('a');

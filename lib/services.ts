@@ -4,6 +4,33 @@ import api from '@/lib/axios';
 import { logger } from '@/lib/logger';
 import { isSessionActive } from '@/lib/session-cookies';
 
+const toServiceError = (error: unknown, fallback: string) => {
+  if (error instanceof AxiosError) {
+    const http = {
+      isAxiosError: true,
+      name: 'AxiosError',
+      code: error.code,
+      config: { method: error.config?.method, url: error.config?.url },
+    };
+    if (error.response) {
+      return {
+        ...http,
+        message: error.response.data?.message || fallback,
+        status: error.response.status,
+        data: error.response.data,
+        response: { status: error.response.status },
+      };
+    }
+    if (error.request) {
+      return { ...http, message: 'No response from server', status: null };
+    }
+  }
+  return {
+    message: error instanceof Error ? error.message : 'Unexpected error',
+    status: null,
+  };
+};
+
 interface RegisterPayload {
   email: string;
   password: string;
@@ -624,22 +651,7 @@ export const getKidsService = async () => {
     const response = await api.get('auth/kids');
     return response.data;
   } catch (error: unknown) {
-    if (error instanceof AxiosError) {
-      if (error.response) {
-        throw {
-          message: error.response.data?.message || 'Failed to fetch kids',
-          status: error.response.status,
-          data: error.response.data,
-        };
-      }
-      if (error.request) {
-        throw { message: 'No response from server', status: null };
-      }
-    }
-    throw {
-      message: error instanceof Error ? error.message : 'Unexpected error',
-      status: null,
-    };
+    throw toServiceError(error, 'Failed to fetch kids');
   }
 };
 
@@ -648,23 +660,7 @@ export const getAvailableVoicesService = async (): Promise<Voice[]> => {
     const response = await api.get('voice/available');
     return response.data;
   } catch (error: unknown) {
-    if (error instanceof AxiosError) {
-      if (error.response) {
-        throw {
-          message:
-            error.response.data?.message || 'Failed to fetch available voices',
-          status: error.response.status,
-          data: error.response.data,
-        };
-      }
-      if (error.request) {
-        throw { message: 'No response from server', status: null };
-      }
-    }
-    throw {
-      message: error instanceof Error ? error.message : 'Unexpected error',
-      status: null,
-    };
+    throw toServiceError(error, 'Failed to fetch available voices');
   }
 };
 
@@ -1461,22 +1457,7 @@ export const getStoryByIdService = async (storyId: string) => {
     const response = await api.get(`stories/${storyId}`);
     return response.data;
   } catch (error: unknown) {
-    if (error instanceof AxiosError) {
-      if (error.response) {
-        throw {
-          message: error.response.data?.message || 'Failed to fetch story',
-          status: error.response.status,
-          data: error.response.data,
-        };
-      }
-      if (error.request) {
-        throw { message: 'No response from server', status: null };
-      }
-    }
-    throw {
-      message: error instanceof Error ? error.message : 'Unexpected error',
-      status: null,
-    };
+    throw toServiceError(error, 'Failed to fetch story');
   }
 };
 
@@ -1485,23 +1466,7 @@ export const getDailyChallengesService = async (kidId: string) => {
     const response = await api.get(`stories/daily-challenge/kid/${kidId}`);
     return response.data;
   } catch (error: unknown) {
-    if (error instanceof AxiosError) {
-      if (error.response) {
-        throw {
-          message:
-            error.response.data?.message || 'Failed to fetch daily challenges',
-          status: error.response.status,
-          data: error.response.data,
-        };
-      }
-      if (error.request) {
-        throw { message: 'No response from server', status: null };
-      }
-    }
-    throw {
-      message: error instanceof Error ? error.message : 'Unexpected error',
-      status: null,
-    };
+    throw toServiceError(error, 'Failed to fetch daily challenges');
   }
 };
 

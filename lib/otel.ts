@@ -15,6 +15,7 @@
 import { DiagConsoleLogger, DiagLogLevel, diag } from '@opentelemetry/api';
 import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { OTLPHttpProtoTraceExporter, registerOTel } from '@vercel/otel';
+import { QueryScrubbingSpanProcessor } from './otel-scrub';
 
 /**
  * Parse the standard `OTEL_EXPORTER_OTLP_HEADERS` format: comma-separated
@@ -240,16 +241,18 @@ export function registerTelemetry(): void {
     return;
   }
 
-  const spanProcessor = new BatchSpanProcessor(
-    new OTLPHttpProtoTraceExporter({
-      url: tracesUrl,
-      headers,
-    }),
-    // Shorter than the 5000ms default, to narrow the window described in the
-    // shutdown note below. Spans are exported on this timer or as soon as
-    // `maxExportBatchSize` (512 by default) spans are buffered, whichever
-    // comes first.
-    { scheduledDelayMillis: 2000 }
+  const spanProcessor = new QueryScrubbingSpanProcessor(
+    new BatchSpanProcessor(
+      new OTLPHttpProtoTraceExporter({
+        url: tracesUrl,
+        headers,
+      }),
+      // Shorter than the 5000ms default, to narrow the window described in the
+      // shutdown note below. Spans are exported on this timer or as soon as
+      // `maxExportBatchSize` (512 by default) spans are buffered, whichever
+      // comes first.
+      { scheduledDelayMillis: 2000 }
+    )
   );
 
   registerOTel({

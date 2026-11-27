@@ -30,12 +30,10 @@ export const metadata: Metadata = {
   title: SITE_TITLE,
   description: SITE_DESCRIPTION,
   applicationName: 'Storytime',
-  alternates: { canonical: 'https://web.storytimeapp.me' },
   openGraph: {
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
     siteName: 'Storytime',
-    url: 'https://web.storytimeapp.me',
     type: 'website',
   },
   twitter: {

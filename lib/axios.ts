@@ -1,6 +1,7 @@
 // lib/axios.ts
 import axios from 'axios';
 import Cookies from 'js-cookie';
+import { isSessionActive } from '@/lib/session-cookies';
 
 let isRefreshing = false;
 let failedQueue: {
@@ -30,6 +31,8 @@ const API_ORIGIN =
 // mobile app's X-API-Key header (EXPO_PUBLIC_API_KEY). Inlined at build time.
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
 
+const isGuestUrl = (url: string | undefined) => /^\/?guest\//.test(url ?? '');
+
 const api = axios.create({
   baseURL: `${API_ORIGIN}/api/v1/`,
   headers: {
@@ -42,8 +45,22 @@ api.interceptors.request.use((config) => {
   if (API_KEY && config.headers) {
     config.headers['X-API-Key'] = API_KEY;
   }
+  // Guest endpoints always identify the caller by guest session, never by a
+  // (possibly expired) user token. Note: the backend's OptionalAuth guest
+  // routes (guest/progress, guest/history) would lose a logged-in bearer under
+  // this rule; the web app calls guest/history only for guests, and never
+  // calls guest/progress.
+  const isGuestEndpoint = isGuestUrl(config.url);
   const token = Cookies.get('accessToken');
-  if (token && config.headers) {
+  // Send the bearer only for a signed-in session: a still-valid token, or an
+  // expired one that the refresh flow (refreshToken cookie) can renew. A dead
+  // session is cleared and the request goes out as a guest.
+  const authed = !isGuestEndpoint && !!token && isSessionActive();
+  if (isGuestEndpoint && config.headers) {
+    // A refresh retry may have put a bearer on the reused request config.
+    delete config.headers.Authorization;
+  }
+  if (authed && token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
   } else if (config.headers) {
     // Guest mode: forward the guest session so quota/history are tracked
@@ -78,11 +95,12 @@ api.interceptors.response.use(
     // /voice/preferred) must NOT trigger a refresh+redirect to /login. Just
     // surface the error so the caller can handle it (guests browse freely).
     const hasRefreshToken = !!Cookies.get('refreshToken');
+    const canRefresh = hasRefreshToken && !isGuestUrl(originalRequest?.url);
 
     if (
       error.response?.status === 401 &&
       !originalRequest._retry &&
-      hasRefreshToken
+      canRefresh
     ) {
       originalRequest._retry = true;
 

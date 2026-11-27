@@ -156,10 +156,21 @@ export const useStoryStatus = (storyId: string): StoryStatus => {
 // text changed.
 const POSITIONS_KEY = 'readerPositions';
 
-type PositionMap = Record<
-  string,
-  { page: number; count: number; sig?: string; at?: number }
->;
+type PositionEntry = { page: number; count: number; sig?: string; at?: number };
+type PositionMap = Record<string, PositionEntry>;
+
+const isPositionEntry = (value: unknown): value is PositionEntry => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  const { page, count, sig, at } = value as Record<string, unknown>;
+  return (
+    Number.isInteger(page) &&
+    Number.isInteger(count) &&
+    (sig === undefined || typeof sig === 'string') &&
+    (at === undefined || (typeof at === 'number' && Number.isFinite(at)))
+  );
+};
 
 const MAX_POSITIONS = 200;
 
@@ -193,7 +204,7 @@ const storedUserId = (): string | null => {
 // A signed-in reader we can't identify returns null: nothing is persisted
 // rather than sharing one key between accounts. (A guest's position is not
 // carried over to their account on login; the account starts from page one.)
-const readerScope = (): string | null => {
+export const readerScope = (): string | null => {
   if (isUserLoggedIn()) {
     const id = tokenUserId(Cookies.get('accessToken')) ?? storedUserId();
     return id ? `u:${id}` : null;
@@ -263,18 +274,21 @@ export const saveReadingPosition = (
   if (pageCount <= 0 || !key) {
     return;
   }
-  const map = readPositions();
+  // Drop legacy bare-id keys and malformed entries.
+  const valid = Object.entries(readPositions()).filter(
+    (e): e is [string, PositionEntry] =>
+      e[0].includes('|') && isPositionEntry(e[1])
+  );
   // Strictly increasing so recency order survives same-millisecond saves.
-  const latest = Math.max(0, ...Object.values(map).map((e) => e?.at ?? 0));
+  const latest = Math.max(0, ...valid.map(([, e]) => e.at ?? 0));
+  const map: PositionMap = Object.fromEntries(valid);
   map[key] = {
     page: Math.min(Math.max(Math.trunc(page) || 0, 0), pageCount - 1),
     count: pageCount,
     sig,
     at: Math.max(Date.now(), latest + 1),
   };
-  // Drop legacy bare-id keys and keep only the most recent entries.
   const kept = Object.entries(map)
-    .filter(([k]) => k.includes('|'))
     .sort(([, a], [, b]) => (b.at ?? 0) - (a.at ?? 0))
     .slice(0, MAX_POSITIONS);
   writePositions(Object.fromEntries(kept));

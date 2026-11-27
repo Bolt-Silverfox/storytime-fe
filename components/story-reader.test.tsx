@@ -180,6 +180,97 @@ describe('guest with a single stored narration file', () => {
   });
 });
 
+describe('saved reading position', () => {
+  const positions = () =>
+    JSON.parse(
+      window.localStorage.getItem('readerPositions') ?? '{}'
+    ) as Record<string, { page: number }>;
+  const b64 = (o: object) =>
+    btoa(JSON.stringify(o))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+  const signInElsewhere = async (userId: string) => {
+    const services = await import('@/lib/services');
+    vi.mocked(services.isUserLoggedIn).mockReturnValue(true);
+    document.cookie = `accessToken=${b64({})}.${b64({ userId })}.sig; path=/`;
+  };
+
+  beforeEach(() => {
+    guest.clips = 0;
+    guest.story = {
+      id: 'story-1',
+      title: 'T',
+      textContent: TEXT,
+      audioUrl: 'full.mp3',
+    };
+  });
+  afterEach(async () => {
+    const services = await import('@/lib/services');
+    vi.mocked(services.isUserLoggedIn).mockReturnValue(false);
+    document.cookie =
+      'accessToken=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+  });
+
+  it('is not saved again by page turns after the story is finished', async () => {
+    renderReader();
+    await waitFor(() => screen.getByRole('switch'));
+    fireEvent.click(screen.getByRole('switch'));
+    await waitReady();
+    await turnTo(2);
+    expect(positions()['g:|story-1']?.page).toBe(2);
+    fireEvent.click(playButton());
+    await endAudio();
+    expect(doneIds()).toContain('story-1');
+    expect(positions()).toEqual({});
+    await turnTo(1);
+    expect(screen.getAllByText('Page 4 of 6').length).toBeGreaterThan(0);
+    expect(positions()).toEqual({});
+  });
+
+  it('does not write to an account that signed in from another tab', async () => {
+    renderReader();
+    await waitFor(() => screen.getByRole('switch'));
+    fireEvent.click(screen.getByRole('switch'));
+    await waitReady();
+    await turnTo(1);
+    window.localStorage.setItem(
+      'readerPositions',
+      JSON.stringify({
+        ...positions(),
+        'u:alice|story-1': { page: 5, count: 6, at: 1 },
+      })
+    );
+    await signInElsewhere('alice');
+    await turnTo(2);
+    expect(screen.getAllByText('Page 4 of 6').length).toBeGreaterThan(0);
+    expect(positions()['u:alice|story-1']).toEqual({
+      page: 5,
+      count: 6,
+      at: 1,
+    });
+  });
+
+  it('does not clear the position of an account that signed in from another tab', async () => {
+    renderReader();
+    await waitFor(() => screen.getByRole('switch'));
+    fireEvent.click(screen.getByRole('switch'));
+    await waitReady();
+    window.localStorage.setItem(
+      'readerPositions',
+      JSON.stringify({ 'u:alice|story-1': { page: 5, count: 6, at: 1 } })
+    );
+    await signInElsewhere('alice');
+    fireEvent.click(playButton());
+    await endAudio();
+    expect(positions()['u:alice|story-1']).toEqual({
+      page: 5,
+      count: 6,
+      at: 1,
+    });
+  });
+});
+
 describe('batch narration with fewer clips than pages, read-along off', () => {
   beforeEach(() => {
     guest.clips = 4;

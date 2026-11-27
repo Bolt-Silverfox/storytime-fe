@@ -9,6 +9,7 @@ import {
   getReadingPosition,
   markDone,
   markReading,
+  readerScope,
   saveReadingPosition,
 } from '@/lib/progress-store';
 import { pagesSignature, resolvePages } from '@/lib/reader/paginate';
@@ -170,12 +171,14 @@ const StoryReader = ({
   // story, so pages are not mapped to clips and the file ending ends the story.
   const singleFileRef = useRef(false);
   singleFileRef.current = isGuest && !!guestAudioUrl;
+  const positionScopeRef = useRef<string | null>(null);
 
   // Resume where the reader left off once the pages are known.
   useEffect(() => {
     if (!(storyId && pages.length > 0)) {
       return;
     }
+    positionScopeRef.current = readerScope();
     dispatch({
       type: 'init',
       count: pages.length,
@@ -186,10 +189,16 @@ const StoryReader = ({
   // Remember the position (per story) as pages turn. Only while the page is
   // visible, so narration playing with the text hidden can't overwrite it.
   useEffect(() => {
-    if (storyId && reader.count > 0 && isChecked) {
+    if (
+      storyId &&
+      reader.count > 0 &&
+      isChecked &&
+      !storyFinished &&
+      readerScope() === positionScopeRef.current
+    ) {
       saveReadingPosition(storyId, reader.page, reader.count, pagesSig);
     }
-  }, [storyId, reader.page, reader.count, pagesSig, isChecked]);
+  }, [storyId, reader.page, reader.count, pagesSig, isChecked, storyFinished]);
 
   // Revealing the text while narration is playing shows the narrated page.
   // biome-ignore lint/correctness/useExhaustiveDependencies: only react to the read-along switch; the rest is read via refs.
@@ -607,7 +616,9 @@ const StoryReader = ({
     // Reflect completion on story cards immediately (works for guests too).
     markDone(storyId);
     // Finished: the next visit starts from page one.
-    clearReadingPosition(storyId);
+    if (readerScope() === positionScopeRef.current) {
+      clearReadingPosition(storyId);
+    }
     if (isGuest) {
       return;
     }

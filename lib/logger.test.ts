@@ -2044,6 +2044,9 @@ describe('round 11: every serialised header form', () => {
     `{"password\\u0022:\\u0022${SECRET}\\u0022}`,
     `password\\u003d${SECRET}`,
     `authorization=${JSON.stringify(digest)}, next=1`,
+    String.raw`{"cookie":"pref=\u0022a\u0022; theme=${SECRET}","next":1}`,
+    `Cookie: a="${SECRET}${' x'.repeat(150)}"; b=1`,
+    `Cookie: a="x; theme=${SECRET}`,
     `{"x-api-key\\u0022:\\u0022${SECRET}"}`,
   ];
 

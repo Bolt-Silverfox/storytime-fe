@@ -182,7 +182,7 @@ const AUTH_HEADER =
 const AUTH_HEADER_LINE =
   /(authorization["']?\s*:\s*)(?:"(?:[^"\\\r\n]|\\.){0,8000}"|'(?:[^'\\\r\n]|\\.){0,8000}'|[^\s"'`][^\r\n]*)/gi;
 const COOKIE_HEADER =
-  /(\b(?:set-)?cookie["']?\s*:\s*)(?:"(?:[^"\\\r\n]|\\.){0,8000}"|'(?:[^'\\\r\n]|\\.){0,8000}'|\[\s*"(?:[^"\\\r\n]|\\.){0,8000}"(?:\s*,\s*"(?:[^"\\\r\n]|\\.){0,8000}"){0,50}\s*\]|(?:\\+["'`]|[^\s"'`\\[{])(?:=\\*(["'`])(?:(?!\2)[^\r\n]){0,200}\2|[^\r\n"'`\\]|\\[^\r\nnr"'`]|['`](?=[^\s,;"'`\\]))*)/gi;
+  /(\b(?:set-)?cookie["']?\s*:\s*)(?:"(?:[^"\\\r\n]|\\.){0,8000}"|'(?:[^'\\\r\n]|\\.){0,8000}'|\[\s*"(?:[^"\\\r\n]|\\.){0,8000}"(?:\s*,\s*"(?:[^"\\\r\n]|\\.){0,8000}"){0,50}\s*\]|(?:\\+["'`]|[^\s"'`\\[{])(?:=\\*(["'`])(?:(?!\2)[^\r\n])*\2?|[^\r\n"'`\\]|\\[^\r\nnr"'`]|['`](?=[^\s,;"'`\\]))*)/gi;
 const UNICODE_SEPARATOR = /\\u00(22|27|60|3[ad])/gi;
 // Scheme-prefixed credentials. The value must look like a credential, so
 // "a token of friendship" and "Basic information" stay readable. A
@@ -478,9 +478,10 @@ function redactString(input: string, budget: Walk): string {
   }
   value = redactKeyNames(
     value
-      .replace(UNICODE_SEPARATOR, (_, hex: string) =>
-        String.fromCharCode(Number.parseInt(hex, 16))
-      )
+      .replace(UNICODE_SEPARATOR, (_, hex: string) => {
+        const char = String.fromCharCode(Number.parseInt(hex, 16));
+        return /["'`]/.test(char) ? `\\${char}` : char;
+      })
       .replace(JWT, REDACTED)
       .replace(AUTH_HEADER_LINE, `$1${REDACTED}`)
       .replace(AUTH_HEADER, `$1${REDACTED}`)

@@ -890,7 +890,7 @@ const StoryReader = ({
   const synthMoving = audioSounding && Boolean(audioUrl);
 
   return (
-    <div>
+    <div className='[&_button]:scroll-mb-[calc(9.5rem+env(safe-area-inset-bottom))]'>
       {/* Hidden audio element */}
       {audioUrl && (
         <audio

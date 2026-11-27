@@ -1455,3 +1455,37 @@ describe('the reader opens with read-along already on', () => {
     }
   );
 });
+
+describe('keyboard focus on the last page', () => {
+  beforeEach(() => {
+    guest.clips = 6;
+    guest.pending = 0;
+    guest.failed = [5];
+    guest.story = { id: 'story-1', title: 'T', textContent: TEXT };
+  });
+  afterEach(() => {
+    guest.failed = [];
+  });
+
+  it('scrolls every control above the sticky Play button clear of it when focused', async () => {
+    renderReader();
+    await waitFor(() => screen.getByRole('switch'));
+    fireEvent.click(screen.getByRole('switch'));
+    await waitReady();
+    await turnTo(5);
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Finish story' })).toBeTruthy();
+
+    const buttons = Array.from(document.querySelectorAll('button'));
+    const above = buttons.slice(0, buttons.indexOf(playButton()));
+    expect(above.length).toBeGreaterThan(4);
+    for (const button of above) {
+      expect(
+        button.closest(
+          '[class~="[&_button]:scroll-mb-[calc(9.5rem+env(safe-area-inset-bottom))]"]'
+        ),
+        button.textContent ?? ''
+      ).not.toBeNull();
+    }
+  });
+});

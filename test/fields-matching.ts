@@ -42,9 +42,9 @@ export function fieldsMatching(value: unknown, needle: Needle): string[] {
     }
     seen.add(node);
     if (node instanceof Error) {
-      visit(node.name, `${path}.name`);
-      visit(node.message, `${path}.message`);
-      visit(node.stack, `${path}.stack`);
+      for (const key of ['name', 'message', 'stack']) {
+        visit(readOwn(node, key), `${path}.${key}`);
+      }
     }
     if (node instanceof Map) {
       for (const [k, v] of node) {

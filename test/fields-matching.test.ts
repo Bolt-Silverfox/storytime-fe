@@ -42,6 +42,16 @@ describe('fieldsMatching', () => {
     expect(fieldsMatching(value, 'marker')).toEqual(['$.ok']);
   });
 
+  it('a throwing Error field getter does not stop the other Error fields', () => {
+    const error = new Error('marker in message');
+    Object.defineProperty(error, 'name', {
+      get: () => {
+        throw new Error('trap');
+      },
+    });
+    expect(fieldsMatching(error, 'marker')).toContain('$.message');
+  });
+
   it('checks symbol keys and values held under them', () => {
     const value = { [Symbol('marker')]: 1, [Symbol('k')]: 'marker' };
     expect(fieldsMatching(value, 'marker')).toEqual([

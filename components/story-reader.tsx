@@ -151,11 +151,16 @@ const StoryReader = ({
   const [audioRetry, setAudioRetry] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [clipEnded, setClipEnded] = useState(false);
   // A new clip starts from zero with an unknown length. Reset the clock in the
   // same batch as the clip change so the new page never renders against the
   // old clip's playhead (which would flash its last sentence).
-  const resetClock = () => {
+  const rewindClock = () => {
     setCurrentTime(0);
+    setClipEnded(false);
+  };
+  const resetClock = () => {
+    rewindClock();
     setDuration(0);
   };
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -557,6 +562,7 @@ const StoryReader = ({
     // At clip end, advance to the next paragraph; wait if it isn't ready yet;
     // stop (and reset) once the whole story has been read through.
     const handleEnded = () => {
+      setClipEnded(true);
       const current = clipIndexRef.current;
       const next = current + 1;
       const action = clipEndAction({
@@ -599,7 +605,7 @@ const StoryReader = ({
       if (action === 'stop') {
         // The ended clip's playhead must not outlive the narration: going back
         // a page would otherwise light that clip's last sentence again.
-        resetClock();
+        rewindClock();
         dispatch({ type: 'clip', clip: next, from: current });
         return;
       }
@@ -613,8 +619,13 @@ const StoryReader = ({
         0;
       clipIndexRef.current = first;
       setCurrentClip(first);
-      setAudioUrl(readyClipsRef.current.get(first) ?? null);
-      resetClock();
+      const firstUrl = readyClipsRef.current.get(first) ?? null;
+      setAudioUrl(firstUrl);
+      if (firstUrl === audio.getAttribute('src')) {
+        rewindClock();
+      } else {
+        resetClock();
+      }
       if (isCheckedRef.current && !singleFileRef.current) {
         dispatch({ type: 'clip', clip: first, from: current });
       }
@@ -793,6 +804,9 @@ const StoryReader = ({
     }
     if (!(audioRef.current && audioUrl)) {
       return;
+    }
+    if (clipEnded) {
+      rewindClock();
     }
     audioRef.current.play().catch((error) => {
       console.error('Failed to play audio:', error);
@@ -1096,6 +1110,7 @@ const StoryReader = ({
                 activeSentence={
                   // Playing, or paused part-way through the clip (keep the
                   // "where we are" marker); hidden at the start / once finished.
+                  !clipEnded &&
                   (isPlaying || currentTime > 0) &&
                   useAudioParagraphs &&
                   reader.page === narratedPage

@@ -685,7 +685,7 @@ describe('sentence read-along highlight', () => {
     fireEvent.keyDown(document, { key: 'ArrowLeft' });
     expect(screen.getAllByText('Page 2 of 4').length).toBeGreaterThan(0);
     expect(active()).toEqual([]);
-    expect(screen.getByText('00:00 / 00:00')).toBeTruthy();
+    expect(screen.getByText('00:00 / 00:30')).toBeTruthy();
   });
 
   it('keeps the spoken sentence clear of the sticky Play button', async () => {
@@ -1440,7 +1440,7 @@ describe('read-along through every narration state', () => {
     define('duration', Number.NaN);
   };
   const clipEnds = async () => {
-    define('currentTime', 30);
+    await tick(30);
     await endAudio();
   };
   const clipEndsOntoNewSource = async () => {

@@ -2016,3 +2016,81 @@ describe('round 10: bounded work', () => {
     });
   });
 });
+
+describe('round 11: failure classification table', () => {
+  const axiosConfig = { headers: new AxiosHeaders() } as never;
+  const kinds: [string, () => unknown, boolean, boolean][] = [
+    ['AbortError', () => new DOMException('a', 'AbortError'), true, true],
+    ['CanceledError', () => ({ name: 'CanceledError' }), true, true],
+    ['ERR_CANCELED', () => new AxiosError('c', 'ERR_CANCELED'), true, true],
+    ['ERR_NETWORK', () => new AxiosError('n', 'ERR_NETWORK'), true, true],
+    [
+      'ECONNABORTED',
+      () => new AxiosError('t', 'ECONNABORTED', axiosConfig),
+      false,
+      true,
+    ],
+    [
+      'ETIMEDOUT',
+      () => new AxiosError('t', 'ETIMEDOUT', axiosConfig),
+      false,
+      true,
+    ],
+    ['fetch TypeError', () => new TypeError('Failed to fetch'), false, true],
+    ['Safari fetch TypeError', () => new TypeError('Load failed'), false, true],
+    ['other TypeError', () => new TypeError('x is undefined'), false, false],
+    ['401', () => makeAxiosError(401), true, true],
+    ['429', () => makeAxiosError(429), true, true],
+    ['403', () => makeAxiosError(403), false, false],
+    ['500', () => makeAxiosError(500), false, false],
+    ['plain 401 status', () => ({ status: 401 }), true, true],
+    [
+      'ERR_BAD_OPTION_VALUE',
+      () => new AxiosError('bad option', 'ERR_BAD_OPTION_VALUE', axiosConfig),
+      false,
+      false,
+    ],
+    [
+      'ERR_BAD_OPTION',
+      () => new AxiosError('bad option', 'ERR_BAD_OPTION', axiosConfig),
+      false,
+      false,
+    ],
+    [
+      'ERR_INVALID_URL',
+      () => new AxiosError('bad url', 'ERR_INVALID_URL', axiosConfig),
+      false,
+      false,
+    ],
+    [
+      'axios-shaped without code or response',
+      () => ({ isAxiosError: true, config: {}, message: 'm' }),
+      false,
+      false,
+    ],
+    ['ERR_BAD_REQUEST', () => makeAxiosError(400), false, false],
+    ['SyntaxError', () => new SyntaxError('bad json'), false, false],
+    ['plain Error', () => new Error('render failed'), false, false],
+    ['string', () => 'Failed to fetch', false, false],
+    ['null', () => null, false, false],
+  ];
+
+  it.each(kinds)(
+    '%s: online %s, offline %s',
+    (_name, make, online, offline) => {
+      expect(isExpectedFailure(make())).toBe(online);
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+      expect(isExpectedFailure(make())).toBe(offline);
+    }
+  );
+
+  it('a caller status is expected online and offline', () => {
+    expect(isExpectedFailure(makeAxiosError(403), { statuses: [403] })).toBe(
+      true
+    );
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    expect(isExpectedFailure(makeAxiosError(403), { statuses: [403] })).toBe(
+      true
+    );
+  });
+});

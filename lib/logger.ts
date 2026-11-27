@@ -993,8 +993,7 @@ function classifyFailure(error: unknown, statuses?: number[]): boolean {
   return (
     (typeof e.code === 'string' && OFFLINE_CODES.has(e.code)) ||
     (e.name === 'TypeError' &&
-      FETCH_FAILURE.test(String((e as { message?: unknown }).message))) ||
-    (isAxiosLike(e) && !e.response)
+      FETCH_FAILURE.test(String((e as { message?: unknown }).message)))
   );
 }
 

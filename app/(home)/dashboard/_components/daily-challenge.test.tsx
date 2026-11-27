@@ -71,8 +71,8 @@ describe('DailyChallenge', () => {
     ).toBeTruthy();
     expect(getDailyChallengesService).toHaveBeenCalledWith('k1');
     expect(sentry.captureException).toHaveBeenCalledOnce();
-    expect((sentry.captureException.mock.calls[0][0] as Error).message).toBe(
-      'boom'
-    );
+    const reported = sentry.captureException.mock.calls[0][0] as Error;
+    expect(reported.message).toBe('Failed to fetch daily challenges');
+    expect(reported.stack).toMatch(/^Error: \[omitted\]\n {4}at /);
   });
 });

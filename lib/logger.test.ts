@@ -129,7 +129,7 @@ describe('level routing', () => {
       Error,
       { tags: Record<string, string>; extra: Record<string, unknown> },
     ];
-    expect(captured.message).toBe('boom');
+    expect(captured.message).toBe('Failed to fetch kids');
     expect(hint.tags).toMatchObject({ feature: 'kids', scope: 'API' });
     expect(hint.extra).toMatchObject({
       kidId: 'k1',
@@ -389,9 +389,9 @@ describe('axios errors reach Sentry with context', () => {
     const a = sentry.captureException.mock.calls[0][0] as Error;
     const b = sentry.captureException.mock.calls[1][0] as AggregateError;
     expect((a.cause as Error).message).not.toContain('abc.def.ghi');
-    expect((a.cause as Error).message).toContain('inner');
+    expect((a.cause as Error).message).toBe('[omitted]');
     expect(b.errors).toHaveLength(1);
-    expect((b.errors[0] as Error).message).not.toContain('me@x.io');
+    expect((b.errors[0] as Error).message).toBe('[omitted]');
   });
 
   it('redacts the message string itself', () => {
@@ -895,7 +895,7 @@ describe('round 4: linear time', () => {
   it('a whole logger call has a total scan budget', () => {
     const s = 'a='.repeat(32_000);
     const t = performance.now();
-    logger.error(s, new Error(s), { context: { s } });
+    logger.error(s, new Error(s), { context: { s, again: s } });
     expect(performance.now() - t).toBeLessThan(500);
     // The last of the three 64k strings is past the 128k budget: it is dropped
     // entirely (not merely cut to 8k like the others).
@@ -1015,7 +1015,7 @@ describe('round 5: one redaction per call, priority budget', () => {
       Error,
       { extra: Record<string, string> },
     ];
-    expect(copy.message).toBe('real failure');
+    expect(copy.message).toBe('m');
     expect(copy.stack).toContain('at doThing (app/file.js:10:5)');
     expect(hint.extra.userId).toBe('u1');
     expect(hint.extra.blob1.endsWith('[truncated]')).toBe(true);
@@ -1029,7 +1029,7 @@ describe('round 5: one redaction per call, priority budget', () => {
     expect(performance.now() - t).toBeLessThan(500);
     const copy = sentry.captureException.mock.calls[0][0] as Error;
     expect(copy.message.startsWith('yyyy')).toBe(true);
-    expect(copy.stack).toContain('yyyy');
+    expect(copy.stack).toMatch(/^Error: \[omitted\]\n {4}at /);
   });
 
   it('redacts each input once (context is not scanned for console and Sentry separately)', () => {
@@ -1267,7 +1267,7 @@ describe('round 7: hostile errors', () => {
     );
     expect(sentry.captureException).toHaveBeenCalledOnce();
     const copy = sentry.captureException.mock.calls[0][0] as Error;
-    expect(copy.message).toBe('real');
+    expect(copy.message).toBe('m');
   });
 
   it('a throwing message/stack/cause getter falls back to [unreadable]', () => {
@@ -1299,7 +1299,7 @@ describe('round 7: hostile error proxies', () => {
     logger.error('m', proxy);
     expect(sentry.captureException).toHaveBeenCalledOnce();
     expect((sentry.captureException.mock.calls[0][0] as Error).message).toBe(
-      'real'
+      'm'
     );
     expect(spies.error).toHaveBeenCalled();
   });
@@ -1713,10 +1713,13 @@ describe('round 9: one sanitiser before every sink', () => {
   });
 
   it('stops emitting markers once the output budget is spent', () => {
-    const shared = { a: 1 };
-    const wide = Array.from({ length: 100 }, () => Array(100).fill(shared));
+    const cycle: Record<string, unknown> = {};
+    cycle.self = cycle;
+    const wide = Array.from({ length: 100 }, () => Array(100).fill(cycle));
     const out = JSON.stringify(redact(wide));
-    expect(out.split('[Circular]').length - 1).toBeLessThan(7_000);
+    const markers = out.split('[Circular]').length - 1;
+    expect(markers).toBeGreaterThan(0);
+    expect(markers).toBeLessThan(5_000);
     expect(out).toContain('[truncated]');
   });
 
@@ -1729,7 +1732,7 @@ describe('round 9: one sanitiser before every sink', () => {
     logger.error('m', new Error('outer', { cause: revoked() }));
     expect(sentry.captureException).toHaveBeenCalledOnce();
     const copy = sentry.captureException.mock.calls[0][0] as Error;
-    expect(copy.message).toBe('outer');
+    expect(copy.message).toBe('m');
     expect(copy.cause).toBe('[Unserializable]');
     expect(spies.error).toHaveBeenCalledOnce();
   });
@@ -1739,8 +1742,8 @@ describe('round 9: one sanitiser before every sink', () => {
     Object.defineProperty(agg, 'errors', { value: revoked() });
     logger.error('m', agg);
     expect(sentry.captureException).toHaveBeenCalledOnce();
-    expect((sentry.captureException.mock.calls[0][0] as Error).message).toBe(
-      'many'
+    expect((sentry.captureException.mock.calls[0][0] as Error).name).toBe(
+      'AggregateError'
     );
   });
 
@@ -2462,7 +2465,10 @@ describe('shared objects are not circular', () => {
       { extra: Record<string, unknown> },
     ];
     expect(hint.extra.kidId).toBe('k1');
-    expect(exception.cause).toEqual({ kidId: 'k1', token: '[REDACTED]' });
+    expect(exception.cause).toEqual({
+      kidId: '[omitted]',
+      token: '[REDACTED]',
+    });
     expect(fieldsMatching(sentry.captureException.mock.calls, 'Kq7Lm')).toEqual(
       []
     );
@@ -2520,5 +2526,323 @@ describe('auth actions are matched by route', () => {
   ])('a 401 from %s is reported', (url) => {
     logger.error('x', makeAxiosError(401, url), { expected: true });
     expect(sentry.captureMessage).toHaveBeenCalledOnce();
+  });
+});
+
+describe('untrusted error text is never forwarded', () => {
+  const sinks = () => [
+    spies.debug.mock.calls,
+    spies.info.mock.calls,
+    spies.warn.mock.calls,
+    spies.error.mock.calls,
+    sentry.addBreadcrumb.mock.calls,
+    sentry.captureException.mock.calls,
+    sentry.captureMessage.mock.calls,
+  ];
+  const exception = () => sentry.captureException.mock.calls[0][0] as Error;
+
+  it('replaces an error message with the caller message unless it is a known library message', () => {
+    logger.error('Loading kids failed', new Error('row Kq7Lm was rejected'));
+    logger.error('x', new Error('Request failed with status code 500'));
+    logger.error('y', new TypeError('Failed to fetch'));
+    expect(exception().message).toBe('Loading kids failed');
+    expect((sentry.captureException.mock.calls[1][0] as Error).message).toBe(
+      'Request failed with status code 500'
+    );
+    expect((sentry.captureException.mock.calls[2][0] as Error).message).toBe(
+      'Failed to fetch'
+    );
+    expect(spies.error.mock.calls[0]).toContainEqual(
+      expect.objectContaining({ message: '[omitted]' })
+    );
+    expect(fieldsMatching(sinks(), 'Kq7Lm')).toEqual([]);
+  });
+
+  it('keeps only stack frames, without query strings or appended causes', () => {
+    const err = new Error('Kq7Lm');
+    err.stack = [
+      'Error: Kq7Lm',
+      '    at loadKids (https://app.example.com/_next/static/chunks/page.js?token=Kq7Lm:10:5)',
+      '    at async run (webpack-internal:///(app-pages-browser)/./lib/x.ts:3:9)',
+      'Caused by: SyntaxError: Unexpected token "Kq7Lm"',
+      '    at JSON.parse (<anonymous>)',
+    ].join('\n');
+    logger.error('m', err);
+    expect(exception().stack).toBe(
+      [
+        'Error: [omitted]',
+        '    at loadKids (https://app.example.com/_next/static/chunks/page.js:10:5)',
+        '    at async run (webpack-internal:///(app-pages-browser)/./lib/x.ts:3:9)',
+      ].join('\n')
+    );
+    expect(fieldsMatching(sinks(), 'Kq7Lm')).toEqual([]);
+  });
+
+  it('drops the parser excerpt from an axios-wrapped SyntaxError', () => {
+    let parseError: unknown;
+    try {
+      JSON.parse('{"name":Ada}');
+    } catch (err) {
+      parseError = err;
+    }
+    const wrapped = AxiosError.from(parseError as Error, 'ERR_BAD_RESPONSE', {
+      url: 'auth/kids',
+      method: 'get',
+    } as never);
+    expect(wrapped.stack).toContain('Caused by: SyntaxError');
+    logger.error('kids', wrapped);
+    logger.warn('kids', wrapped);
+    expect(exception().stack).not.toContain('Caused by');
+    expect((exception().cause as Error).stack).toContain('JSON.parse');
+    expect(fieldsMatching(sinks(), 'Ada')).toEqual([]);
+  });
+
+  it('keeps structural fields: class name, code, status and numeric props', () => {
+    const err = Object.assign(new Error('x'), {
+      name: 'FirebaseError',
+      code: 'messaging/permission-blocked',
+      detail: 'Kq7Lm',
+      attempt: 2,
+    });
+    logger.error('m', err);
+    const copy = exception() as unknown as Record<string, unknown>;
+    expect(copy.name).toBe('FirebaseError');
+    expect(copy.code).toBe('messaging/permission-blocked');
+    expect(copy.attempt).toBe(2);
+    expect(copy).not.toHaveProperty('detail');
+    logger.error(
+      'n',
+      Object.assign(new Error('y'), { name: 'Kq7Lm', code: 'Kq7Lm-9' })
+    );
+    expect(fieldsMatching(sinks(), 'Kq7Lm')).toEqual([]);
+  });
+
+  it('drops server text from service errors and string throws', () => {
+    logger.error('kids', {
+      isAxiosError: true,
+      name: 'AxiosError',
+      code: 'ERR_BAD_REQUEST',
+      message: 'No kid named Kq7Lm',
+      status: 400,
+      data: { message: 'No kid named Kq7Lm' },
+      config: { method: 'get', url: 'auth/kids' },
+      response: { status: 400 },
+    });
+    logger.error('thrown', 'Kq7Lm');
+    logger.error('plain', { message: 'Kq7Lm', status: null });
+    const [, hint] = sentry.captureMessage.mock.calls[0] as [
+      string,
+      { contexts: { http_error: Record<string, unknown> } },
+    ];
+    expect(hint.contexts.http_error).toMatchObject({
+      status: 400,
+      method: 'GET',
+      path: '/auth/kids',
+      code: 'ERR_BAD_REQUEST',
+    });
+    expect(fieldsMatching(sinks(), 'Kq7Lm')).toEqual([]);
+  });
+
+  it('reduces a URL in error data to its origin, normalised path and allow-listed query keys', () => {
+    logger.error(
+      'm',
+      new Error('e', {
+        cause: {
+          url: 'https://user:Kq7Lm@api.example.com/stories/Kq7Lm?token=Kq7Lm&page=2#t=Kq7Lm',
+        },
+      })
+    );
+    expect(exception().cause).toEqual({
+      url: 'https://api.example.com/stories/:id?page',
+    });
+    expect(fieldsMatching(sinks(), 'Kq7Lm')).toEqual([]);
+  });
+});
+
+describe('property: no generated secret reaches any sink', () => {
+  const seeded = (seed: number) => () => {
+    seed = (seed * 1_103_515_245 + 12_345) % 2 ** 31;
+    return seed / 2 ** 31;
+  };
+  const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+  const secretFrom = (rand: () => number) =>
+    `Q${Array.from(
+      { length: 19 },
+      () => ALPHABET[Math.floor(rand() * ALPHABET.length)]
+    ).join('')}`;
+  const fragments = (secret: string) =>
+    Array.from({ length: secret.length - 7 }, (_, i) => secret.slice(i, i + 8));
+
+  const placements: [
+    string,
+    (s: string) => unknown,
+    Record<string, unknown>?,
+  ][] = [
+    ['message', (s) => new Error(s)],
+    ['multi-line message', (s) => new Error(`bad\n    at ${s} (x.js:1:2)`)],
+    [
+      'stack header and caused-by section',
+      (s) => {
+        const e = new Error('e');
+        e.stack = `Error: ${s}\n    at f (https://a/x.js:1:2)\nCaused by: Error: ${s}\n    at g (https://a/y.js?k=${s}:3:4)`;
+        return e;
+      },
+    ],
+    [
+      'frame query string',
+      (s) => {
+        const e = new Error('e');
+        e.stack = `Error: e\n    at f (https://a/x.js?v=${s}:1:2)\nf@https://a/x.js#${s}:1:2`;
+        return e;
+      },
+    ],
+    ['cause message', (s) => new Error('outer', { cause: new Error(s) })],
+    ['string cause', (s) => new Error('outer', { cause: s })],
+    [
+      'deep cause chain',
+      (s) =>
+        new Error('a', {
+          cause: new Error('b', {
+            cause: new Error('c', { cause: { detail: s } }),
+          }),
+        }),
+    ],
+    ['aggregate member', (s) => new AggregateError([new Error(s), s], 'many')],
+    [
+      'own string prop',
+      (s) => Object.assign(new Error('e'), { detail: s, code: s }),
+    ],
+    ['name', (s) => Object.assign(new Error('e'), { name: s })],
+    [
+      'response data',
+      (s) => {
+        const e = makeAxiosError(500, '/kids');
+        (e.response as { data: unknown }).data = {
+          message: s,
+          nested: { why: s },
+        };
+        e.message = s;
+        return e;
+      },
+    ],
+    [
+      'url path and query',
+      (s) =>
+        makeAxiosError(500, `https://u:${s}@api/stories/${s}?q=${s}#t=${s}`),
+    ],
+    [
+      'request headers',
+      (s) => {
+        const e = makeAxiosError(500, '/kids');
+        e.config?.headers.set('Authorization', `Bearer ${s}`);
+        e.config?.headers.set('Cookie', `sid=${s}`);
+        return e;
+      },
+    ],
+    [
+      'service error',
+      (s) => ({
+        isAxiosError: true,
+        name: 'AxiosError',
+        message: s,
+        status: 500,
+        data: { message: s },
+        config: { method: 'get', url: `stories/${s}?token=${s}` },
+        response: { status: 500 },
+      }),
+    ],
+    ['thrown string', (s) => s],
+    ['plain thrown object', (s) => ({ message: s, reason: { text: s } })],
+    [
+      'context values',
+      () => new Error('e'),
+      {
+        token: '%s',
+        headers: { Authorization: 'Bearer %s', Cookie: 'a=%s' },
+        url: 'https://api/stories?token=%s&page=2',
+        failure: new Error('%s'),
+        nested: { password: '%s', list: [{ apiKey: '%s' }] },
+      },
+    ],
+  ];
+
+  const isAxiosShaped = (value: unknown) =>
+    typeof value === 'object' && value !== null && 'isAxiosError' in value;
+
+  const fill = (value: unknown, s: string): unknown => {
+    if (typeof value === 'string') {
+      return value.replaceAll('%s', s);
+    }
+    if (value instanceof Error) {
+      return new Error(fill(value.message, s) as string);
+    }
+    if (Array.isArray(value)) {
+      return value.map((v) => fill(v, s));
+    }
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(
+        Object.entries(value).map(([k, v]) => [k, fill(v, s)])
+      );
+    }
+    return value;
+  };
+
+  it.each(placements)('a secret in the %s', (_name, make, context) => {
+    const rand = seeded(_name.length * 7_919);
+    for (let run = 0; run < 25; run++) {
+      vi.clearAllMocks();
+      const secret = secretFrom(rand);
+      const ctx = context && (fill(context, secret) as Record<string, unknown>);
+      for (const env of ['development', 'production'] as const) {
+        configureLogger({ environment: env });
+        logger.error('failed', make(secret), { context: ctx });
+        logger.error('failed', make(secret), { context: ctx, expected: true });
+        const thrown = make(secret);
+        if (thrown instanceof Error || isAxiosShaped(thrown)) {
+          logger.warn('warned', thrown, ctx);
+          logger.debug('debugged', thrown, ctx);
+        }
+      }
+      const calls = [
+        spies.debug.mock.calls,
+        spies.warn.mock.calls,
+        spies.error.mock.calls,
+        sentry.addBreadcrumb.mock.calls,
+        sentry.captureException.mock.calls,
+        sentry.captureMessage.mock.calls,
+      ];
+      expect(spies.error).toHaveBeenCalled();
+      for (const fragment of fragments(secret)) {
+        expect(fieldsMatching(calls, fragment)).toEqual([]);
+      }
+    }
+  });
+});
+
+describe('caller text: value ends', () => {
+  it('a query value group stops at the next query parameter', () => {
+    expect(redact('GET /x?password=a(b&page=3)&view=grid failed')).toBe(
+      'GET /x?password=[REDACTED]&page=3)&view=grid failed'
+    );
+    expect(redact('token=[a&b] next')).toBe('token=[REDACTED] next');
+  });
+
+  it('omits the rest of the line when a sensitive group end is not found', () => {
+    const member = `x Kq7Lm${'y'.repeat(2_100)}`;
+    const out = redact(`token=["${member}", "Zx4Wv"] tail\nnext line`);
+    expect(out).toBe('token=[REDACTED]\nnext line');
+  });
+
+  it.each([
+    ['authorization=opaque page=3', 'authorization=[REDACTED] page=3'],
+    ['authorization=Bearer opaque page=3', 'authorization=[REDACTED] page=3'],
+    ['authorization=Custom Kq7Lm page=3', 'authorization=[REDACTED] page=3'],
+    ['authorization=Custom a=Kq7Lm, b=Zx4Wv', 'authorization=[REDACTED]'],
+    [
+      'authorization=Digest username="a", response="Kq7Lm" page=3',
+      'authorization=[REDACTED] page=3',
+    ],
+  ])('%s', (input, expected) => {
+    expect(redact(input)).toBe(expected);
   });
 });

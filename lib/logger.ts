@@ -11,10 +11,12 @@ import * as Sentry from '@sentry/nextjs';
  * in normal operation (401 session expiry, 429, guest quota 403, aborted
  * requests, offline) leave a breadcrumb instead of paging Sentry.
  *
- * Everything is redacted before it reaches the console or Sentry. No Node-only
- * imports, so it is safe in the browser, server and edge runtimes. Sentry is
- * only initialised client-side (instrumentation-client.ts); on the server, or
- * if Sentry is missing/throws, the Sentry step is silently skipped.
+ * Thrown values are reduced to their structure (class, known library message,
+ * stack frames, code, HTTP status/method/path) and never forward their own
+ * text; caller strings are redacted. No Node-only imports, so it is safe in
+ * the browser, server and edge runtimes. Sentry is only initialised
+ * client-side (instrumentation-client.ts); on the server, or if Sentry is
+ * missing/throws, the Sentry step is silently skipped.
  */
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
@@ -365,15 +367,21 @@ function closingRunEnds(
 }
 
 const MAX_GROUP = 2_000;
+const GROUP_UNCLOSED = -1;
+const GROUP_DELIMITED = -2;
+const GROUP_UNBOUNDED = -3;
 
-function groupEnd(input: string, at: number): number {
+function groupEnd(input: string, at: number, grammar: Grammar): number {
   const limit = Math.min(input.length, at + MAX_GROUP);
   const unclosed = new Set<string>();
   let depth = 0;
   for (let i = at; i < limit; i++) {
     const c = input[i];
     if (c === '\n' || c === '\r') {
-      return -1;
+      return GROUP_UNCLOSED;
+    }
+    if (i > at && isUrlGrammar(grammar) && endsValueAt(input, i, grammar)) {
+      return GROUP_DELIMITED;
     }
     if (OPENERS.includes(c)) {
       depth++;
@@ -391,7 +399,7 @@ function groupEnd(input: string, at: number): number {
       }
     }
   }
-  return -1;
+  return limit < input.length ? GROUP_UNBOUNDED : GROUP_UNCLOSED;
 }
 
 function unquotedEnd(input: string, from: number, grammar: Grammar): number {
@@ -400,10 +408,13 @@ function unquotedEnd(input: string, from: number, grammar: Grammar): number {
   while (i < input.length && !endsValueAt(input, i, grammar)) {
     const c = input[i];
     if (OPENERS.includes(c) && groups) {
-      const end = groupEnd(input, i);
-      if (end !== -1) {
+      const end = groupEnd(input, i, grammar);
+      if (end >= 0) {
         i = end;
         continue;
+      }
+      if (end === GROUP_UNBOUNDED) {
+        return lineEnd(input, i);
       }
       groups = false;
     } else if (c === ',' && i > from) {
@@ -462,11 +473,39 @@ function paramFollows(input: string, at: number): boolean {
   return PARAM_NAME.test(input);
 }
 
+const AUTH_SCHEMES = new Set([
+  'basic',
+  'bearer',
+  'digest',
+  'aws4-hmac-sha256',
+  'negotiate',
+  'ntlm',
+  'token',
+  'apikey',
+  'hoba',
+  'mutual',
+  'vapid',
+  'dpop',
+  'hawk',
+  'oauth',
+  'scram-sha-1',
+  'scram-sha-256',
+]);
+
 function authSchemeEnd(input: string, from: number, grammar: Grammar): number {
   AUTH_SCHEME.lastIndex = from;
   let end: number;
   if (AUTH_SCHEME.test(input)) {
-    end = paramEnd(input, AUTH_SCHEME.lastIndex);
+    const paramStart = AUTH_SCHEME.lastIndex;
+    const word = input.slice(from, paramStart).trimEnd();
+    end = paramEnd(input, paramStart);
+    if (!AUTH_SCHEMES.has(word.toLowerCase())) {
+      PARAM_NAME.lastIndex = paramStart;
+      const nextIsField = PARAM_NAME.test(input) && !paramFollows(input, end);
+      if (end === paramStart || nextIsField) {
+        return from + word.length;
+      }
+    }
   } else {
     end = unquotedEnd(input, from, grammar);
     if (input.slice(from, end) !== REDACTED || !paramFollows(input, end)) {
@@ -825,7 +864,130 @@ function put(target: object, key: string, value: unknown): void {
   });
 }
 
-function clean(value: unknown, depth: number, walk: Walk): unknown {
+const OMITTED = '[omitted]';
+
+const LIBRARY_MESSAGES = [
+  /^Request failed with status code [1-5]\d\d$/,
+  /^timeout of \d{1,9}ms exceeded$/,
+  /^(?:Network Error|canceled|Failed to fetch|Load failed|No response from server|Unexpected error)$/,
+  /^NetworkError when attempting to fetch resource\.$/,
+  /^(?:The user aborted a request|The operation was aborted|signal is aborted without reason)\.?$/,
+];
+const ERROR_NAME = /^(?:Error|[A-Z][A-Za-z0-9]{0,47}(?:Error|Exception))$/;
+const ERROR_CODE =
+  /^(?:[A-Z][A-Z0-9_]{1,47}|[a-z][a-z0-9-]{0,31}\/[a-z0-9-]{1,63})$/;
+const QUERY_KEYS = new Set([
+  'page',
+  'limit',
+  'offset',
+  'sort',
+  'order',
+  'category',
+  'type',
+  'status',
+  'lang',
+]);
+const WHOLE_URL =
+  /^(?:([a-z][a-z\d+.-]{0,20}:\/\/)(?:[^\s/?#@]{0,300}@)?([^\s/?#@]{1,300}))?(\/[^\s?#]{0,4000})?(?:\?([^\s#]{0,8000}))?(?:#\S{0,8000})?$/i;
+
+function libraryMessage(text: string): string {
+  return text.length <= 120 && LIBRARY_MESSAGES.some((re) => re.test(text))
+    ? text
+    : OMITTED;
+}
+
+function structuralUrl(text: string): string | undefined {
+  const m = text.length <= 16_000 ? WHOLE_URL.exec(text) : null;
+  if (!(m && ((m[1] && m[2]) || text.startsWith('/')))) {
+    return undefined;
+  }
+  const [, scheme = '', host = '', path = '', query] = m;
+  const keys = (query ?? '')
+    .split('&')
+    .map((pair) => pair.split('=')[0])
+    .filter((key) => QUERY_KEYS.has(key));
+  const kept = [...new Set(keys)];
+  return `${scheme}${host}${path ? normalisePath(path) : ''}${
+    kept.length ? `?${kept.join('&')}` : ''
+  }`;
+}
+
+const MAX_FRAMES = 50;
+const MAX_FRAME_LINE = 1_000;
+const FRAME_LOCATION = /^(\S{1,800}?):(\d{1,7}):(\d{1,7})$/;
+const V8_FRAME =
+  /^\s*at (?:((?:async |new )?[\w$.<>[\]]{1,120}) \((\S{1,820}|<anonymous>|native)\)|(\S{1,820}))$/;
+const GECKO_FRAME = /^([\w$.<>/[\]*]{0,120})@(\S{0,820})$/;
+
+function frameLocation(location: string): string | undefined {
+  if (location === '<anonymous>' || location === 'native' || location === '') {
+    return location;
+  }
+  const m = FRAME_LOCATION.exec(location);
+  if (!m || /^data:/i.test(m[1])) {
+    return undefined;
+  }
+  const file = m[1]
+    .replace(/[?#].*$/, '')
+    .replace(/^([a-z][a-z\d+.-]*:\/\/)[^/@]*@/i, '$1');
+  return `${file}:${m[2]}:${m[3]}`;
+}
+
+function stackFrame(line: string): string | undefined {
+  if (line.length > MAX_FRAME_LINE) {
+    return undefined;
+  }
+  const v8 = V8_FRAME.exec(line);
+  if (v8) {
+    const [, fn, wrapped, bare] = v8;
+    const location = frameLocation(wrapped ?? bare);
+    if (location === undefined) {
+      return undefined;
+    }
+    return fn ? `    at ${fn} (${location})` : `    at ${location}`;
+  }
+  const gecko = GECKO_FRAME.exec(line);
+  if (gecko) {
+    const location = frameLocation(gecko[2]);
+    return location === undefined ? undefined : `${gecko[1]}@${location}`;
+  }
+  return undefined;
+}
+
+const MAX_STACK = 64_000;
+
+function stackFrames(stack: string, message: unknown, header: string): string {
+  const text = typeof message === 'string' ? message : '';
+  const at = text ? stack.indexOf(text) : -1;
+  const body = at !== -1 && at <= 200 ? stack.slice(at + text.length) : stack;
+  const lines = body.slice(0, MAX_STACK).split(/\r?\n/);
+  const frames: string[] = [];
+  let started = false;
+  for (const line of lines) {
+    const frame = stackFrame(line);
+    if (frame === undefined) {
+      if (started) {
+        break;
+      }
+      continue;
+    }
+    started = true;
+    frames.push(frame);
+    if (frames.length >= MAX_FRAMES) {
+      break;
+    }
+  }
+  const firstLine = stack.slice(0, MAX_FRAME_LINE + 1).split(/\r?\n/, 1)[0];
+  const headed = stackFrame(firstLine) === undefined;
+  return [...(headed ? [header] : []), ...frames].join('\n');
+}
+
+function clean(
+  value: unknown,
+  depth: number,
+  walk: Walk,
+  untrusted = false
+): unknown {
   if (walk.out <= 0) {
     return emit(walk, TRUNCATED);
   }
@@ -836,7 +998,7 @@ function clean(value: unknown, depth: number, walk: Walk): unknown {
     walk.active.add(value);
   }
   try {
-    return cleanNode(value, depth, walk);
+    return cleanNode(value, depth, walk, untrusted);
   } catch {
     return emit(walk, UNSERIALIZABLE);
   } finally {
@@ -850,24 +1012,44 @@ function cleanProp(
   owner: object,
   key: string | number,
   depth: number,
-  walk: Walk
+  walk: Walk,
+  untrusted: boolean
 ): unknown {
   const value = safeRead(
     () => (owner as Record<string | number, unknown>)[key],
     THREW
   );
-  return value === THREW ? emit(walk, UNREADABLE) : clean(value, depth, walk);
+  return value === THREW
+    ? emit(walk, UNREADABLE)
+    : clean(value, depth, walk, untrusted);
 }
 
-function cleanNode(value: unknown, depth: number, walk: Walk): unknown {
+function cleanText(walk: Walk, value: string, untrusted: boolean): string {
+  if (!untrusted) {
+    return cleanString(walk, value);
+  }
+  walk.out -= 2;
+  const known = libraryMessage(value);
+  return emit(
+    walk,
+    known === OMITTED ? (structuralUrl(value) ?? OMITTED) : known
+  );
+}
+
+function cleanNode(
+  value: unknown,
+  depth: number,
+  walk: Walk,
+  untrusted: boolean
+): unknown {
   switch (typeof value) {
     case 'string':
-      return cleanString(walk, value);
+      return cleanText(walk, value, untrusted);
     case 'function':
       return emit(walk, '[Function]');
     case 'symbol':
     case 'bigint':
-      return cleanString(walk, String(value));
+      return untrusted ? emit(walk, OMITTED) : cleanString(walk, String(value));
     case 'object':
       break;
     default:
@@ -894,7 +1076,7 @@ function cleanNode(value: unknown, depth: number, walk: Walk): unknown {
         items.push(emit(walk, TRUNCATED));
         break;
       }
-      items.push(cleanProp(value, i, depth + 1, walk));
+      items.push(cleanProp(value, i, depth + 1, walk, untrusted));
     }
     return items;
   }
@@ -911,7 +1093,7 @@ function cleanNode(value: unknown, depth: number, walk: Walk): unknown {
       cleanString(walk, key),
       isSensitiveKey(key)
         ? emit(walk, REDACTED)
-        : cleanProp(value, key, depth + 1, walk)
+        : cleanProp(value, key, depth + 1, walk, untrusted)
     );
   }
   return out;
@@ -926,26 +1108,13 @@ const ERROR_SKIP = new Set([
   'config',
   'request',
   'response',
+  'code',
 ]);
 
-const PARSE_FAILURE = 'Input could not be parsed';
-
-const withoutHeader = (stack: string, message: unknown) => {
-  if (!stack.startsWith('SyntaxError')) {
-    return stack;
-  }
-  const header = `SyntaxError: ${message}`;
-  return `SyntaxError: ${PARSE_FAILURE}${
-    typeof message === 'string' && stack.startsWith(header)
-      ? stack.slice(header.length)
-      : ''
-  }`;
-};
-
 /**
- * Errors and Axios-like values keep what grouping and debugging need: name,
- * message, stack, cause, AggregateError members, primitive own props and a
- * whitelisted HTTP summary. Request/response/config are never copied.
+ * Errors are third-party text, so only their structure is kept: class name,
+ * library message, stack frames, code, numeric/boolean props, cause and
+ * AggregateError members (recursively the same way) and an HTTP summary.
  */
 function cleanError(
   value: object,
@@ -957,40 +1126,43 @@ function cleanError(
   const source = value as Record<string, unknown>;
   const record: Record<string, unknown> = {};
   const name = safeRead(() => source.name, THREW);
-  // JSON.parse and response.json() quote the input they rejected.
-  const parseFailure = name === 'SyntaxError';
   const rawMessage = safeRead(() => source.message, THREW);
-  const message = parseFailure ? PARSE_FAILURE : rawMessage;
-  record.name =
-    typeof name === 'string'
-      ? cleanString(walk, name)
+  record.name = emit(
+    walk,
+    typeof name === 'string' && ERROR_NAME.test(name)
+      ? name
       : isError
         ? 'Error'
-        : 'AxiosError';
+        : 'AxiosError'
+  );
   record.message =
-    typeof message === 'string'
-      ? cleanString(walk, message)
-      : message === undefined
+    typeof rawMessage === 'string'
+      ? emit(walk, libraryMessage(rawMessage))
+      : rawMessage === undefined
         ? ''
         : emit(walk, UNREADABLE);
   if (isError) {
     const stack = safeRead(() => source.stack, undefined);
-    const shownStack =
-      parseFailure && typeof stack === 'string'
-        ? withoutHeader(stack, rawMessage)
-        : stack;
-    record.stack =
-      typeof shownStack === 'string' && shownStack
-        ? cleanString(walk, shownStack)
-        : undefined;
+    const frames =
+      typeof stack === 'string' && stack
+        ? stackFrames(stack, rawMessage, `${record.name}: ${record.message}`)
+        : '';
+    record.stack = frames ? cleanString(walk, frames) : undefined;
     for (const key of ['cause', 'errors']) {
       const nested = safeRead(() => source[key], THREW);
       if (nested !== undefined) {
         record[key] =
           nested === THREW
             ? emit(walk, UNREADABLE)
-            : clean(nested, depth + 1, walk);
+            : clean(nested, depth + 1, walk, true);
       }
+    }
+    const code = safeRead(() => source.code, undefined);
+    if (typeof code === 'number' && Number.isFinite(code)) {
+      walk.out -= 8;
+      record.code = code;
+    } else if (!isHttp && typeof code === 'string' && ERROR_CODE.test(code)) {
+      record.code = emit(walk, code);
     }
     const keys = safeRead(() => Object.keys(source), [] as string[]);
     for (const key of keys.slice(0, MAX_ENTRIES)) {
@@ -1004,8 +1176,6 @@ function cleanError(
       if (typeof prop === 'number' || typeof prop === 'boolean') {
         walk.out -= 8;
         put(record, cleanString(walk, key), prop);
-      } else if (typeof prop === 'string') {
-        put(record, cleanString(walk, key), cleanString(walk, prop));
       }
     }
     walk.errors.add(record);
@@ -1034,8 +1204,8 @@ function httpFields(source: Record<string, unknown>, walk: Walk): HttpFields {
   const code = safeRead(() => source.code, undefined);
   const path = normalisePath(safeRead(() => config?.url, undefined));
   const fields: HttpFields = {};
-  if (typeof code === 'string') {
-    fields.code = cleanString(walk, code);
+  if (typeof code === 'string' && ERROR_CODE.test(code)) {
+    fields.code = emit(walk, code);
   }
   if (status !== undefined) {
     fields.status = status;
@@ -1132,7 +1302,7 @@ function sanitiseError(
 ): ErrorEntry {
   const walk = newWalk();
   walk.out = MAX_OUTPUT / 2;
-  const cleaned = error === undefined ? undefined : clean(error, 0, walk);
+  const cleaned = error === undefined ? undefined : clean(error, 0, walk, true);
   walk.out += MAX_OUTPUT / 2;
   const record =
     cleaned && typeof cleaned === 'object'
@@ -1144,7 +1314,14 @@ function sanitiseError(
     rawContext === undefined ? undefined : clean(rawContext, 0, walk);
   const fields = record && walk.http.get(record);
   const exception =
-    record && walk.errors.has(record) ? toException(record, walk) : undefined;
+    record && walk.errors.has(record)
+      ? toException(
+          record.message === OMITTED
+            ? { ...record, message: safeMessage }
+            : record,
+          walk
+        )
+      : undefined;
   return {
     message: safeMessage,
     data: [

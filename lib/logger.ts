@@ -672,6 +672,16 @@ const ERROR_SKIP = new Set([
   'response',
 ]);
 
+const PARSE_FAILURE = 'Input could not be parsed';
+
+const withoutHeader = (stack: string) => {
+  if (!stack.startsWith('SyntaxError')) {
+    return stack;
+  }
+  const frames = stack.search(/\n[ \t]*at /);
+  return `SyntaxError: ${PARSE_FAILURE}${frames === -1 ? '' : stack.slice(frames)}`;
+};
+
 /**
  * Errors and Axios-like values keep what grouping and debugging need: name,
  * message, stack, cause, AggregateError members, primitive own props and a
@@ -687,7 +697,11 @@ function cleanError(
   const source = value as Record<string, unknown>;
   const record: Record<string, unknown> = {};
   const name = safeRead(() => source.name, THREW);
-  const message = safeRead(() => source.message, THREW);
+  // JSON.parse and response.json() quote the input they rejected.
+  const parseFailure = name === 'SyntaxError';
+  const message = parseFailure
+    ? PARSE_FAILURE
+    : safeRead(() => source.message, THREW);
   record.name =
     typeof name === 'string'
       ? cleanString(walk, name)
@@ -702,8 +716,12 @@ function cleanError(
         : emit(walk, UNREADABLE);
   if (isError) {
     const stack = safeRead(() => source.stack, undefined);
+    const shownStack =
+      parseFailure && typeof stack === 'string' ? withoutHeader(stack) : stack;
     record.stack =
-      typeof stack === 'string' && stack ? cleanString(walk, stack) : undefined;
+      typeof shownStack === 'string' && shownStack
+        ? cleanString(walk, shownStack)
+        : undefined;
     for (const key of ['cause', 'errors']) {
       const nested = safeRead(() => source[key], THREW);
       if (nested !== undefined) {

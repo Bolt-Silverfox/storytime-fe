@@ -1813,3 +1813,60 @@ describe('round 9: one sanitiser before every sink', () => {
     expect(hint.tags['http.path']).toBe(expected);
   });
 });
+
+describe('parse errors', () => {
+  const parseError = (text: string) => {
+    try {
+      JSON.parse(text);
+    } catch (err) {
+      return err as Error;
+    }
+    throw new Error('expected a parse error');
+  };
+
+  it('never forwards the input a JSON SyntaxError quotes', () => {
+    logger.error('x', parseError('{"id":"k1","name":Ada}'));
+    logger.warn('y', parseError('Ada Lovelace'));
+    const copy = sentry.captureException.mock.calls[0][0] as Error;
+    expect(copy.name).toBe('SyntaxError');
+    expect(copy.stack).toContain('JSON.parse');
+    expect(
+      JSON.stringify([
+        copy.message,
+        copy.stack,
+        sentry.captureException.mock.calls,
+        sentry.addBreadcrumb.mock.calls,
+        spies.error.mock.calls,
+        spies.warn.mock.calls,
+      ])
+    ).not.toContain('Ada');
+  });
+
+  it.each([
+    ['a header without frames', 'SyntaxError: Unexpected identifier "Ada"'],
+    [
+      'a header and frames',
+      'SyntaxError: "Ada"\n    at JSON.parse (<anonymous>)',
+    ],
+  ])('drops the quoted input from %s', (_name, stack) => {
+    const err = new SyntaxError(
+      'JSON Parse error: Unexpected identifier "Ada"'
+    );
+    err.stack = stack;
+    logger.error('x', err);
+    const copy = sentry.captureException.mock.calls[0][0] as Error;
+    expect(copy.stack).not.toContain('Ada');
+    expect(copy.stack).toMatch(/^SyntaxError: /);
+  });
+
+  it('keeps frame-only stacks', () => {
+    const err = new SyntaxError(
+      'JSON Parse error: Unexpected identifier "Ada"'
+    );
+    err.stack = 'parse@\nload@https://app/x.js:1:2';
+    logger.error('x', err);
+    const copy = sentry.captureException.mock.calls[0][0] as Error;
+    expect(copy.stack).toBe(err.stack);
+    expect(copy.message).not.toContain('Ada');
+  });
+});

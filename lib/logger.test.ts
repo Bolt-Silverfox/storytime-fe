@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { AxiosError, AxiosHeaders } from 'axios';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fieldsMatching } from '@/test/fields-matching';
 import {
   configureLogger,
   createLogger,
@@ -149,11 +150,12 @@ describe('level routing', () => {
     logger.error('login failed', new Error('bad Bearer abc.def.ghi'), {
       context: { password: 'hunter2', email: 'me@x.io' },
     });
-    const sent = JSON.stringify([
-      sentry.captureException.mock.calls,
-      spies.error.mock.calls,
-    ]);
-    expect(sent).not.toMatch(/hunter2|me@x\.io|abc\.def\.ghi/);
+    expect(
+      fieldsMatching(
+        [sentry.captureException.mock.calls, spies.error.mock.calls],
+        /hunter2|me@x\.io|abc\.def\.ghi/
+      )
+    ).toEqual([]);
   });
 });
 
@@ -361,11 +363,12 @@ describe('axios errors reach Sentry with context', () => {
     expect(hint.fingerprint).toEqual(
       expect.arrayContaining(['GET', '/stories/:id/audio', '500'])
     );
-    const sent =
-      JSON.stringify(sentry.captureException.mock.calls[0]) + captured.stack;
-    expect(sent).not.toMatch(
-      /qsecret|hdrsecret|bodysecret|leak@example|9f1c2d3e/
-    );
+    expect(
+      fieldsMatching(
+        sentry.captureException.mock.calls[0],
+        /qsecret|hdrsecret|bodysecret|leak@example|9f1c2d3e/
+      )
+    ).toEqual([]);
   });
 
   it('different endpoints get different fingerprints', () => {
@@ -410,15 +413,17 @@ describe('captured messages and console are redacted', () => {
     logger.error('y', new Error('Bearer abc.def.ghi'), {
       context: { cookie: 'sess=zzz' },
     });
-    const out = JSON.stringify([spies.warn.mock.calls, spies.error.mock.calls]);
-    expect(out).not.toMatch(/hunter2|tok123|a@b\.io|abc\.def\.ghi|sess=zzz/);
+    expect(
+      fieldsMatching(
+        [spies.warn.mock.calls, spies.error.mock.calls],
+        /hunter2|tok123|a@b\.io|abc\.def\.ghi|sess=zzz/
+      )
+    ).toEqual([]);
   });
 
   it('breadcrumb data is redacted', () => {
     logger.warn('w', { password: 'pw1' });
-    expect(JSON.stringify(sentry.addBreadcrumb.mock.calls)).not.toContain(
-      'pw1'
-    );
+    expect(fieldsMatching(sentry.addBreadcrumb.mock.calls, 'pw1')).toEqual([]);
   });
 });
 
@@ -523,13 +528,17 @@ describe('round 2: nested pairs, labels and urls', () => {
   it('logger.error with a labelled secret leaks nowhere', () => {
     logger.error('Failed: password=hunter2');
     logger.warn('Failed: password=hunter2');
-    const all = JSON.stringify([
-      spies.error.mock.calls,
-      spies.warn.mock.calls,
-      sentry.captureMessage.mock.calls,
-      sentry.addBreadcrumb.mock.calls,
-    ]);
-    expect(all).not.toContain('hunter2');
+    expect(
+      fieldsMatching(
+        [
+          spies.error.mock.calls,
+          spies.warn.mock.calls,
+          sentry.captureMessage.mock.calls,
+          sentry.addBreadcrumb.mock.calls,
+        ],
+        'hunter2'
+      )
+    ).toEqual([]);
   });
 
   it('masks the exception message and the first stack line', () => {
@@ -661,9 +670,9 @@ describe('round 2: isolation', () => {
     logger.error('fail token=abc123 for me@x.io', new Error('Bearer q.w.e'), {
       context: { password: 'pw9' },
     });
-    expect(JSON.stringify(spies.error.mock.calls)).not.toMatch(
-      /abc123|me@x\.io|q\.w\.e|pw9/
-    );
+    expect(
+      fieldsMatching(spies.error.mock.calls, /abc123|me@x\.io|q\.w\.e|pw9/)
+    ).toEqual([]);
   });
 
   it('Authorization header without a known scheme is masked', () => {
@@ -720,9 +729,9 @@ describe('round 3: key-name scan (table tests)', () => {
             const copy = sentry.captureException.mock.calls[0][0] as Error;
             expect(copy.message).not.toContain(value.slice(0, 12));
             expect(copy.stack).not.toContain(value.slice(0, 12));
-            expect(JSON.stringify(spies.error.mock.calls)).not.toContain(
-              value.slice(0, 12)
-            );
+            expect(
+              fieldsMatching(spies.error.mock.calls, value.slice(0, 12))
+            ).toEqual([]);
           });
         }
       }
@@ -1300,20 +1309,20 @@ describe('passwordless links', () => {
     logger.error(`failed at ${link}`, new Error(`navigation to ${link}`), {
       context: { href: link },
     });
-    const out = JSON.stringify([
+    const sinks = [
       spies.warn.mock.calls,
       spies.error.mock.calls,
       sentry.addBreadcrumb.mock.calls,
       sentry.captureException.mock.calls,
-    ]);
-    expect(out).not.toContain(linkToken);
-    expect(out).toContain('/auth/magic#t=[REDACTED]');
+    ];
+    expect(fieldsMatching(sinks, linkToken)).toEqual([]);
+    expect(fieldsMatching(sinks, '/auth/magic#t=[REDACTED]')).not.toEqual([]);
   });
 
   it('masks percent-encoded emails', () => {
     logger.warn('redirect /login?next=%2Fstories&e=kid%40example.com');
-    expect(JSON.stringify(spies.warn.mock.calls)).not.toContain(
-      'kid%40example.com'
+    expect(fieldsMatching(spies.warn.mock.calls, 'kid%40example.com')).toEqual(
+      []
     );
   });
 });
@@ -1369,8 +1378,11 @@ describe('round 8: axios summaries keep only string codes', () => {
     };
     logger.error('x', hostile, { expected: true });
     expect(
-      JSON.stringify([spies.warn.mock.calls, sentry.addBreadcrumb.mock.calls])
-    ).not.toContain('CODESECRET');
+      fieldsMatching(
+        [spies.warn.mock.calls, sentry.addBreadcrumb.mock.calls],
+        'CODESECRET'
+      )
+    ).toEqual([]);
     const net = new AxiosError('Network Error', 'ERR_NETWORK', {
       url: '/kids',
       method: 'get',
@@ -1391,8 +1403,11 @@ describe('round 8: error names are redacted on every path', () => {
     logger.warn('w', named());
     logger.error('e', named(), { expected: true });
     expect(
-      JSON.stringify([spies.warn.mock.calls, sentry.addBreadcrumb.mock.calls])
-    ).not.toContain('kid@example.com');
+      fieldsMatching(
+        [spies.warn.mock.calls, sentry.addBreadcrumb.mock.calls],
+        'kid@example.com'
+      )
+    ).toEqual([]);
   });
 });
 
@@ -1450,12 +1465,15 @@ describe('round 8: caller tags are sanitised', () => {
       { tags: Record<string, string> },
     ];
     expect(exHint.tags.feature).toBe('kids');
-    expect(JSON.stringify(sentry.captureException.mock.calls)).not.toMatch(
-      /kid@example\.com|TAGSECRET/
-    );
-    expect(JSON.stringify(sentry.captureMessage.mock.calls)).not.toContain(
-      'kid@example.com'
-    );
+    expect(
+      fieldsMatching(
+        sentry.captureException.mock.calls,
+        /kid@example\.com|TAGSECRET/
+      )
+    ).toEqual([]);
+    expect(
+      fieldsMatching(sentry.captureMessage.mock.calls, 'kid@example.com')
+    ).toEqual([]);
   });
 });
 
@@ -1524,7 +1542,7 @@ describe('round 8: disabled debug and info do no work', () => {
     const { payload, read } = watched();
     logger.info('token=abc123', payload);
     expect(read).toHaveBeenCalledOnce();
-    expect(JSON.stringify(spies.info.mock.calls)).not.toContain('abc123');
+    expect(fieldsMatching(spies.info.mock.calls, 'abc123')).toEqual([]);
   });
 });
 
@@ -1597,14 +1615,17 @@ describe('round 9: one sanitiser before every sink', () => {
     revoke();
     return proxy;
   };
-  const everything = () =>
-    JSON.stringify([
-      spies.warn.mock.calls,
-      spies.error.mock.calls,
-      sentry.addBreadcrumb.mock.calls,
-      sentry.captureException.mock.calls,
-      sentry.captureMessage.mock.calls,
-    ]);
+  const leaked = (needle: string | RegExp) =>
+    fieldsMatching(
+      [
+        spies.warn.mock.calls,
+        spies.error.mock.calls,
+        sentry.addBreadcrumb.mock.calls,
+        sentry.captureException.mock.calls,
+        sentry.captureMessage.mock.calls,
+      ],
+      needle
+    );
 
   it('masks every pair of a Cookie header', () => {
     for (const text of [
@@ -1636,7 +1657,7 @@ describe('round 9: one sanitiser before every sink', () => {
     const scoped = createLogger('kid@example.com');
     scoped.warn('w');
     scoped.error('e', new Error('x'));
-    expect(everything()).not.toContain('kid@example.com');
+    expect(leaked('kid@example.com')).toEqual([]);
     createLogger('API').error('e', new Error('x'));
     const hint = sentry.captureException.mock.calls.at(-1)?.[1] as {
       tags: Record<string, string>;
@@ -1674,7 +1695,7 @@ describe('round 9: one sanitiser before every sink', () => {
     const err = Object.assign(new Error('e'), { 'kid@example.com': 3 });
     logger.warn('w', { 'kid@example.com': 1 });
     logger.error('x', err, { context: { 'kid@example.com': 2 } });
-    expect(everything()).not.toContain('kid@example.com');
+    expect(leaked('kid@example.com')).toEqual([]);
   });
 
   it('charges circular markers against the output budget', () => {
@@ -1754,7 +1775,7 @@ describe('round 9: one sanitiser before every sink', () => {
     };
     logger.error('y', hostile);
     logger.error('z', { ...hostile, code: 'ERR_NETWORK' }, { expected: true });
-    expect(everything()).not.toContain('kid@example.com');
+    expect(leaked('kid@example.com')).toEqual([]);
     const [, hint] = sentry.captureException.mock.calls[0] as [
       Error,
       { contexts: { http_error: Record<string, unknown> } },
@@ -1838,15 +1859,18 @@ describe('parse errors', () => {
     expect(copy.name).toBe('SyntaxError');
     expect(copy.stack).toContain('JSON.parse');
     expect(
-      JSON.stringify([
-        copy.message,
-        copy.stack,
-        sentry.captureException.mock.calls,
-        sentry.addBreadcrumb.mock.calls,
-        spies.error.mock.calls,
-        spies.warn.mock.calls,
-      ])
-    ).not.toContain('Ada');
+      fieldsMatching(
+        [
+          copy.message,
+          copy.stack,
+          sentry.captureException.mock.calls,
+          sentry.addBreadcrumb.mock.calls,
+          spies.error.mock.calls,
+          spies.warn.mock.calls,
+        ],
+        'Ada'
+      )
+    ).toEqual([]);
   });
 
   it.each([

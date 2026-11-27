@@ -24,6 +24,25 @@ const isEditable = (target: EventTarget | null): boolean => {
   );
 };
 
+const SCROLL_KEYS = new Set([
+  'PageDown',
+  'PageUp',
+  'ArrowDown',
+  'ArrowUp',
+  'Home',
+  'End',
+  ' ',
+]);
+
+const activatesOnSpace = (target: EventTarget | null): boolean => {
+  const el = target as HTMLElement | null;
+  return (
+    !!el &&
+    typeof el.closest === 'function' &&
+    !!el.closest('button, a[href], summary, [role="button"], [role="switch"]')
+  );
+};
+
 interface PageViewProps {
   pages: string[];
   page: number;
@@ -132,28 +151,59 @@ const PageView = ({
   const lastUserScroll = useRef(Number.NEGATIVE_INFINITY);
   const lastOwnScroll = useRef(Number.NEGATIVE_INFINITY);
 
-  // Wheel and touch-drag come only from the user (scrollIntoView fires
-  // neither), so they mark manual scrolling without catching our own.
+  // Wheel, touch-drag, scroll keys and a held pointer (scrollbar drag) come
+  // only from the user (scrollIntoView fires none of them), so they mark
+  // manual scrolling without catching our own.
   useEffect(() => {
     const mark = () => {
       lastUserScroll.current = Date.now();
     };
-    // Scrolls with no wheel/touch (keyboard, scrollbar) only show up as scroll
-    // events; ours also do, so ignore those shortly after our own call.
-    const onScroll = () => {
-      if (Date.now() - lastOwnScroll.current > OWN_SCROLL_SETTLE_MS) {
+    let pointerHeld = false;
+    const onPointerDown = () => {
+      pointerHeld = true;
+    };
+    const onPointerUp = () => {
+      pointerHeld = false;
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (
+        !e.defaultPrevented &&
+        SCROLL_KEYS.has(e.key) &&
+        !isEditable(e.target) &&
+        !(e.key === ' ' && activatesOnSpace(e.target))
+      ) {
         mark();
       }
     };
+    // Other scrolls with no such input only show up as scroll events; ours
+    // also do, so ignore those shortly after our own call.
+    const onScroll = () => {
+      if (
+        pointerHeld ||
+        Date.now() - lastOwnScroll.current > OWN_SCROLL_SETTLE_MS
+      ) {
+        mark();
+      }
+    };
+    const passiveCapture = { capture: true, passive: true };
     window.addEventListener('wheel', mark, { passive: true });
     window.addEventListener('touchmove', mark, { passive: true });
-    window.addEventListener('scroll', onScroll, {
-      capture: true,
-      passive: true,
-    });
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('pointerdown', onPointerDown, passiveCapture);
+    window.addEventListener('pointerup', onPointerUp, passiveCapture);
+    window.addEventListener('pointercancel', onPointerUp, passiveCapture);
+    window.addEventListener('scroll', onScroll, passiveCapture);
     return () => {
       window.removeEventListener('wheel', mark);
       window.removeEventListener('touchmove', mark);
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('pointerdown', onPointerDown, {
+        capture: true,
+      });
+      window.removeEventListener('pointerup', onPointerUp, { capture: true });
+      window.removeEventListener('pointercancel', onPointerUp, {
+        capture: true,
+      });
       window.removeEventListener('scroll', onScroll, { capture: true });
     };
   }, []);

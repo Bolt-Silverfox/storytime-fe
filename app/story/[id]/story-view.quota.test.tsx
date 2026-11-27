@@ -21,8 +21,10 @@ const svc = vi.hoisted(() => ({
   } as unknown,
 }));
 
+const refetch = vi.hoisted(() => vi.fn());
+
 vi.mock('@/lib/hooks/use-story-quota', () => ({
-  useStoryQuota: () => ({ quota: quotaState.quota }),
+  useStoryQuota: () => ({ quota: quotaState.quota, refetch }),
 }));
 vi.mock('@/components/quota-indicator', () => ({
   default: ({ variant }: { variant: string }) => (
@@ -59,6 +61,7 @@ vi.mock('@/lib/services', () => ({
 describe('StoryView quota', () => {
   afterEach(() => {
     cleanup();
+    refetch.mockClear();
     svc.story = null;
   });
 
@@ -97,6 +100,34 @@ describe('StoryView quota', () => {
     expect(await screen.findByText(/enjoyed your free stories/)).toBeTruthy();
     expect(screen.getByText(/Upgrade to premium/)).toBeTruthy();
     expect(screen.queryByText(/couldn.t open this story/)).toBeNull();
+    svc.loggedIn = false;
+  });
+
+  it('refetches the quota once when the backend rejects a new story', async () => {
+    svc.loggedIn = true;
+    svc.error = {
+      message: 'limit',
+      status: 403,
+      data: { code: 'STORY_LIMIT_EXCEEDED' },
+    };
+    quotaState.quota = { remaining: 2, totalAllowed: 3, unlimited: false };
+    render(<StoryView storyId='s1' />);
+    expect(refetch).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Read this story' }));
+    expect(await screen.findByText(/enjoyed your free stories/)).toBeTruthy();
+    expect(refetch).toHaveBeenCalledTimes(1);
+    svc.loggedIn = false;
+  });
+
+  it('does not refetch the quota on a non-403 failure', async () => {
+    svc.loggedIn = true;
+    svc.error = new Error('boom');
+    quotaState.quota = { remaining: 2, totalAllowed: 3, unlimited: false };
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(<StoryView storyId='s1' />);
+    fireEvent.click(screen.getByRole('button', { name: 'Read this story' }));
+    expect(await screen.findByText(/couldn.t open this story/)).toBeTruthy();
+    expect(refetch).not.toHaveBeenCalled();
     svc.loggedIn = false;
   });
 

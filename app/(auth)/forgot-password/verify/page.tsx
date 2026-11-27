@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -22,24 +22,39 @@ import {
   InputOTPSlot,
 } from '@/components/ui/input-otp';
 import { useAuth } from '@/context/auth-context';
+import { useMountedRef } from '@/hooks/use-mounted-ref';
 import {
-  sendVerificationEmailService,
+  RESET_CODE_LENGTH,
+  ResetCodeSchema,
+  sanitizeResetCode,
+} from '@/lib/reset-code';
+import {
+  clearResetSessionIfUnchanged,
+  readResetSession,
+  saveResetSession,
+} from '@/lib/reset-session';
+import {
+  requestPasswordResetService,
   validateResetTokenService,
 } from '@/lib/services';
 import { maskEmail } from '@/lib/utils';
 import { StepBackButton } from '../../register/components/step-back';
 
 const FormSchema = z.object({
-  pin: z.string().min(6, {
-    message: 'Your one-time password must be 6 characters.',
-  }),
+  pin: ResetCodeSchema,
 });
+
+const SLOT_INDEXES = Array.from({ length: RESET_CODE_LENGTH }, (_, i) => i);
 
 const Page = () => {
   const router = useRouter();
   const { registrationData } = useAuth();
   const [timeLeft, setTimeLeft] = useState(60);
   const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const submitting = useRef(false);
+  const resending = useRef(false);
+  const mounted = useMountedRef();
 
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
@@ -55,16 +70,32 @@ const Page = () => {
   }, [timeLeft]);
 
   async function handleResend() {
+    const email = registrationData?.email;
+    if (!email) {
+      toast.error('Email is missing from context.');
+      return;
+    }
+    if (resending.current || submitting.current) {
+      return;
+    }
+    resending.current = true;
+    setIsResending(true);
+    setTimeLeft(60);
+    const seen = readResetSession();
     try {
-      const response = await sendVerificationEmailService(
-        registrationData?.email ?? ''
-      );
-      toast.success(response.message);
+      const response = await requestPasswordResetService(email);
+      clearResetSessionIfUnchanged(seen);
+      if (mounted.current) {
+        toast.success(response.message);
+      }
       // biome-ignore lint/suspicious/noExplicitAny: the caught value is untyped; only .message is read below
     } catch (error: any) {
-      toast.error(error.message || 'Could not send verification email');
+      if (mounted.current) {
+        toast.error(error?.message || 'Could not send a new reset code');
+      }
     } finally {
-      setTimeLeft(60);
+      resending.current = false;
+      setIsResending(false);
     }
   }
 
@@ -77,19 +108,34 @@ const Page = () => {
       return;
     }
 
+    if (submitting.current || resending.current) {
+      return;
+    }
+    submitting.current = true;
     setIsLoading(true);
 
     try {
       const response = await validateResetTokenService({ token, email });
+      if (!mounted.current) {
+        return;
+      }
 
+      if (!saveResetSession({ token, email })) {
+        toast.error('This browser blocked site storage', {
+          description:
+            'Allow storage for this site or leave private browsing, then verify the code again.',
+        });
+        submitting.current = false;
+        return;
+      }
       toast.success(response.message);
-      router.push(
-        `/create-new-password?token=${encodeURIComponent(
-          data.pin
-        )}&email=${encodeURIComponent(email)}`
-      );
+      router.push('/create-new-password');
       // biome-ignore lint/suspicious/noExplicitAny: the caught value is untyped; only .message is read below
     } catch (error: any) {
+      submitting.current = false;
+      if (!mounted.current) {
+        return;
+      }
       toast.error('OTP verification failed', {
         description: error?.message || 'An unexpected error occurred.',
       });
@@ -125,12 +171,25 @@ const Page = () => {
             control={form.control}
             name='pin'
             render={({ field }) => (
-              <FormItem>
+              <FormItem className='w-full'>
                 <FormControl>
-                  <InputOTP maxLength={6} {...field}>
-                    <InputOTPGroup className='gap-[9px] justify-center items-center'>
-                      {Array.from({ length: 6 }).map((_, i) => (
-                        <InputOTPSlot key={Math.random()} index={i} />
+                  <InputOTP
+                    maxLength={RESET_CODE_LENGTH}
+                    inputMode='numeric'
+                    containerClassName='w-full'
+                    {...field}
+                    onChange={(value) =>
+                      field.onChange(sanitizeResetCode(value))
+                    }
+                    pasteTransformer={sanitizeResetCode}
+                  >
+                    <InputOTPGroup className='w-full gap-1.5 sm:gap-[9px] justify-center items-center'>
+                      {SLOT_INDEXES.map((i) => (
+                        <InputOTPSlot
+                          key={i}
+                          index={i}
+                          className='min-w-0 flex-1 !px-0 min-h-11 sm:min-h-[50px] rounded-lg sm:rounded-[16px]'
+                        />
                       ))}
                     </InputOTPGroup>
                   </InputOTP>
@@ -149,15 +208,16 @@ const Page = () => {
             variant='secondary'
             type='button'
             onClick={handleResend}
-            disabled={timeLeft > 0}
+            disabled={timeLeft > 0 || isResending}
+            aria-busy={isResending}
             className='py-2.5 px-6 rounded-[50px] !mx-auto max-w-max bg-surface border-hairline-warm shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] border text-strong'
           >
-            Resend OTP
+            {isResending ? 'Sending…' : 'Resend OTP'}
           </Button>
           <Button
             variant='primary'
             type='submit'
-            disabled={!form.formState.isValid}
+            disabled={!form.formState.isValid || isResending}
             className='w-full py-[15px] h-auto'
           >
             {!form.formState.isValid ? 'Proceed' : 'Verify email'}

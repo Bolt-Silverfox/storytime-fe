@@ -7,6 +7,7 @@ import StoryHome from '@/app/(home)/dashboard/_components/story-home';
 import BackButton from '@/components/back-button';
 import FavoriteHeart from '@/components/favorite-heart';
 import QuotaIndicator from '@/components/quota-indicator';
+import ReadBeforeRow from '@/components/read-before-row';
 import StoryStatusBadge from '@/components/story-status-badge';
 import { useInfiniteStories } from '@/lib/hooks/use-infinite-stories';
 import {
@@ -106,6 +107,7 @@ function StoriesBrowse() {
         </header>
         <section className='mx-auto max-w-6xl px-4 sm:px-6 pb-16'>
           <QuotaIndicator className='mb-6' />
+          <ReadBeforeRow />
           <StoryHome />
         </section>
       </main>
@@ -148,6 +150,10 @@ function StoriesBrowse() {
         </p>
 
         <QuotaIndicator className='mt-6' />
+
+        <div className='mt-6'>
+          <ReadBeforeRow />
+        </div>
 
         {/* Category filter — horizontal scroll on mobile (avoids long labels
             stacking one-per-row), wraps normally from sm up. */}

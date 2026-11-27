@@ -312,6 +312,111 @@ describe('PageView', () => {
     expect(cls).not.toMatch(/(^|\s)animate-/);
   });
 
+  describe('follow-scroll after scroll input within and after our own scroll settles', () => {
+    const scrollBy = (dispatch: () => void) => () => {
+      dispatch();
+      fireEvent.scroll(window);
+    };
+    const nextButton = () => screen.getByRole('button', { name: 'Next page' });
+    const inputs: {
+      input: string;
+      act: () => void;
+      within: 'pauses' | 'follows';
+      after: 'pauses' | 'follows';
+    }[] = [
+      {
+        input: 'mouse wheel',
+        act: scrollBy(() => fireEvent.wheel(window)),
+        within: 'pauses',
+        after: 'pauses',
+      },
+      {
+        input: 'touch drag',
+        act: scrollBy(() => fireEvent.touchMove(window)),
+        within: 'pauses',
+        after: 'pauses',
+      },
+      ...['PageDown', 'PageUp', 'ArrowDown', 'ArrowUp', 'Home', 'End', ' '].map(
+        (key) => ({
+          input: `the ${JSON.stringify(key)} key`,
+          act: scrollBy(() => fireEvent.keyDown(document.body, { key })),
+          within: 'pauses' as const,
+          after: 'pauses' as const,
+        })
+      ),
+      {
+        input: 'a scrollbar drag',
+        act: () => {
+          fireEvent.pointerDown(document.documentElement);
+          fireEvent.scroll(window);
+          fireEvent.pointerUp(document.documentElement);
+        },
+        within: 'pauses',
+        after: 'pauses',
+      },
+      {
+        input: 'a scroll event with no user input',
+        act: () => fireEvent.scroll(window),
+        within: 'follows',
+        after: 'pauses',
+      },
+      {
+        input: 'Space on a focused button',
+        act: () => fireEvent.keyDown(nextButton(), { key: ' ' }),
+        within: 'follows',
+        after: 'follows',
+      },
+      {
+        input: 'a click that scrolls nothing',
+        act: () => {
+          fireEvent.pointerDown(nextButton());
+          fireEvent.pointerUp(nextButton());
+        },
+        within: 'follows',
+        after: 'follows',
+      },
+      {
+        input: 'ArrowDown in a text field',
+        act: () => {
+          const field = document.createElement('input');
+          document.body.append(field);
+          fireEvent.keyDown(field, { key: 'ArrowDown' });
+          field.remove();
+        },
+        within: 'follows',
+        after: 'follows',
+      },
+    ];
+    const cases = inputs.flatMap(({ input, act, within, after }) => [
+      { input, act, delay: 300, when: 'within', expected: within },
+      { input, act, delay: 2000, when: 'after', expected: after },
+    ]);
+
+    it.each(cases)(
+      '$input $when the auto-scroll interval: $expected',
+      ({ act, delay, expected }) => {
+        const scroll = vi.fn();
+        HTMLElement.prototype.scrollIntoView = scroll;
+        let now = 9_000_000;
+        vi.spyOn(Date, 'now').mockImplementation(() => now);
+        const props = {
+          pages: ['One. Two. Three.'],
+          page: 0,
+          onNext: () => undefined,
+          onPrev: () => undefined,
+        };
+        const { rerender } = setup({ ...props, activeSentence: 0 });
+        expect(scroll).toHaveBeenCalledTimes(1);
+        now += delay;
+        act();
+        now += 500;
+        rerender(<PageView {...props} activeSentence={1} />);
+        expect(scroll).toHaveBeenCalledTimes(expected === 'follows' ? 2 : 1);
+        vi.restoreAllMocks();
+      }
+    );
+  });
+
   it('renders a friendly empty state with no pages', () => {
     setup({ pages: [], page: 0 });
     expect(screen.getByText('Story content not available')).toBeTruthy();

@@ -1156,8 +1156,12 @@ describe('round 7: subscript chains fail closed', () => {
   );
 
   it('masks a secret at the end of a very long chain', () => {
-    const out = redact(`${'[token]'.repeat(5_000)}=SECRETVALUE`) as string;
+    const out = redact(
+      `${'[token]'.repeat(1_100)}=SECRETVALUE safe-suffix`
+    ) as string;
     expect(out).not.toContain('SECRETVALUE');
+    expect(out).toContain('=[REDACTED] safe-suffix');
+    expect(out).not.toContain('[truncated]');
   });
 
   it.each([
@@ -1265,5 +1269,250 @@ describe('passwordless links', () => {
     expect(JSON.stringify(spies.warn.mock.calls)).not.toContain(
       'kid%40example.com'
     );
+  });
+});
+
+describe('round 8: values that start like a mask or a bracket', () => {
+  it.each(['"password":"[REDACTED]hunter2"', "password='[REDACTED]hunter2'"])(
+    'masks the whole value of %s',
+    (text) => {
+      expect(redact(text)).not.toContain('hunter2');
+    }
+  );
+
+  it('leaves an already-masked value as one mask', () => {
+    expect(redact('"password":"[REDACTED]"')).toBe('"password":"[REDACTED]"');
+  });
+
+  it.each([
+    'password=[hunter2]',
+    'password=(hunter2)',
+    'password={hunter2}',
+    'password=<hunter2>',
+    'token: [hunter2] rest',
+  ])('masks a bracketed value: %s', (text) => {
+    expect(redact(text)).not.toContain('hunter2');
+  });
+});
+
+describe('round 8: percent-encoded magic-link fragment', () => {
+  const linkToken = 'Zx9_mK2-pQ7wR4tY8uI0oP3aS6dF1gH5jK9lZ2xC4vB';
+
+  it.each([
+    `next=%2Fauth%2Fmagic%23t%3D${linkToken}`,
+    `next=%2Fauth%2Fmagic%23T%3d${linkToken}`,
+    `x=1%26t%3D${linkToken}`,
+  ])('masks %s', (text) => {
+    expect(redact(text)).not.toContain(linkToken);
+  });
+});
+
+describe('round 8: axios summaries keep only string codes', () => {
+  it('drops an object-valued code and keeps ERR_NETWORK', () => {
+    const hostile = {
+      config: { url: '/kids', method: 'get' },
+      response: { status: 500 },
+      code: { secret: 'CODESECRET' },
+      message: 'm',
+    };
+    logger.error('x', hostile, { expected: true });
+    expect(
+      JSON.stringify([spies.warn.mock.calls, sentry.addBreadcrumb.mock.calls])
+    ).not.toContain('CODESECRET');
+    const net = new AxiosError('Network Error', 'ERR_NETWORK', {
+      url: '/kids',
+      method: 'get',
+      headers: new AxiosHeaders(),
+    } as never);
+    expect((redact(net) as { code?: unknown }).code).toBe('ERR_NETWORK');
+  });
+});
+
+describe('round 8: error names are redacted on every path', () => {
+  const named = () => {
+    const err = new Error('boom');
+    err.name = 'Failed for kid@example.com';
+    return err;
+  };
+
+  it('in warn and expected error output', () => {
+    logger.warn('w', named());
+    logger.error('e', named(), { expected: true });
+    expect(
+      JSON.stringify([spies.warn.mock.calls, sentry.addBreadcrumb.mock.calls])
+    ).not.toContain('kid@example.com');
+  });
+});
+
+describe('round 8: offline only excuses network failures', () => {
+  beforeEach(() => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+  });
+
+  it('keeps unrelated errors reportable', () => {
+    expect(isExpectedFailure(new SyntaxError('bad json'))).toBe(false);
+    expect(isExpectedFailure(new Error('render failed'))).toBe(false);
+  });
+
+  it('still excuses network-shaped failures, aborts and rate limits', () => {
+    expect(isExpectedFailure(new TypeError('Failed to fetch'))).toBe(true);
+    expect(
+      isExpectedFailure(
+        new AxiosError('timeout', 'ECONNABORTED', {
+          headers: new AxiosHeaders(),
+        } as never)
+      )
+    ).toBe(true);
+    expect(isExpectedFailure(new DOMException('a', 'AbortError'))).toBe(true);
+    expect(isExpectedFailure(makeAxiosError(429))).toBe(true);
+  });
+});
+
+describe('round 8: classification never throws', () => {
+  it('returns false when reading the error throws', () => {
+    const hostile = new Proxy(
+      {},
+      {
+        get() {
+          throw new Error('trap');
+        },
+      }
+    );
+    expect(() => isExpectedFailure(hostile)).not.toThrow();
+    expect(isExpectedFailure(hostile)).toBe(false);
+  });
+});
+
+describe('round 8: caller tags are sanitised', () => {
+  it('keeps safe tags and drops sensitive keys and values', () => {
+    logger.error('x', new Error('e'), {
+      tags: {
+        feature: 'kids',
+        user: 'kid@example.com',
+        token: 'TAGSECRET',
+      },
+    });
+    logger.error('y', undefined, { tags: { note: 'kid@example.com' } });
+    const [, exHint] = sentry.captureException.mock.calls[0] as [
+      unknown,
+      { tags: Record<string, string> },
+    ];
+    expect(exHint.tags.feature).toBe('kids');
+    expect(JSON.stringify(sentry.captureException.mock.calls)).not.toMatch(
+      /kid@example\.com|TAGSECRET/
+    );
+    expect(JSON.stringify(sentry.captureMessage.mock.calls)).not.toContain(
+      'kid@example.com'
+    );
+  });
+});
+
+describe('round 8: outage limiter only records delivered events', () => {
+  const net = () =>
+    new AxiosError('Network Error', 'ERR_NETWORK', {
+      url: '/kids/7',
+      method: 'get',
+      headers: new AxiosHeaders(),
+    } as never);
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('retries after a capture that threw', () => {
+    vi.useFakeTimers();
+    sentry.captureMessage.mockImplementationOnce(() => {
+      throw new Error('sdk down');
+    });
+    logger.error('kids', net(), { expected: true });
+    vi.advanceTimersByTime(1_000);
+    logger.error('kids', net(), { expected: true });
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(2);
+  });
+
+  it('still suppresses after a capture that succeeded', () => {
+    vi.useFakeTimers();
+    logger.error('kids', net(), { expected: true });
+    vi.advanceTimersByTime(1_000);
+    logger.error('kids', net(), { expected: true });
+    expect(sentry.captureMessage).toHaveBeenCalledOnce();
+  });
+});
+
+describe('round 8: disabled debug and info do no work', () => {
+  const watched = () => {
+    const read = vi.fn(() => 'v');
+    const payload = {};
+    Object.defineProperty(payload, 'field', { get: read, enumerable: true });
+    return { payload, read };
+  };
+
+  it('does not read the payload in production', () => {
+    configureLogger({ environment: 'production' });
+    const { payload, read } = watched();
+    logger.debug('d', payload);
+    logger.info('i', payload);
+    expect(read).not.toHaveBeenCalled();
+    expect(spies.debug).not.toHaveBeenCalled();
+    expect(spies.info).not.toHaveBeenCalled();
+  });
+
+  it('treats an unrecognised NODE_ENV as production', () => {
+    configureLogger({ environment: undefined });
+    vi.stubEnv('NODE_ENV', 'staging');
+    try {
+      logger.info('i');
+      expect(spies.info).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('still redacts on the development path', () => {
+    const { payload, read } = watched();
+    logger.info('token=abc123', payload);
+    expect(read).toHaveBeenCalledOnce();
+    expect(JSON.stringify(spies.info.mock.calls)).not.toContain('abc123');
+  });
+});
+
+describe('round 8: bounded work', () => {
+  it('a no-value subscript chain is not quadratic', () => {
+    const make = (chars: number) => `x${'[token]'.repeat(chars / 7)}= `;
+    const small = make(8_001);
+    const large = make(64_001);
+    redact(small);
+    const t1 = best(() => redact(small));
+    const t2 = best(() => redact(large));
+    expect(t2).toBeLessThan(20 * t1 + 25);
+  });
+
+  it('stops walking a primitive array once the budget is spent', () => {
+    const out = redact(new Array(1_000_000).fill(7)) as unknown[];
+    expect(out.length).toBeLessThan(100_000);
+    expect(out.at(-1)).toBe('[truncated]');
+  });
+
+  it('stops walking object entries once the budget is spent', () => {
+    const big: Record<string, number> = {};
+    for (let i = 0; i < 200_000; i++) {
+      big[`k${i}`] = i;
+    }
+    const out = redact(big) as Record<string, unknown>;
+    expect(Object.keys(out).length).toBeLessThan(50_000);
+  });
+
+  it('bounds AggregateError members and own props', () => {
+    const members = Array.from({ length: 5_000 }, (_, i) => new Error(`m${i}`));
+    const agg = new AggregateError(members, 'many');
+    for (let i = 0; i < 5_000; i++) {
+      (agg as unknown as Record<string, number>)[`p${i}`] = i;
+    }
+    logger.error('agg', agg);
+    const [captured] = sentry.captureException.mock.calls[0] as [
+      Error & { errors: unknown[] },
+    ];
+    expect(captured.errors.length).toBeLessThan(500);
+    expect(Object.keys(captured).length).toBeLessThan(500);
   });
 });

@@ -47,7 +47,7 @@ function currentEnvironment(): Environment {
     return config.environment;
   }
   const env = process.env.NODE_ENV;
-  return env === 'production' || env === 'test' ? env : 'development';
+  return env === 'development' || env === 'test' ? env : 'production';
 }
 
 // ---------------------------------------------------------------------------
@@ -55,6 +55,7 @@ function currentEnvironment(): Environment {
 // ---------------------------------------------------------------------------
 
 const REDACTED = '[REDACTED]';
+const TRUNCATED = '[truncated]';
 const MAX_DEPTH = 6;
 const MAX_STRING = 8_000;
 
@@ -200,6 +201,7 @@ const SCHEME_BASIC =
 const EMAIL =
   /[A-Za-z0-9._%+-]{1,64}(?:@|%40)[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){0,5}\.[A-Za-z]{2,24}/g;
 const FRAGMENT_TOKEN = /([#&])t=[^\s&#"'<>]+/g;
+const ENCODED_FRAGMENT_TOKEN = /(%2[36])t(%3D)[\w-]+/gi;
 
 // Independent final pass: find sensitive key NAMES anywhere (after a label, a
 // URL "?", "&", "#", a quote, ...), then mask the value that follows. It does
@@ -269,6 +271,9 @@ const FILE_NAME = /\.(?:m?[jt]sx?|map|css|html?)$/i;
 // Unquoted values run to the next delimiter, with NO length cap, so a long
 // token is never cut in the middle and left half-visible.
 const VALUE_RUN = /(?:(?!%26)[^\s&#;,"'`()[\]{}<>])+/y;
+const VALUE_GROUP =
+  /\[[^\]\n]{0,2000}\]|\([^)\n]{0,2000}\)|\{[^}\n]{0,2000}\}|<[^>\n]{0,2000}>/y;
+const VALUE_UNCLOSED = /[[({<][^\s&#;,"'`]*/y;
 const VALUE_OPEN_QUOTE = /(\\*)(["'`])/y;
 
 // Only the story-ish capitalised word "Token:" is treated as prose unless the
@@ -342,9 +347,22 @@ function valueSpan(
     }
     return end > start ? { start, end, quote: q } : null;
   }
-  VALUE_RUN.lastIndex = from;
-  const run = VALUE_RUN.exec(input);
-  return run ? { start: from, end: from + run[0].length, quote: '' } : null;
+  let end = from;
+  for (;;) {
+    VALUE_RUN.lastIndex = end;
+    end += VALUE_RUN.exec(input)?.[0].length ?? 0;
+    VALUE_GROUP.lastIndex = end;
+    const group = VALUE_GROUP.exec(input);
+    if (!group) {
+      break;
+    }
+    end += group[0].length;
+  }
+  if (end === from) {
+    VALUE_UNCLOSED.lastIndex = from;
+    end += VALUE_UNCLOSED.exec(input)?.[0].length ?? 0;
+  }
+  return end > from ? { start: from, end, quote: '' } : null;
 }
 
 function redactKeyNames(input: string): string {
@@ -367,7 +385,7 @@ function redactKeyNames(input: string): string {
       shouldMask(cls, key, input.slice(keyEnd, sepEnd), peek)
         ? valueSpan(input, sepEnd)
         : null;
-    if (!span || input.startsWith(REDACTED, span.start)) {
+    if (!span || input.slice(span.start, span.end) === REDACTED) {
       // Not a secret: resume right after the key (not after its value) so a
       // nested key ("Failed: token: x") is still seen, without re-scanning
       // the value for every key.
@@ -418,6 +436,7 @@ function redactString(input: string): string {
       .replace(SCHEME_LONG, REDACTED)
       .replace(SCHEME_BASIC, `Basic ${REDACTED}`)
       .replace(FRAGMENT_TOKEN, `$1t=${REDACTED}`)
+      .replace(ENCODED_FRAGMENT_TOKEN, `$1t$2${REDACTED}`)
   ).replace(EMAIL, REDACTED);
   return value.length > MAX_STRING || cutInput
     ? `${value.slice(0, MAX_STRING)}…[truncated]`
@@ -501,7 +520,7 @@ function normalisePath(url: unknown): string | undefined {
 interface HttpErrorSummary {
   name: string;
   message: string;
-  code?: unknown;
+  code?: string;
   status?: number;
   method?: string;
   path?: string;
@@ -514,7 +533,7 @@ function summariseAxios(err: Record<string, unknown>): HttpErrorSummary {
   return {
     name: typeof err.name === 'string' ? err.name : 'AxiosError',
     message: redactString(String(err.message ?? '')),
-    code: err.code,
+    code: typeof err.code === 'string' ? redactString(err.code) : undefined,
     status:
       response?.status ??
       (typeof err.status === 'number' ? err.status : undefined),
@@ -545,6 +564,7 @@ function redactInner(
     return out;
   }
   if (value === null || typeof value !== 'object') {
+    budget.left -= 8;
     return typeof value === 'function' ? '[Function]' : value;
   }
   if (seen.has(value)) {
@@ -560,7 +580,7 @@ function redactInner(
   }
   if (value instanceof Error) {
     return {
-      name: value.name,
+      name: typeof value.name === 'string' ? redactString(value.name) : 'Error',
       message: redactString(value.message),
       stack: value.stack ? redactString(value.stack) : undefined,
       cause:
@@ -570,14 +590,31 @@ function redactInner(
     };
   }
   if (Array.isArray(value)) {
-    return value.map((item) => redactInner(item, depth + 1, seen, budget));
+    const items: unknown[] = [];
+    for (let i = 0; i < value.length; i++) {
+      if (budget.left <= 0) {
+        items.push(TRUNCATED);
+        break;
+      }
+      items.push(redactInner(value[i], depth + 1, seen, budget));
+    }
+    return items;
   }
   const out: Record<string, unknown> = {};
-  for (const [key, inner] of Object.entries(value)) {
+  for (const key of Object.keys(value)) {
+    if (budget.left <= 0) {
+      out[TRUNCATED] = TRUNCATED;
+      break;
+    }
     budget.left -= key.length + 4;
     out[key] = isSensitiveKey(key)
       ? REDACTED
-      : redactInner(inner, depth + 1, seen, budget);
+      : redactInner(
+          (value as Record<string, unknown>)[key],
+          depth + 1,
+          seen,
+          budget
+        );
   }
   return out;
 }
@@ -608,12 +645,16 @@ function safeRead<T>(read: () => T, fallback: T): T {
   }
 }
 
+const MAX_ERROR_ENTRIES = 50;
+
 function safeErrorCopy(
   error: Error,
   depth = 0,
-  seen = new WeakSet<object>()
+  seen = new WeakSet<object>(),
+  copies = { left: MAX_ERROR_ENTRIES }
 ): Error {
   seen.add(error);
+  copies.left--;
   // Read each getter exactly once, and never let one throw.
   const message = safeRead(() => error.message, '[unreadable]');
   const name = safeRead(() => error.name, 'Error');
@@ -630,7 +671,7 @@ function safeErrorCopy(
       undefined
     );
     if (cause instanceof Error && !seen.has(cause)) {
-      copy.cause = safeErrorCopy(cause, depth + 1, seen);
+      copy.cause = safeErrorCopy(cause, depth + 1, seen, copies);
     } else if (cause !== undefined && !(cause instanceof Error)) {
       copy.cause = redact(cause);
     }
@@ -639,16 +680,29 @@ function safeErrorCopy(
       undefined
     );
     if (Array.isArray(members)) {
-      (copy as unknown as { errors: unknown[] }).errors = members.map((m) =>
-        m instanceof Error && !seen.has(m)
-          ? safeErrorCopy(m, depth + 1, seen)
-          : redact(m)
-      );
+      const errors: unknown[] = [];
+      for (let i = 0; i < members.length; i++) {
+        if (copies.left <= 0) {
+          errors.push(TRUNCATED);
+          break;
+        }
+        const m = safeRead(() => members[i], '[unreadable]');
+        errors.push(
+          m instanceof Error && !seen.has(m)
+            ? safeErrorCopy(m, depth + 1, seen, copies)
+            : redact(m)
+        );
+        if (!(m instanceof Error)) {
+          copies.left--;
+        }
+      }
+      (copy as unknown as { errors: unknown[] }).errors = errors;
     }
   }
   // Keys first, then read values only for the ones we keep (Object.entries
   // would invoke every getter, including message/stack, a second time).
-  for (const key of safeRead(() => Object.keys(error), [] as string[])) {
+  const keys = safeRead(() => Object.keys(error), [] as string[]);
+  for (const key of keys.slice(0, MAX_ERROR_ENTRIES)) {
     if (
       key === 'message' ||
       key === 'name' ||
@@ -693,9 +747,13 @@ export function isExpectedFailure(
   error: unknown,
   options: { statuses?: number[] } = {}
 ): boolean {
-  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-    return true;
-  }
+  return safeRead(() => classifyFailure(error, options.statuses), false);
+}
+
+const OFFLINE_CODES = new Set(['ECONNABORTED', 'ETIMEDOUT']);
+const FETCH_FAILURE = /failed to fetch|networkerror|load failed|network error/i;
+
+function classifyFailure(error: unknown, statuses?: number[]): boolean {
   if (!error || typeof error !== 'object') {
     return false;
   }
@@ -707,11 +765,20 @@ export function isExpectedFailure(
     return true;
   }
   const status = e.response?.status ?? e.status;
-  if (typeof status !== 'number') {
+  if (
+    typeof status === 'number' &&
+    (status === 401 || status === 429 || !!statuses?.includes(status))
+  ) {
+    return true;
+  }
+  if (!(typeof navigator !== 'undefined' && navigator.onLine === false)) {
     return false;
   }
   return (
-    status === 401 || status === 429 || !!options.statuses?.includes(status)
+    (typeof e.code === 'string' && OFFLINE_CODES.has(e.code)) ||
+    (e.name === 'TypeError' &&
+      FETCH_FAILURE.test(String((e as { message?: unknown }).message))) ||
+    (isAxiosLike(e) && !e.response)
   );
 }
 
@@ -811,6 +878,22 @@ function httpSummary(error: unknown): HttpErrorSummary | undefined {
   }, undefined);
 }
 
+const MAX_TAGS = 20;
+
+function safeTags(tags: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  const entries = safeRead(
+    () => Object.entries(asRecord(tags)).slice(0, MAX_TAGS),
+    []
+  );
+  for (const [key, value] of entries) {
+    if (typeof value === 'string' && !isSensitiveKey(key)) {
+      out[redactString(key)] = redactString(value);
+    }
+  }
+  return out;
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -836,7 +919,7 @@ function report(
   }
   const http = httpSummary(rawError);
   const tags: Record<string, string> = {
-    ...options.tags,
+    ...safeTags(options.tags),
     ...(scope ? { scope } : {}),
     ...(http?.status === undefined
       ? {}
@@ -918,14 +1001,6 @@ function maybeReportExpectedOutage(
   if (last !== undefined && now - last < OUTAGE_EVENT_INTERVAL_MS) {
     return;
   }
-  lastOutageEvent.delete(key);
-  lastOutageEvent.set(key, now);
-  if (lastOutageEvent.size > MAX_OUTAGE_KEYS) {
-    const oldest = lastOutageEvent.keys().next().value;
-    if (oldest !== undefined) {
-      lastOutageEvent.delete(oldest);
-    }
-  }
   Sentry.captureMessage(
     `Expected failure: ${network ? 'network error' : 'unauthorised'} ${http.method ?? ''} ${http.path ?? ''}`.trim(),
     {
@@ -946,6 +1021,14 @@ function maybeReportExpectedOutage(
       extra: { logMessage: message },
     }
   );
+  lastOutageEvent.delete(key);
+  lastOutageEvent.set(key, now);
+  if (lastOutageEvent.size > MAX_OUTAGE_KEYS) {
+    const oldest = lastOutageEvent.keys().next().value;
+    if (oldest !== undefined) {
+      lastOutageEvent.delete(oldest);
+    }
+  }
 }
 
 export interface Logger {
@@ -973,14 +1056,17 @@ export function createLogger(scope?: string): Logger {
   const plain =
     (level: 'debug' | 'info') =>
     (message: string, ...data: unknown[]) =>
-      safely(() =>
+      safely(() => {
+        if (currentEnvironment() !== 'development') {
+          return;
+        }
         writeConsole(
           level,
           scope,
           redactString(String(message)),
           data.map(redact)
-        )
-      );
+        );
+      });
   const emitWarn = (safeMessage: string, safeData: unknown[]) => {
     safely(() => writeConsole('warn', scope, safeMessage, safeData));
     sendBreadcrumb('warning', scope, safeMessage, safeData);

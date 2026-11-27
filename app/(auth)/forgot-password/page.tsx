@@ -20,7 +20,10 @@ import {
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/auth-context';
 import { useMountedRef } from '@/hooks/use-mounted-ref';
-import { clearResetSession } from '@/lib/reset-session';
+import {
+  clearResetSessionIfUnchanged,
+  readResetSession,
+} from '@/lib/reset-session';
 import { requestPasswordResetService } from '@/lib/services';
 import { StepBackButton } from '../register/components/step-back';
 
@@ -52,9 +55,10 @@ const Page = () => {
     }
     submitting.current = true;
     setIsLoading(true);
+    const seen = readResetSession();
     try {
       const res = await requestPasswordResetService(data.email);
-      clearResetSession();
+      clearResetSessionIfUnchanged(seen);
       if (!mounted.current) {
         return;
       }

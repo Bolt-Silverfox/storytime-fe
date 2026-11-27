@@ -80,4 +80,25 @@ describe('forgot-password page', () => {
     expect(push).not.toHaveBeenCalled();
     expect(readResetSession()).toBeNull();
   });
+
+  it('keeps a reset session saved by a newer flow when an older request settles late', async () => {
+    let resolve: (v: { message: string }) => void = () => {};
+    requestReset.mockReturnValue(
+      new Promise((r) => {
+        resolve = r;
+      })
+    );
+    const { unmount } = render(<Page />);
+    await requestCodeFor('new@example.com');
+    await waitFor(() => expect(requestReset).toHaveBeenCalled());
+    unmount();
+    saveResetSession({ token: '22222222', email: 'new@example.com' });
+    await act(async () => {
+      resolve({ message: 'sent' });
+    });
+    expect(readResetSession()).toEqual({
+      token: '22222222',
+      email: 'new@example.com',
+    });
+  });
 });

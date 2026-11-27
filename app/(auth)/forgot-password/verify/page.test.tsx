@@ -318,4 +318,29 @@ describe('forgot-password verify page', () => {
     expect(readResetSession()).toBeNull();
     expect(push).not.toHaveBeenCalled();
   });
+
+  it('keeps a reset session saved by a newer flow when an older resend settles late', async () => {
+    vi.useFakeTimers();
+    saveResetSession({ token: '11111111', email: 'kid@example.com' });
+    let resolve: (v: { message: string }) => void = () => {};
+    requestReset.mockReturnValue(
+      new Promise((r) => {
+        resolve = r;
+      })
+    );
+    const { unmount } = render(<Page />);
+    waitOutCountdown();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Resend OTP' }));
+    });
+    unmount();
+    saveResetSession({ token: '22222222', email: 'kid@example.com' });
+    await act(async () => {
+      resolve({ message: 'sent' });
+    });
+    expect(readResetSession()).toEqual({
+      token: '22222222',
+      email: 'kid@example.com',
+    });
+  });
 });

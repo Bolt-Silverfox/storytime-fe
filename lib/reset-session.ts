@@ -39,3 +39,15 @@ export function clearResetSession(): void {
     window.sessionStorage.removeItem(KEY);
   } catch {}
 }
+
+export function clearResetSessionIfUnchanged(seen: ResetSession | null): void {
+  const current = readResetSession();
+  if (
+    seen &&
+    current &&
+    current.token === seen.token &&
+    current.email === seen.email
+  ) {
+    clearResetSession();
+  }
+}

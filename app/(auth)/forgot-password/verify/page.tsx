@@ -28,7 +28,11 @@ import {
   ResetCodeSchema,
   sanitizeResetCode,
 } from '@/lib/reset-code';
-import { clearResetSession, saveResetSession } from '@/lib/reset-session';
+import {
+  clearResetSessionIfUnchanged,
+  readResetSession,
+  saveResetSession,
+} from '@/lib/reset-session';
 import {
   requestPasswordResetService,
   validateResetTokenService,
@@ -77,9 +81,10 @@ const Page = () => {
     resending.current = true;
     setIsResending(true);
     setTimeLeft(60);
+    const seen = readResetSession();
     try {
       const response = await requestPasswordResetService(email);
-      clearResetSession();
+      clearResetSessionIfUnchanged(seen);
       if (mounted.current) {
         toast.success(response.message);
       }

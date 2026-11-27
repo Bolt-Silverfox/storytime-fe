@@ -101,7 +101,7 @@ export const clipEndAction = (a: {
   if (a.failed.has(next)) {
     return 'failed';
   }
-  if (next < a.clipTotal) {
+  if (next < knownClipCount(a.clipTotal, a.ready)) {
     return 'wait';
   }
   // Out of clips. Long stories narrate only their first pages: with the text

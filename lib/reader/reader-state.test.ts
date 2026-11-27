@@ -220,6 +220,16 @@ describe('clipEndAction (what happens when a clip ends)', () => {
       clipEndAction({ ...base, ready: clips(0, 2, 3), failed: clips(1) })
     ).toBe('failed');
   });
+  it('waits for a gap before a later ready clip even with no clip count yet', () => {
+    expect(
+      clipEndAction({
+        ...base,
+        ready: clips(0, 2),
+        clipTotal: 0,
+        textVisible: false,
+      })
+    ).toBe('wait');
+  });
   it('single file: finishes the story when the file ends, even with many pages (b)', () => {
     expect(
       clipEndAction({

@@ -165,23 +165,6 @@ function isSensitiveKey(key: string): boolean {
   );
 }
 
-// Every logger call shares one scan budget across message + error + context,
-// so the total work is bounded however many large strings are passed.
-const MAX_CALL_SCAN = 128_000;
-let activeBudget: { left: number } | null = null;
-
-function withBudget<T>(fn: () => T): T {
-  if (activeBudget) {
-    return fn();
-  }
-  activeBudget = { left: MAX_CALL_SCAN };
-  try {
-    return fn();
-  } finally {
-    activeBudget = null;
-  }
-}
-
 // Header and payload are length-bounded so a run of "eyJ" cannot make the
 // match quadratic.
 const JWT = /eyJ[\w-]{3,200}\.[\w-]{1,20000}\.[\w-]{0,2000}/g;
@@ -325,6 +308,14 @@ function shouldMask(
   return key === 'Token' ? looksLikeCredential(peek()) : true;
 }
 
+function backslashesBefore(input: string, i: number): number {
+  let k = 0;
+  while (input[i - k - 1] === '\\') {
+    k++;
+  }
+  return k;
+}
+
 /** [start, end) of the value after `from`, or null. Linear: scans each char once. */
 function valueSpan(
   input: string,
@@ -334,18 +325,16 @@ function valueSpan(
   const open = VALUE_OPEN_QUOTE.exec(input);
   if (open) {
     const q = open[2];
-    const escaped = open[1].length > 0;
+    const level = open[1].length;
     const start = from + open[0].length;
+    // Each serialisation maps k backslashes before a quote to 2k + 1, so at the
+    // opener's escape level the closer has `level` of them modulo 2(level + 1).
+    const period = 2 * (level + 1);
     let i = input.indexOf(q, start);
-    // Skip quotes escaped inside a plain string; for an escaped-JSON opener
-    // (\") the closer is the next backslash-escaped quote.
-    while (i !== -1 && (input[i - 1] === '\\') !== escaped) {
+    while (i !== -1 && backslashesBefore(input, i) % period !== level) {
       i = input.indexOf(q, i + 1);
     }
-    let end = i === -1 ? input.length : i;
-    while (escaped && i !== -1 && end > start && input[end - 1] === '\\') {
-      end--;
-    }
+    const end = i === -1 ? input.length : i - level;
     return end > start ? { start, end, quote: q } : null;
   }
   let end = from;
@@ -406,19 +395,18 @@ function redactKeyNames(input: string): string {
 const MAX_SCAN = 64_000;
 const SMALL_STRING = 512;
 
-function redactString(input: string): string {
-  const budget = activeBudget ?? { left: MAX_CALL_SCAN };
+function redactString(input: string, budget: Walk): string {
   // Short strings (ids, names, short messages) are always scanned: they are
   // cheap, and must never degrade to "[truncated]" because a huge blob was
   // logged beside them.
   const small = input.length <= SMALL_STRING;
   const allowed = small
     ? input.length
-    : Math.min(input.length, MAX_SCAN, budget.left);
+    : Math.min(input.length, MAX_SCAN, budget.scan);
   if (allowed <= 0 && !small) {
     return '[truncated]';
   }
-  budget.left = Math.max(0, budget.left - allowed);
+  budget.scan = Math.max(0, budget.scan - allowed);
   let value = input;
   const cutInput = input.length > allowed;
   if (cutInput) {
@@ -445,200 +433,94 @@ function redactString(input: string): string {
 }
 
 function isAxiosLike(value: object): boolean {
-  return (
-    (value as { isAxiosError?: unknown }).isAxiosError === true ||
-    ('config' in value && 'response' in value)
+  return safeRead(
+    () =>
+      (value as { isAxiosError?: unknown }).isAxiosError === true ||
+      ('config' in value && 'response' in value),
+    false
   );
 }
 
-const ID_SEGMENT =
-  /^(?:\d+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{16,}|c[a-z0-9]{20,})$/i;
-// Parents whose next segment is an entity (slug / code / id), not a route word.
-const DYNAMIC_PARENTS = new Set([
-  'verify',
-  'invite',
-  'reset-password',
-  'stories',
-  'story',
-  'users',
-  'user',
-  'kids',
-  'share',
-]);
-// Route words that legitimately follow those parents.
-const STATIC_WORDS = new Set([
-  'me',
-  'categories',
-  'user',
-  'library',
-  'completed',
-  'continue-reading',
-  'progress',
-  'quota',
-  'daily-challenge',
-  'kid',
-  'recommended',
-  'search',
-  'audio',
-  'avatar',
-  'upload-avatar',
-]);
+const ROUTE_WORDS = new Set(
+  (
+    'access api apple audio auth available avatar avatars batch categories ' +
+    'change-password completed continue-reading daily-challenge devices ' +
+    'feedback google guest help-support history invite kid kids library link ' +
+    'linked-accounts login logout mark-all-read me notification-preferences ' +
+    'notifications oauth parent-favorites passwordless preferred progress ' +
+    'quota recommended refresh refresh-token register request ' +
+    'request-password-reset reset-password search send-verification session ' +
+    'share stories story system unlink upload-avatar user users v1 ' +
+    'validate-reset-token verify verify-email voice'
+  ).split(' ')
+);
+const MAX_SEGMENTS = 20;
 
-function normaliseSegment(seg: string, parent: string): string {
-  if (seg === '' || STATIC_WORDS.has(seg)) {
-    return seg;
-  }
-  if (
-    ID_SEGMENT.test(seg) ||
-    (seg.length >= 20 && /\d/.test(seg)) ||
-    (seg.length >= 6 && /\d/.test(seg) && /[a-z]/i.test(seg))
-  ) {
-    return ':id';
-  }
-  return DYNAMIC_PARENTS.has(parent) ? ':slug' : seg;
-}
-
-/** Path only (no origin/query/fragment), with ids/slugs replaced by ":id"/":slug". */
+/** Path only (no origin/query/fragment); every segment that is not a known route word becomes ":id". */
 function normalisePath(url: unknown): string | undefined {
   if (typeof url !== 'string') {
     return undefined;
   }
-  let path = url.split(/[?#]/)[0];
-  path = path.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]*/i, '');
-  const segments = path.split('/');
-  let parent = '';
-  const out = segments.map((seg) => {
-    const next = normaliseSegment(seg, parent);
-    if (seg !== '') {
-      parent = seg;
-    }
-    return next;
-  });
-  const joined = out.join('/');
-  return redactString(joined.startsWith('/') ? joined : `/${joined}`);
+  const path = url
+    .split(/[?#]/)[0]
+    .replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]*/i, '')
+    .split('/', MAX_SEGMENTS)
+    .map((seg) => (seg === '' || ROUTE_WORDS.has(seg) ? seg : ':id'))
+    .join('/');
+  return path.startsWith('/') ? path : `/${path}`;
 }
 
-interface HttpErrorSummary {
-  name: string;
-  message: string;
+const HTTP_METHODS = new Set([
+  'GET',
+  'POST',
+  'PUT',
+  'PATCH',
+  'DELETE',
+  'HEAD',
+  'OPTIONS',
+]);
+
+interface HttpFields {
   code?: string;
   status?: number;
   method?: string;
   path?: string;
 }
 
-/** Axios errors carry request headers/body; keep only a safe summary. */
-function summariseAxios(err: Record<string, unknown>): HttpErrorSummary {
-  const response = err.response as { status?: number } | undefined;
-  const config = err.config as { url?: string; method?: string } | undefined;
-  return {
-    name: typeof err.name === 'string' ? err.name : 'AxiosError',
-    message: redactString(String(err.message ?? '')),
-    code: typeof err.code === 'string' ? redactString(err.code) : undefined,
-    status:
-      response?.status ??
-      (typeof err.status === 'number' ? err.status : undefined),
-    method: config?.method?.toUpperCase(),
-    path: normalisePath(config?.url),
-  };
+interface HttpSummary extends HttpFields {
+  name: string;
+  message: string;
 }
 
-// Total serialised size allowed for one redacted value.
-const MAX_TOTAL = 64_000;
+const isHttpStatus = (s: unknown): s is number =>
+  Number.isInteger(s) && (s as number) >= 100 && (s as number) <= 599;
 
-interface Budget {
-  left: number;
+const MAX_OUTPUT = 64_000;
+const MAX_CALL_SCAN = 128_000;
+const MAX_ENTRIES = 100;
+const MAX_TAGS = 20;
+const UNREADABLE = '[unreadable]';
+const UNSERIALIZABLE = '[Unserializable]';
+const THREW = Symbol('threw');
+
+interface Walk {
+  scan: number;
+  out: number;
+  seen: WeakSet<object>;
+  errors: WeakSet<object>;
+  http: WeakMap<object, HttpFields>;
 }
 
-function redactInner(
-  value: unknown,
-  depth: number,
-  seen: WeakSet<object>,
-  budget: Budget
-): unknown {
-  if (budget.left <= 0) {
-    return '[truncated]';
-  }
-  if (typeof value === 'string') {
-    const out = redactString(value);
-    budget.left -= out.length;
-    return out;
-  }
-  if (value === null || typeof value !== 'object') {
-    budget.left -= 8;
-    return typeof value === 'function' ? '[Function]' : value;
-  }
-  if (seen.has(value)) {
-    return '[Circular]';
-  }
-  if (depth >= MAX_DEPTH) {
-    return '[Truncated]';
-  }
-  seen.add(value);
+const newWalk = (): Walk => ({
+  scan: MAX_CALL_SCAN,
+  out: MAX_OUTPUT,
+  seen: new WeakSet(),
+  errors: new WeakSet(),
+  http: new WeakMap(),
+});
 
-  if (isAxiosLike(value)) {
-    return summariseAxios(value as Record<string, unknown>);
-  }
-  if (value instanceof Error) {
-    return {
-      name: typeof value.name === 'string' ? redactString(value.name) : 'Error',
-      message: redactString(value.message),
-      stack: value.stack ? redactString(value.stack) : undefined,
-      cause:
-        value.cause === undefined
-          ? undefined
-          : redactInner(value.cause, depth + 1, seen, budget),
-    };
-  }
-  if (Array.isArray(value)) {
-    const items: unknown[] = [];
-    for (let i = 0; i < value.length; i++) {
-      if (budget.left <= 0) {
-        items.push(TRUNCATED);
-        break;
-      }
-      items.push(redactInner(value[i], depth + 1, seen, budget));
-    }
-    return items;
-  }
-  const out: Record<string, unknown> = {};
-  for (const key of Object.keys(value)) {
-    if (budget.left <= 0) {
-      out[TRUNCATED] = TRUNCATED;
-      break;
-    }
-    budget.left -= key.length + 4;
-    out[key] = isSensitiveKey(key)
-      ? REDACTED
-      : redactInner(
-          (value as Record<string, unknown>)[key],
-          depth + 1,
-          seen,
-          budget
-        );
-  }
-  return out;
-}
-
-/** Deep-copy `value` with secrets (tokens, auth headers, cookies, emails, passwords, session ids) masked. */
-export function redact(value: unknown): unknown {
-  try {
-    return withBudget(() =>
-      redactInner(value, 0, new WeakSet(), { left: MAX_TOTAL })
-    );
-  } catch {
-    return '[Unserializable]';
-  }
-}
-
-/**
- * A copy of `error` that is safe to send to Sentry yet keeps what grouping and
- * debugging need: name, redacted message, redacted stack, `cause`,
- * AggregateError members and primitive own props such as `status` / `code`.
- * Request/response/config (headers, bodies) are never copied.
- */
 /** Run a property read that may throw (hostile getters, revoked proxies). */
-function safeRead<T>(read: () => T, fallback: T): T {
+function safeRead<T, F>(read: () => T, fallback: F): T | F {
   try {
     return read();
   } catch {
@@ -646,84 +528,326 @@ function safeRead<T>(read: () => T, fallback: T): T {
   }
 }
 
-const MAX_ERROR_ENTRIES = 50;
+function emit(walk: Walk, marker: string): string {
+  walk.out -= marker.length;
+  return marker;
+}
 
-function safeErrorCopy(
-  error: Error,
-  depth = 0,
-  seen = new WeakSet<object>(),
-  copies = { left: MAX_ERROR_ENTRIES }
-): Error {
-  seen.add(error);
-  copies.left--;
-  // Read each getter exactly once, and never let one throw.
-  const message = safeRead(() => error.message, '[unreadable]');
-  const name = safeRead(() => error.name, 'Error');
-  const stack = safeRead(() => error.stack, undefined);
-  const copy = new Error(
-    typeof message === 'string' ? redactString(message) : '[unreadable]'
+const cleanString = (walk: Walk, value: string) =>
+  emit(walk, redactString(value, walk));
+
+function put(target: object, key: string, value: unknown): void {
+  Object.defineProperty(target, key, {
+    value,
+    enumerable: true,
+    writable: true,
+    configurable: true,
+  });
+}
+
+function clean(value: unknown, depth: number, walk: Walk): unknown {
+  if (walk.out <= 0) {
+    return emit(walk, TRUNCATED);
+  }
+  try {
+    return cleanNode(value, depth, walk);
+  } catch {
+    return emit(walk, UNSERIALIZABLE);
+  }
+}
+
+function cleanProp(
+  owner: object,
+  key: string | number,
+  depth: number,
+  walk: Walk
+): unknown {
+  const value = safeRead(
+    () => (owner as Record<string | number, unknown>)[key],
+    THREW
   );
-  copy.name = typeof name === 'string' ? redactString(name) : 'Error';
-  copy.stack =
-    typeof stack === 'string' && stack ? redactString(stack) : undefined;
-  if (depth < MAX_DEPTH) {
-    const cause = safeRead(
-      () => (error as { cause?: unknown }).cause,
-      undefined
-    );
-    if (cause instanceof Error && !seen.has(cause)) {
-      copy.cause = safeErrorCopy(cause, depth + 1, seen, copies);
-    } else if (cause !== undefined && !(cause instanceof Error)) {
-      copy.cause = redact(cause);
-    }
-    const members = safeRead(
-      () => (error as { errors?: unknown }).errors,
-      undefined
-    );
-    if (Array.isArray(members)) {
-      const errors: unknown[] = [];
-      for (let i = 0; i < members.length; i++) {
-        if (copies.left <= 0) {
-          errors.push(TRUNCATED);
-          break;
-        }
-        const m = safeRead(() => members[i], '[unreadable]');
-        if (m instanceof Error && !seen.has(m)) {
-          errors.push(safeErrorCopy(m, depth + 1, seen, copies));
-        } else {
-          errors.push(redact(m));
-          copies.left--;
-        }
+  return value === THREW ? emit(walk, UNREADABLE) : clean(value, depth, walk);
+}
+
+function cleanNode(value: unknown, depth: number, walk: Walk): unknown {
+  switch (typeof value) {
+    case 'string':
+      return cleanString(walk, value);
+    case 'function':
+      return emit(walk, '[Function]');
+    case 'symbol':
+    case 'bigint':
+      return cleanString(walk, String(value));
+    case 'object':
+      break;
+    default:
+      walk.out -= 8;
+      return value;
+  }
+  if (value === null) {
+    walk.out -= 8;
+    return null;
+  }
+  if (walk.seen.has(value)) {
+    return emit(walk, '[Circular]');
+  }
+  if (depth >= MAX_DEPTH) {
+    return emit(walk, '[Truncated]');
+  }
+  walk.seen.add(value);
+  const isError = value instanceof Error;
+  const isHttp = isAxiosLike(value);
+  if (isError || isHttp) {
+    return cleanError(value, isError, isHttp, depth, walk);
+  }
+  if (Array.isArray(value)) {
+    const items: unknown[] = [];
+    for (let i = 0; i < value.length; i++) {
+      if (walk.out <= 0 || i >= MAX_ENTRIES) {
+        items.push(emit(walk, TRUNCATED));
+        break;
       }
-      (copy as unknown as { errors: unknown[] }).errors = errors;
+      items.push(cleanProp(value, i, depth + 1, walk));
     }
+    return items;
   }
-  // Keys first, then read values only for the ones we keep (Object.entries
-  // would invoke every getter, including message/stack, a second time).
-  const keys = safeRead(() => Object.keys(error), [] as string[]);
-  for (const key of keys.slice(0, MAX_ERROR_ENTRIES)) {
-    if (
-      key === 'message' ||
-      key === 'name' ||
-      key === 'stack' ||
-      isSensitiveKey(key) ||
-      key === 'config' ||
-      key === 'request' ||
-      key === 'response'
-    ) {
-      continue;
+  const out: Record<string, unknown> = {};
+  const keys = Object.keys(value);
+  for (let i = 0; i < keys.length; i++) {
+    if (walk.out <= 0 || i >= MAX_ENTRIES) {
+      put(out, TRUNCATED, emit(walk, TRUNCATED));
+      break;
     }
-    const val = safeRead(
-      () => (error as unknown as Record<string, unknown>)[key],
-      '[unreadable]'
+    const key = keys[i];
+    put(
+      out,
+      cleanString(walk, key),
+      isSensitiveKey(key)
+        ? emit(walk, REDACTED)
+        : cleanProp(value, key, depth + 1, walk)
     );
-    if (typeof val === 'number' || typeof val === 'boolean') {
-      (copy as unknown as Record<string, unknown>)[key] = val;
-    } else if (typeof val === 'string') {
-      (copy as unknown as Record<string, unknown>)[key] = redactString(val);
+  }
+  return out;
+}
+
+const ERROR_SKIP = new Set([
+  'message',
+  'name',
+  'stack',
+  'cause',
+  'errors',
+  'config',
+  'request',
+  'response',
+]);
+
+/**
+ * Errors and Axios-like values keep what grouping and debugging need: name,
+ * message, stack, cause, AggregateError members, primitive own props and a
+ * whitelisted HTTP summary. Request/response/config are never copied.
+ */
+function cleanError(
+  value: object,
+  isError: boolean,
+  isHttp: boolean,
+  depth: number,
+  walk: Walk
+): Record<string, unknown> {
+  const source = value as Record<string, unknown>;
+  const record: Record<string, unknown> = {};
+  const name = safeRead(() => source.name, THREW);
+  const message = safeRead(() => source.message, THREW);
+  record.name =
+    typeof name === 'string'
+      ? cleanString(walk, name)
+      : isError
+        ? 'Error'
+        : 'AxiosError';
+  record.message =
+    typeof message === 'string'
+      ? cleanString(walk, message)
+      : message === undefined
+        ? ''
+        : emit(walk, UNREADABLE);
+  if (isError) {
+    const stack = safeRead(() => source.stack, undefined);
+    record.stack =
+      typeof stack === 'string' && stack ? cleanString(walk, stack) : undefined;
+    for (const key of ['cause', 'errors']) {
+      const nested = safeRead(() => source[key], THREW);
+      if (nested !== undefined) {
+        record[key] =
+          nested === THREW
+            ? emit(walk, UNREADABLE)
+            : clean(nested, depth + 1, walk);
+      }
+    }
+    const keys = safeRead(() => Object.keys(source), [] as string[]);
+    for (const key of keys.slice(0, MAX_ENTRIES)) {
+      if (ERROR_SKIP.has(key) || isSensitiveKey(key)) {
+        continue;
+      }
+      const prop = safeRead(() => source[key], undefined);
+      if (typeof prop === 'number' || typeof prop === 'boolean') {
+        walk.out -= 8;
+        put(record, cleanString(walk, key), prop);
+      } else if (typeof prop === 'string') {
+        put(record, cleanString(walk, key), cleanString(walk, prop));
+      }
+    }
+    walk.errors.add(record);
+  }
+  if (isHttp) {
+    const http = httpFields(source, walk);
+    Object.assign(record, http);
+    walk.http.set(record, http);
+  }
+  return record;
+}
+
+function httpFields(source: Record<string, unknown>, walk: Walk): HttpFields {
+  const response = safeRead(() => source.response, undefined) as
+    | { status?: unknown }
+    | undefined;
+  const config = safeRead(() => source.config, undefined) as
+    | { url?: unknown; method?: unknown }
+    | undefined;
+  const status = [
+    safeRead(() => response?.status, undefined),
+    safeRead(() => source.status, undefined),
+  ].find(isHttpStatus);
+  const method = safeRead(() => config?.method, undefined);
+  const upper = typeof method === 'string' ? method.toUpperCase() : '';
+  const code = safeRead(() => source.code, undefined);
+  const path = normalisePath(safeRead(() => config?.url, undefined));
+  const fields: HttpFields = {};
+  if (typeof code === 'string') {
+    fields.code = cleanString(walk, code);
+  }
+  if (status !== undefined) {
+    fields.status = status;
+  }
+  if (HTTP_METHODS.has(upper)) {
+    fields.method = upper;
+  }
+  if (path) {
+    fields.path = emit(walk, path);
+  }
+  return fields;
+}
+
+/** Deep-copy `value` with secrets (tokens, auth headers, cookies, emails, passwords, session ids) masked, in keys and values. */
+export function redact(value: unknown): unknown {
+  return clean(value, 0, newWalk());
+}
+
+function cleanMessage(message: unknown, walk: Walk): string {
+  const text =
+    typeof message === 'string'
+      ? message
+      : safeRead(() => String(message), UNREADABLE);
+  return cleanString(walk, text);
+}
+
+function cleanTags(tags: unknown, walk: Walk): Record<string, string> {
+  const out: Record<string, string> = {};
+  const source = asRecord(tags);
+  const keys = safeRead(() => Object.keys(source), [] as string[]);
+  for (const key of keys.slice(0, MAX_TAGS)) {
+    const value = safeRead(() => source[key], undefined);
+    if (typeof value === 'string' && !isSensitiveKey(key)) {
+      put(out, cleanString(walk, key), cleanString(walk, value));
     }
   }
-  return copy;
+  return out;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function toException(record: Record<string, unknown>, walk: Walk): Error {
+  const revive = (v: unknown): unknown =>
+    Array.isArray(v)
+      ? v.map(revive)
+      : v && typeof v === 'object' && walk.errors.has(v)
+        ? toException(v as Record<string, unknown>, walk)
+        : v;
+  const error = new Error(String(record.message));
+  for (const [key, value] of Object.entries(record)) {
+    put(
+      error,
+      key,
+      key === 'cause' || key === 'errors' ? revive(value) : value
+    );
+  }
+  return error;
+}
+
+interface Entry {
+  message: string;
+  data: unknown[];
+}
+
+interface ErrorEntry extends Entry {
+  exception?: Error;
+  details?: unknown;
+  context?: unknown;
+  tags: Record<string, string>;
+  http?: HttpSummary;
+}
+
+function sanitiseData(message: unknown, data: unknown[]): Entry {
+  const walk = newWalk();
+  return {
+    message: cleanMessage(message, walk),
+    data: data.map((item) => clean(item, 0, walk)),
+  };
+}
+
+// The error is cleaned first so the exception keeps priority on the shared budgets.
+function sanitiseError(
+  message: unknown,
+  error: unknown,
+  options: LogOptions
+): ErrorEntry {
+  const walk = newWalk();
+  const cleaned = error === undefined ? undefined : clean(error, 0, walk);
+  const record =
+    cleaned && typeof cleaned === 'object'
+      ? (cleaned as Record<string, unknown>)
+      : undefined;
+  const safeMessage = cleanMessage(message, walk);
+  const rawContext = safeRead(() => options.context, undefined);
+  const context =
+    rawContext === undefined ? undefined : clean(rawContext, 0, walk);
+  const fields = record && walk.http.get(record);
+  const exception =
+    record && walk.errors.has(record) ? toException(record, walk) : undefined;
+  return {
+    message: safeMessage,
+    data: [
+      ...(cleaned === undefined ? [] : [cleaned]),
+      ...(context === undefined ? [] : [context]),
+    ],
+    exception,
+    details: exception ? undefined : cleaned,
+    context,
+    tags: cleanTags(
+      safeRead(() => options.tags, undefined),
+      walk
+    ),
+    http:
+      record && fields
+        ? {
+            name: String(record.name),
+            message: String(record.message),
+            ...fields,
+          }
+        : undefined,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -868,57 +992,13 @@ function sendBreadcrumb(
   }
 }
 
-function httpSummary(error: unknown): HttpErrorSummary | undefined {
-  return safeRead(() => {
-    if (error && typeof error === 'object' && isAxiosLike(error)) {
-      return summariseAxios(error as Record<string, unknown>);
-    }
-    return undefined;
-  }, undefined);
-}
-
-const MAX_TAGS = 20;
-
-function safeTags(tags: unknown): Record<string, string> {
-  const out: Record<string, string> = {};
-  const entries = safeRead(
-    () => Object.entries(asRecord(tags)).slice(0, MAX_TAGS),
-    []
-  );
-  for (const [key, value] of entries) {
-    if (typeof value === 'string' && !isSensitiveKey(key)) {
-      out[redactString(key)] = redactString(value);
-    }
-  }
-  return out;
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-}
-
-/**
- * Sends the already-redacted pieces to Sentry. Nothing is redacted here: the
- * caller redacts the exception, message and context once and shares the
- * result with the console, so the scan budget is spent once per call.
- */
-function report(
-  scope: string | undefined,
-  safeMessage: string,
-  copy: Error | undefined,
-  details: unknown,
-  safeContext: unknown,
-  rawError: unknown,
-  options: LogOptions
-): void {
+function report(scope: string | undefined, entry: ErrorEntry): void {
   if (!sentryClientAvailable()) {
     return;
   }
-  const http = httpSummary(rawError);
+  const { http } = entry;
   const tags: Record<string, string> = {
-    ...safeTags(options.tags),
+    ...entry.tags,
     ...(scope ? { scope } : {}),
     ...(http?.status === undefined
       ? {}
@@ -927,39 +1007,34 @@ function report(
     ...(http?.path ? { 'http.path': http.path } : {}),
   };
   const extra: Record<string, unknown> = {
-    ...asRecord(safeContext),
-    logMessage: safeMessage,
-    ...(details === undefined ? {} : { details }),
+    ...asRecord(entry.context),
+    logMessage: entry.message,
+    ...(entry.details === undefined ? {} : { details: entry.details }),
   };
-  if (copy) {
-    // Without a fingerprint every endpoint's 500 would merge into one issue.
-    Sentry.captureException(copy, {
+  // Without a fingerprint every endpoint's 500 would merge into one issue.
+  const grouping = http
+    ? {
+        contexts: { http_error: { ...http } },
+        fingerprint: [
+          http.name,
+          http.message,
+          http.method ?? '',
+          http.path ?? '',
+          String(http.status ?? ''),
+        ],
+      }
+    : {};
+  if (entry.exception) {
+    Sentry.captureException(entry.exception, { tags, extra, ...grouping });
+  } else {
+    Sentry.captureMessage(entry.message, {
+      level: 'error',
       tags,
       extra,
-      ...(http
-        ? {
-            contexts: { http_error: { ...http } },
-            fingerprint: [
-              copy.name,
-              http.message,
-              http.method ?? '',
-              http.path ?? '',
-              String(http.status ?? ''),
-            ],
-          }
-        : {}),
+      ...grouping,
     });
-  } else {
-    Sentry.captureMessage(safeMessage, { level: 'error', tags, extra });
   }
 }
-
-const errorSummary = (e: Error): Record<string, unknown> => ({
-  name: e.name,
-  message: e.message,
-  stack: e.stack,
-  cause: e.cause instanceof Error ? errorSummary(e.cause) : e.cause,
-});
 
 // Expected failures are warn-only, which would hide a real outage (every call
 // failing with ERR_NETWORK / CORS) or a misrouted bearer (401 on a normal
@@ -975,10 +1050,9 @@ const lastOutageEvent = new Map<string, number>();
 
 function maybeReportExpectedOutage(
   scope: string | undefined,
-  message: string,
-  error: unknown
+  entry: ErrorEntry
 ): void {
-  const http = httpSummary(error);
+  const { http } = entry;
   if (!(http && sentryClientAvailable())) {
     return;
   }
@@ -1017,7 +1091,7 @@ function maybeReportExpectedOutage(
         http.method ?? '',
         http.path ?? '',
       ],
-      extra: { logMessage: message },
+      extra: { logMessage: entry.message },
     }
   );
   lastOutageEvent.delete(key);
@@ -1045,7 +1119,7 @@ export interface Logger {
 
 const safely = (fn: () => void) => {
   try {
-    withBudget(fn);
+    fn();
   } catch {
     // Logging must never throw.
   }
@@ -1059,56 +1133,30 @@ export function createLogger(scope?: string): Logger {
         if (currentEnvironment() !== 'development') {
           return;
         }
-        writeConsole(
-          level,
-          scope,
-          redactString(String(message)),
-          data.map(redact)
-        );
+        const entry = sanitiseData(message, data);
+        writeConsole(level, scope, entry.message, entry.data);
       });
-  const emitWarn = (safeMessage: string, safeData: unknown[]) => {
-    safely(() => writeConsole('warn', scope, safeMessage, safeData));
-    sendBreadcrumb('warning', scope, safeMessage, safeData);
+  const emitWarn = (entry: Entry) => {
+    safely(() => writeConsole('warn', scope, entry.message, entry.data));
+    sendBreadcrumb('warning', scope, entry.message, entry.data);
   };
-  const warn = (message: string, ...data: unknown[]) =>
-    safely(() => emitWarn(redactString(String(message)), data.map(redact)));
   return {
     debug: plain('debug'),
     info: plain('info'),
-    warn,
+    warn: (message, ...data) =>
+      safely(() => emitWarn(sanitiseData(message, data))),
     error: (message, error, options = {}) =>
       safely(() => {
-        if (options.expected) {
-          const safeMessage = redactString(String(message));
-          emitWarn(safeMessage, [
-            ...(error === undefined ? [] : [redact(error)]),
-            ...(options.context ? [redact(options.context)] : []),
-          ]);
-          safely(() => maybeReportExpectedOutage(scope, safeMessage, error));
+        const entry = sanitiseError(message, error, options);
+        if (safeRead(() => options.expected, false)) {
+          emitWarn(entry);
+          safely(() => maybeReportExpectedOutage(scope, entry));
           return;
         }
-        // Redact each input exactly once, in priority order (exception, then
-        // log message, then context), and reuse the result for the console
-        // and Sentry so the per-call scan budget is spent once.
-        const copy = error instanceof Error ? safeErrorCopy(error) : undefined;
-        const safeMessage = redactString(String(message));
-        const details =
-          error !== undefined && !copy ? redact(error) : undefined;
-        const safeContext = options.context
-          ? redact(options.context)
-          : undefined;
         // Each step is isolated: a throwing console must not stop reporting.
-        safely(() =>
-          writeConsole('error', scope, safeMessage, [
-            ...(copy ? [errorSummary(copy)] : []),
-            ...(details === undefined ? [] : [details]),
-            ...(safeContext === undefined ? [] : [safeContext]),
-          ])
-        );
-        safely(() => sendBreadcrumb('error', scope, safeMessage, []));
-        safely(() =>
-          report(scope, safeMessage, copy, details, safeContext, error, options)
-        );
+        safely(() => writeConsole('error', scope, entry.message, entry.data));
+        safely(() => sendBreadcrumb('error', scope, entry.message, []));
+        safely(() => report(scope, entry));
       }),
   };
 }

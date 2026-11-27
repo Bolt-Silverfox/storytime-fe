@@ -25,7 +25,7 @@ let spies: Record<
 >;
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
   sentry.getClient.mockReturnValue({} as never);
   spies = {
     debug: vi.spyOn(console, 'debug').mockImplementation(() => {}),
@@ -578,8 +578,8 @@ describe('round 2: endpoint normalisation', () => {
   };
   it.each([
     ['/auth/verify/abcdef123456', '/auth/verify/:id'],
-    ['/invite/INVCODE', '/invite/:slug'],
-    ['stories/ada-and-the-moon', '/stories/:slug'],
+    ['/invite/INVCODE', '/invite/:id'],
+    ['stories/ada-and-the-moon', '/stories/:id'],
     ['users/abc123def', '/users/:id'],
     ['reset-password/Xy7Qz9', '/reset-password/:id'],
     ['stories/categories', '/stories/categories'],
@@ -608,19 +608,39 @@ describe('round 2: expected-outage scope and bounds', () => {
 
   it('keeps the rate-limiter map bounded', () => {
     vi.useFakeTimers();
-    for (let i = 0; i < 400; i++) {
-      logger.error(
-        'x',
-        makeAxiosError(
-          401,
-          `/thing${'abcdefghij'.repeat(0)}/n${'q'.repeat(i % 5)}x/v${i}w`
-        ),
-        { expected: true }
-      );
+    const words = [
+      'kids',
+      'stories',
+      'guest',
+      'voice',
+      'user',
+      'devices',
+      'notifications',
+      'avatars',
+      'help-support',
+      'parent-favorites',
+      'categories',
+      'library',
+      'progress',
+      'quota',
+      'history',
+      'session',
+      'audio',
+      'feedback',
+      'access',
+      'available',
+    ];
+    for (const a of words) {
+      for (const b of words) {
+        logger.error('x', makeAxiosError(401, `/${a}/${b}`), {
+          expected: true,
+        });
+      }
     }
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(400);
     // Oldest keys were evicted, so a very early key is reportable again.
     sentry.captureMessage.mockClear();
-    logger.error('x', makeAxiosError(401, '/thing/nx/v0w'), { expected: true });
+    logger.error('x', makeAxiosError(401, '/kids/kids'), { expected: true });
     expect(sentry.captureMessage).toHaveBeenCalledOnce();
     vi.useRealTimers();
   });
@@ -750,10 +770,16 @@ describe('round 3: key-name scan (table tests)', () => {
     expect(out).toContain('https://a/b#');
   });
 
-  it('scans at most 64k characters', () => {
-    const out = redact(`${'a '.repeat(40_000)}password=late`) as string;
-    expect(out).not.toContain('password');
-    expect(out.length).toBeLessThan(9_000);
+  it('scans at most 64k characters of one string', () => {
+    const late = `${'c'.repeat(1_000)} token=SECRETVALUE`;
+    const out = redact({
+      a: `${'a '.repeat(50_000)}password=late`,
+      b: 'b'.repeat(30_000),
+      c: late,
+    }) as Record<string, string>;
+    expect(out.a).not.toContain('password');
+    expect(out.a.length).toBeLessThan(9_000);
+    expect(out.c).toBe(`${'c'.repeat(1_000)} token=[REDACTED]`);
   });
 
   it.each([
@@ -1529,5 +1555,185 @@ describe('round 8: bounded work', () => {
       Error & { errors: unknown[] },
     ];
     expect(captured.errors.length).toBeLessThan(500);
+  });
+});
+
+describe('round 9: one sanitiser before every sink', () => {
+  const revoked = () => {
+    const { proxy, revoke } = Proxy.revocable({}, {});
+    revoke();
+    return proxy;
+  };
+  const everything = () =>
+    JSON.stringify([
+      spies.warn.mock.calls,
+      spies.error.mock.calls,
+      sentry.addBreadcrumb.mock.calls,
+      sentry.captureException.mock.calls,
+      sentry.captureMessage.mock.calls,
+    ]);
+
+  it('masks an embedded quote in a twice-serialised password', () => {
+    const twice = JSON.stringify(
+      JSON.stringify({ password: 'a"b SECRETVALUE', next: 'keep' })
+    );
+    const out = redact(twice) as string;
+    expect(out).not.toContain('SECRETVALUE');
+    expect(out).toContain(String.raw`\"next\":\"keep\"`);
+  });
+
+  it('masks sensitive data in object keys and keeps ordinary keys', () => {
+    const out = JSON.stringify(
+      redact({ 'kid@example.com': 1, kidId: 'k1', nested: { 'a@b.io': 2 } })
+    );
+    expect(out).not.toMatch(/kid@example\.com|a@b\.io/);
+    expect(out).toContain('"kidId":"k1"');
+    const err = Object.assign(new Error('e'), { 'kid@example.com': 3 });
+    logger.warn('w', { 'kid@example.com': 1 });
+    logger.error('x', err, { context: { 'kid@example.com': 2 } });
+    expect(everything()).not.toContain('kid@example.com');
+  });
+
+  it('charges circular markers against the output budget', () => {
+    const shared = { a: 1 };
+    const t = performance.now();
+    const out = redact(new Array(1_000_000).fill(shared)) as unknown[];
+    expect(performance.now() - t).toBeLessThan(500);
+    expect(out.length).toBeLessThan(1_000);
+    expect(out.at(-1)).toBe('[truncated]');
+  });
+
+  it('stops emitting markers once the output budget is spent', () => {
+    const shared = { a: 1 };
+    const wide = Array.from({ length: 100 }, () => Array(100).fill(shared));
+    const out = JSON.stringify(redact(wide));
+    expect(out.split('[Circular]').length - 1).toBeLessThan(7_000);
+    expect(out).toContain('[truncated]');
+  });
+
+  it('keeps an own __proto__ key as data', () => {
+    const out = redact(JSON.parse('{"__proto__":{"kidId":"k1"}}'));
+    expect(JSON.stringify(out)).toBe('{"__proto__":{"kidId":"k1"}}');
+  });
+
+  it('an unreadable cause does not drop the outer error', () => {
+    logger.error('m', new Error('outer', { cause: revoked() }));
+    expect(sentry.captureException).toHaveBeenCalledOnce();
+    const copy = sentry.captureException.mock.calls[0][0] as Error;
+    expect(copy.message).toBe('outer');
+    expect(copy.cause).toBe('[Unserializable]');
+    expect(spies.error).toHaveBeenCalledOnce();
+  });
+
+  it('an unreadable AggregateError member list does not drop the error', () => {
+    const agg = new AggregateError([], 'many');
+    Object.defineProperty(agg, 'errors', { value: revoked() });
+    logger.error('m', agg);
+    expect(sentry.captureException).toHaveBeenCalledOnce();
+    expect((sentry.captureException.mock.calls[0][0] as Error).message).toBe(
+      'many'
+    );
+  });
+
+  it('a revoked proxy as the error still reports the message', () => {
+    logger.error('m', revoked());
+    expect(sentry.captureMessage).toHaveBeenCalledOnce();
+    expect(spies.error).toHaveBeenCalledOnce();
+  });
+
+  it('one hostile context value does not wipe the rest of the context', () => {
+    logger.error('m', new Error('e'), {
+      context: { kidId: 'k1', bad: revoked() },
+    });
+    const hint = sentry.captureException.mock.calls[0][1] as {
+      extra: Record<string, unknown>;
+    };
+    expect(hint.extra.kidId).toBe('k1');
+    expect(hint.extra.bad).toBe('[Unserializable]');
+  });
+
+  it('symbols are rendered as redacted strings', () => {
+    const out = redact({ s: Symbol('kid@example.com') }) as { s: unknown };
+    expect(typeof out.s).toBe('string');
+    expect(out.s).not.toContain('kid@example.com');
+  });
+
+  it('the HTTP summary is sanitised before it reaches Sentry', () => {
+    const err = makeAxiosError(500, '/kids');
+    err.name = 'Failed for kid@example.com';
+    logger.error('x', err);
+    const hostile = {
+      isAxiosError: true,
+      name: 'AxiosError',
+      message: 'm',
+      status: '500 kid@example.com',
+      config: { url: '/kids', method: 'kid@example.com' },
+    };
+    logger.error('y', hostile);
+    logger.error('z', { ...hostile, code: 'ERR_NETWORK' }, { expected: true });
+    expect(everything()).not.toContain('kid@example.com');
+    const [, hint] = sentry.captureException.mock.calls[0] as [
+      Error,
+      { contexts: { http_error: Record<string, unknown> } },
+    ];
+    expect(hint.contexts.http_error).toMatchObject({
+      method: 'GET',
+      status: 500,
+      path: '/kids',
+    });
+  });
+
+  it('keeps endpoint context and grouping for normalised HTTP errors', () => {
+    const normalised = {
+      isAxiosError: true,
+      name: 'AxiosError',
+      message: 'Failed to fetch kids',
+      status: 500,
+      config: { method: 'get', url: 'auth/kids' },
+      response: { status: 500 },
+    };
+    logger.error('kids', normalised);
+    logger.error('kids', {
+      ...normalised,
+      config: { method: 'get', url: 'voice/available' },
+    });
+    const hints = sentry.captureMessage.mock.calls.map(
+      (c) =>
+        c[1] as {
+          contexts: { http_error: Record<string, unknown> };
+          fingerprint: string[];
+        }
+    );
+    expect(hints[0].contexts.http_error).toMatchObject({
+      status: 500,
+      method: 'GET',
+      path: '/auth/kids',
+    });
+    expect(hints[0].fingerprint).toEqual(
+      expect.arrayContaining(['GET', '/auth/kids', '500'])
+    );
+    expect(hints[0].fingerprint).not.toEqual(hints[1].fingerprint);
+    logger.error('plain', { detail: 1 });
+    expect(sentry.captureMessage.mock.calls[2][1]).not.toHaveProperty(
+      'fingerprint'
+    );
+  });
+
+  it.each([
+    ['stories/daily-challenge/kid/k1', '/stories/daily-challenge/kid/:id'],
+    ['stories/daily-challenge/kid/k2', '/stories/daily-challenge/kid/:id'],
+    [
+      'notification-preferences/users/u1',
+      '/notification-preferences/users/:id',
+    ],
+    ['guest/stories/s1/audio/job7', '/guest/stories/:id/audio/:id'],
+    ['auth/unlink/google', '/auth/unlink/google'],
+    ['user/me/upload-avatar', '/user/me/upload-avatar'],
+  ])('normalises unknown path segments: %s -> %s', (url, expected) => {
+    logger.error('x', makeAxiosError(500, url));
+    const hint = sentry.captureException.mock.calls[0][1] as {
+      tags: Record<string, string>;
+    };
+    expect(hint.tags['http.path']).toBe(expected);
   });
 });

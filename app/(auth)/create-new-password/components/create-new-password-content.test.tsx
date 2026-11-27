@@ -151,4 +151,28 @@ describe('CreateNewPasswordContent', () => {
     expect(push).not.toHaveBeenCalled();
     expect(readResetSession()).toBeNull();
   });
+
+  it('keeps a newer reset session saved while an older reset was still pending', async () => {
+    saveResetSession({ token: '11111111', email: 'a@b.co' });
+    let resolve: (v: { message: string }) => void = () => {};
+    resetPasswordService.mockReturnValue(
+      new Promise((r) => {
+        resolve = r;
+      })
+    );
+    const { unmount } = render(<CreateNewPasswordContent />);
+    await submitNewPassword();
+    await waitFor(() =>
+      expect(resetPasswordService).toHaveBeenCalledWith(
+        expect.objectContaining({ token: '11111111' })
+      )
+    );
+    unmount();
+    saveResetSession({ token: '22222222', email: 'a@b.co' });
+    await act(async () => {
+      resolve({ message: 'ok' });
+    });
+    expect(push).not.toHaveBeenCalled();
+    expect(readResetSession()).toEqual({ token: '22222222', email: 'a@b.co' });
+  });
 });

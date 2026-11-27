@@ -20,7 +20,7 @@ import { Input } from '@/components/ui/input';
 import { PasswordInputToggle } from '@/components/ui/password-input-toggle';
 import { useMountedRef } from '@/hooks/use-mounted-ref';
 import {
-  clearResetSession,
+  clearResetSessionIfUnchanged,
   type ResetSession,
   readResetSession,
 } from '@/lib/reset-session';
@@ -103,7 +103,7 @@ export const CreateNewPasswordContent = () => {
         newPassword: data.password,
       });
 
-      clearResetSession();
+      clearResetSessionIfUnchanged(session);
       if (!mounted.current) {
         return;
       }

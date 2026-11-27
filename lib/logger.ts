@@ -890,7 +890,10 @@ function sanitiseData(message: unknown, data: unknown[]): Entry {
   const walk = newWalk();
   return {
     message: cleanMessage(message, walk),
-    data: data.map((item) => clean(item, 0, walk)),
+    data: [
+      ...data.slice(0, MAX_ENTRIES).map((item) => clean(item, 0, walk)),
+      ...(data.length > MAX_ENTRIES ? [emit(walk, TRUNCATED)] : []),
+    ],
   };
 }
 

@@ -1997,6 +1997,17 @@ describe('round 10: bounded work', () => {
     expect(JSON.stringify(redact(objects)).length).toBeLessThan(200_000);
   });
 
+  it('caps the number of logged data arguments', () => {
+    const args = Array.from({ length: 60_000 }, (_, i) => `arg${i}`);
+    logger.warn('many', ...args);
+    const [crumb] = sentry.addBreadcrumb.mock.calls[0] as [
+      { data: { details: unknown[] } },
+    ];
+    expect(crumb.data.details.length).toBeLessThanOrEqual(101);
+    expect(crumb.data.details.at(-1)).toBe('[truncated]');
+    expect(spies.warn.mock.calls[0].length).toBeLessThan(110);
+  });
+
   it('keeps small empty containers', () => {
     expect(redact({ list: [], map: {}, nested: [[], [{}]] })).toEqual({
       list: [],

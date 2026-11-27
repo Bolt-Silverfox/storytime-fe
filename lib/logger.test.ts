@@ -1591,8 +1591,15 @@ describe('round 9: one sanitiser before every sink', () => {
     "{'set-cookie': 'account=SECRETVALUE'}",
     'Authorization: Api-Key SECRETVALUE',
     'authorization=X-Custom.v2 SECRETVALUE',
+    'Authorization: Digest username="u1", response="SECRETVALUE", nonce="n"',
   ])('masks the whole header value in %s', (text) => {
     expect(redact(text)).not.toContain('SECRETVALUE');
+  });
+
+  it('unreadable tags do not drop the exception', () => {
+    logger.error('m', new Error('e'), { tags: revoked() as never });
+    expect(sentry.captureException).toHaveBeenCalledOnce();
+    expect(spies.error).toHaveBeenCalledOnce();
   });
 
   it('applies redaction to the logger scope', () => {

@@ -171,7 +171,10 @@ const JWT = /eyJ[\w-]{3,200}\.[\w-]{1,20000}\.[\w-]{0,2000}/g;
 // "Authorization: <scheme> <token>" with any scheme (or none).
 const AUTH_HEADER =
   /(authorization["']?\s*[:=]\s*)(?:"[^"]{0,2000}"|'[^']{0,2000}'|(?:[A-Za-z][\w.-]{0,30}\s+)?[^\s,;"'&]+)/gi;
-// A Cookie header holds several pairs whose names are not secret-looking.
+// Header lines (Cookie: a=1; b=2, Authorization: Digest a="1", b="2") carry
+// several pairs whose names are not secret-looking: mask to the end of the line.
+const AUTH_HEADER_LINE =
+  /(authorization["']?\s*:\s*)(?:"[^"\r\n]{0,8000}"|'[^'\r\n]{0,8000}'|[^\s"'`][^\r\n]*)/gi;
 const COOKIE_HEADER =
   /(\b(?:set-)?cookie["']?\s*:\s*)(?:"[^"\r\n]{0,8000}"|'[^'\r\n]{0,8000}'|[^\s"'`][^\r\n"'`]*)/gi;
 // Scheme-prefixed credentials. The value must look like a credential, so
@@ -423,6 +426,7 @@ function redactString(input: string, budget: Walk): string {
   value = redactKeyNames(
     value
       .replace(JWT, REDACTED)
+      .replace(AUTH_HEADER_LINE, `$1${REDACTED}`)
       .replace(AUTH_HEADER, `$1${REDACTED}`)
       .replace(COOKIE_HEADER, `$1${REDACTED}`)
       .replace(BEARER, `Bearer ${REDACTED}`)
@@ -758,7 +762,7 @@ function cleanMessage(message: unknown, walk: Walk): string {
 
 function cleanTags(tags: unknown, walk: Walk): Record<string, string> {
   const out: Record<string, string> = {};
-  const source = asRecord(tags);
+  const source = safeRead(() => asRecord(tags), {} as Record<string, unknown>);
   const keys = safeRead(() => Object.keys(source), [] as string[]);
   for (const key of keys.slice(0, MAX_TAGS)) {
     const value = safeRead(() => source[key], undefined);

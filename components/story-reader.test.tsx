@@ -9,6 +9,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
+import { Profiler, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const words = (n: number, p: string) =>
@@ -90,19 +91,21 @@ import { pagesSignature, resolvePages } from '@/lib/reader/paginate';
 import * as services from '@/lib/services';
 import StoryReader from './story-reader';
 
-const renderReader = (isGuest = true, mode = 'plain') =>
+const renderReader = (isGuest = true, mode = 'plain', onCommit?: () => void) =>
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <StoryReader
-        img=''
-        title='T'
-        description='D'
-        voice='Storyteller'
-        setStep={() => undefined}
-        mode={mode}
-        storyId='story-1'
-        isGuest={isGuest}
-      />
+      <Profiler id='reader' onRender={() => onCommit?.()}>
+        <StoryReader
+          img=''
+          title='T'
+          description='D'
+          voice='Storyteller'
+          setStep={() => undefined}
+          mode={mode}
+          storyId='story-1'
+          isGuest={isGuest}
+        />
+      </Profiler>
     </QueryClientProvider>
   );
 
@@ -452,6 +455,298 @@ describe('synth wave animation', () => {
     });
     await waitFor(() => expect(audioEl()).toBeTruthy());
     expect(playing()).toBe('false');
+  });
+});
+
+describe('sentence read-along highlight', () => {
+  // 10-word sentences, three per page (30 words), two pages.
+  const S = (p: string) => `${words(9, p)}.`;
+  const MULTI = ['a', 'b', 'c', 'd', 'e', 'f'].map(S).join(' ');
+  const active = () =>
+    Array.from(document.querySelectorAll('[data-active="true"]')).map((e) =>
+      e.textContent?.slice(0, 2)
+    );
+  const setClock = async (time: number, duration = 30) => {
+    const el = audioEl();
+    Object.defineProperty(el, 'duration', {
+      value: duration,
+      configurable: true,
+    });
+    Object.defineProperty(el, 'currentTime', {
+      value: time,
+      configurable: true,
+      writable: true,
+    });
+    await act(async () => {
+      fireEvent.loadedMetadata(el);
+      fireEvent.timeUpdate(el);
+    });
+  };
+  const start = async (clips = 2, onCommit?: () => void) => {
+    guest.clips = clips;
+    guest.pending = 0;
+    guest.gate = null;
+    guest.story = { id: 'story-1', title: 'T', textContent: MULTI };
+    renderReader(true, 'plain', onCommit);
+    await waitFor(() => screen.getByRole('switch'));
+    fireEvent.click(screen.getByRole('switch'));
+    await waitReady();
+    fireEvent.click(playButton());
+    await waitFor(() =>
+      expect(playButton().getAttribute('aria-pressed')).toBe('true')
+    );
+  };
+
+  // Active sentence index seen in every committed render while tracking.
+  const seen: (string | undefined)[] = [];
+  let tracking = false;
+  const record = () => {
+    if (tracking) {
+      seen.push(
+        document
+          .querySelector('[data-active="true"]')
+          ?.getAttribute('data-sentence') ?? undefined
+      );
+    }
+  };
+
+  it('follows timeupdate through the sentences of the narrated page', async () => {
+    await start();
+    await setClock(1);
+    expect(active()).toEqual(['a0']);
+    await setClock(15);
+    expect(active()).toEqual(['b0']);
+    await setClock(29);
+    expect(active()).toEqual(['c0']);
+    // seeking back moves it back
+    await setClock(2);
+    expect(active()).toEqual(['a0']);
+  });
+
+  it('keeps the highlight on the current sentence while paused mid-clip', async () => {
+    await start();
+    await setClock(15);
+    expect(active()).toEqual(['b0']);
+    fireEvent.click(playButton());
+    await waitFor(() =>
+      expect(playButton().getAttribute('aria-pressed')).toBe('false')
+    );
+    expect(active()).toEqual(['b0']);
+    fireEvent.click(playButton());
+    await waitFor(() => expect(active()).toEqual(['b0']));
+  });
+
+  it('hides the highlight once the story has finished and rewound', async () => {
+    await start(2, record);
+    await setClock(29);
+    await endAudio();
+    await setClock(29);
+    // The rewound first clip of a real element starts from zero.
+    Object.defineProperty(audioEl(), 'currentTime', {
+      value: 0,
+      configurable: true,
+    });
+    seen.length = 0;
+    tracking = true;
+    await endAudio();
+    tracking = false;
+    // not even for one commit: the old playhead is gone with the clip
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every((i) => i === undefined)).toBe(true);
+    await waitFor(() =>
+      expect(playButton().getAttribute('aria-pressed')).toBe('false')
+    );
+    expect(active()).toEqual([]);
+  });
+
+  it('keeps read-along on through a finish and replay loop', async () => {
+    await start();
+    await setClock(29);
+    await endAudio();
+    await setClock(29);
+    await endAudio();
+    expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe(
+      'true'
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Previous page' }));
+    expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe(
+      'true'
+    );
+  });
+
+  it('does not show the first clip duration on a later page before play', async () => {
+    await start(1); // only page 1 has a clip; page 2 has none yet
+    await setClock(0, 3);
+    fireEvent.click(playButton()); // pause
+    await turnTo(1);
+    expect(screen.queryByText('00:00 / 00:03')).toBeNull();
+    expect(screen.getByText('--:-- / --:--')).toBeTruthy();
+  });
+
+  it('hands over to the next page without ever highlighting a stale sentence', async () => {
+    await start(2, record);
+    await setClock(29);
+    expect(active()).toEqual(['c0']);
+    // A new clip starts from zero with unknown duration, as in a browser.
+    const el = audioEl();
+    Object.defineProperty(el, 'currentTime', { value: 0, configurable: true });
+    Object.defineProperty(el, 'duration', {
+      value: Number.NaN,
+      configurable: true,
+    });
+    seen.length = 0;
+    tracking = true;
+    await endAudio();
+    tracking = false;
+    // Page 2 shows (d/e/f); at no commit may its last sentence be lit.
+    expect(screen.getAllByText('Page 2 of 2').length).toBeGreaterThan(0);
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every((i) => i === undefined || i === '0')).toBe(true);
+    expect(active().every((a) => a === 'd0')).toBe(true);
+    await setClock(1);
+    expect(active()).toEqual(['d0']);
+  });
+
+  it('a manual page turn mid-clip does not flash a stale sentence', async () => {
+    await start(2, record);
+    await setClock(29);
+    const el = audioEl();
+    Object.defineProperty(el, 'currentTime', { value: 0, configurable: true });
+    Object.defineProperty(el, 'duration', {
+      value: Number.NaN,
+      configurable: true,
+    });
+    seen.length = 0;
+    tracking = true;
+    await turnTo(1);
+    tracking = false;
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every((i) => i === undefined || i === '0')).toBe(true);
+  });
+
+  it('shows nothing on a page that has no narration', async () => {
+    await start(1);
+    await setClock(15);
+    expect(active()).toEqual(['b0']);
+    await turnTo(1);
+    expect(active()).toEqual([]);
+  });
+
+  it('does not touch the page turn: the page follows the clip end', async () => {
+    await start();
+    await setClock(29);
+    await endAudio();
+    await waitFor(() =>
+      expect(screen.getAllByText('Page 2 of 2').length).toBeGreaterThan(0)
+    );
+  });
+
+  it('single stored file gets no sentence highlight', async () => {
+    guest.clips = 0;
+    guest.story = {
+      id: 'story-1',
+      title: 'T',
+      textContent: MULTI,
+      audioUrl: 'full.mp3',
+    };
+    renderReader();
+    await waitFor(() => screen.getByRole('switch'));
+    fireEvent.click(screen.getByRole('switch'));
+    await waitReady();
+    fireEvent.click(playButton());
+    await setClock(15);
+    expect(active()).toEqual([]);
+  });
+
+  it('clears the highlight when the narration stops at the clip cap and the reader goes back', async () => {
+    guest.clips = 2;
+    guest.pending = 0;
+    guest.gate = null;
+    guest.story = {
+      id: 'story-1',
+      title: 'T',
+      textContent: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l']
+        .map(S)
+        .join(' '),
+    };
+    renderReader();
+    await waitFor(() => screen.getByRole('switch'));
+    fireEvent.click(screen.getByRole('switch'));
+    await waitReady();
+    fireEvent.click(playButton());
+    await setClock(29);
+    await endAudio(); // clip 0 -> 1
+    await setClock(29);
+    await endAudio(); // clip 1 is the last one: stop on page 3
+    await waitFor(() =>
+      expect(playButton().getAttribute('aria-pressed')).toBe('false')
+    );
+    await turnTo(0);
+    fireEvent.keyDown(document, { key: 'ArrowLeft' });
+    expect(screen.getAllByText('Page 2 of 4').length).toBeGreaterThan(0);
+    expect(active()).toEqual([]);
+    expect(screen.getByText('00:00 / 00:30')).toBeTruthy();
+  });
+
+  it('keeps the spoken sentence clear of the sticky Play button', async () => {
+    await start();
+    await setClock(15);
+    const span = document.querySelector('[data-active="true"]');
+    expect(span?.className).toContain('scroll-mb-32');
+    expect(playButton().className).toContain('sticky');
+    expect(playButton().className).toContain('safe-area-inset-bottom');
+  });
+
+  it('keeps read-along on when the reader unmounts and comes back (Change voice, modal)', async () => {
+    guest.clips = 2;
+    guest.story = { id: 'story-1', title: 'T', textContent: MULTI };
+    const Host = ({ show }: { show: boolean }) => {
+      const [on, setOn] = useState(false);
+      const [client] = useState(() => new QueryClient());
+      return show ? (
+        <QueryClientProvider client={client}>
+          <StoryReader
+            img=''
+            title='T'
+            description='D'
+            voice='V'
+            setStep={() => undefined}
+            mode='plain'
+            storyId='story-1'
+            isGuest
+            readAlong={on}
+            onReadAlongChange={setOn}
+          />
+        </QueryClientProvider>
+      ) : null;
+    };
+    // The state lives above the reader, like story-view.
+    const Parent = () => {
+      const [show, setShow] = useState(true);
+      return (
+        <>
+          <button type='button' onClick={() => setShow((v) => !v)}>
+            toggle-reader
+          </button>
+          <Host show={show} />
+        </>
+      );
+    };
+    render(<Parent />);
+    await waitFor(() => screen.getByRole('switch'));
+    fireEvent.click(screen.getByRole('switch'));
+    await waitFor(() =>
+      expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe(
+        'true'
+      )
+    );
+    fireEvent.click(screen.getByText('toggle-reader'));
+    expect(screen.queryByRole('switch')).toBeNull();
+    fireEvent.click(screen.getByText('toggle-reader'));
+    await waitFor(() => screen.getByRole('switch'));
+    expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe(
+      'true'
+    );
   });
 });
 
@@ -962,5 +1257,580 @@ describe('finishing the story from the last page', () => {
       ).toBe('status');
       expect(screen.queryByRole('alert')).toBeNull();
     });
+  });
+});
+
+describe('read-along highlight when the narrated clip changes', () => {
+  const SENTENCES = ['a', 'b', 'c', 'd', 'e', 'f']
+    .map((p) => `${words(9, p)}.`)
+    .join(' ');
+  const seen: (string | null)[] = [];
+  let tracking = false;
+  const record = () => {
+    if (tracking) {
+      seen.push(
+        document
+          .querySelector('[data-active="true"]')
+          ?.getAttribute('data-sentence') ?? null
+      );
+    }
+  };
+  const setClock = async (time: number, duration: number) => {
+    const el = audioEl();
+    Object.defineProperty(el, 'duration', {
+      value: duration,
+      configurable: true,
+    });
+    Object.defineProperty(el, 'currentTime', {
+      value: time,
+      configurable: true,
+      writable: true,
+    });
+    await act(async () => {
+      fireEvent.loadedMetadata(el);
+      fireEvent.timeUpdate(el);
+    });
+  };
+  const srcChangeRewindsElement = () => {
+    const el = audioEl();
+    Object.defineProperty(el, 'currentTime', { value: 0, configurable: true });
+    Object.defineProperty(el, 'duration', {
+      value: Number.NaN,
+      configurable: true,
+    });
+  };
+  const activeSentences = () =>
+    Array.from(document.querySelectorAll('[data-active="true"]')).map((e) =>
+      e.textContent?.slice(0, 2)
+    );
+
+  beforeEach(() => {
+    vi.mocked(services.startGuestStoryAudioBatchService).mockClear();
+    vi.mocked(services.getGuestStoryAudioBatchStatusService).mockClear();
+    resetGuest();
+    guest.clips = 2;
+    guest.story = { id: 'story-1', title: 'T', textContent: SENTENCES };
+  });
+  afterEach(() => {
+    tracking = false;
+    seen.length = 0;
+    vi.restoreAllMocks();
+    resetGuest();
+  });
+
+  const playFirstClipToItsEnd = async () => {
+    renderReader(true, 'plain', record);
+    fireEvent.click(await screen.findByRole('switch'));
+    await batchApplied();
+    fireEvent.click(playButton());
+    await waitFor(() => expect(played).toEqual(['0.mp3']));
+    await setClock(29, 30);
+    expect(activeSentences()).toEqual(['c0']);
+  };
+
+  const scenarios: {
+    name: string;
+    generating: number[];
+    change: () => Promise<void>;
+    page: number;
+  }[] = [
+    {
+      name: 'the next clip arrives after the narration waited for it',
+      generating: [1],
+      page: 2,
+      change: async () => {
+        await endAudio();
+        srcChangeRewindsElement();
+        guest.generating = [];
+        tracking = true;
+        await nextPoll();
+      },
+    },
+    {
+      name: 'Try again prepares the audio afresh',
+      generating: [],
+      page: 1,
+      change: async () => {
+        vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(() =>
+          Promise.reject(new Error('nope'))
+        );
+        fireEvent.click(playButton());
+        fireEvent.click(playButton());
+        const retry = await screen.findByRole('button', { name: /try again/i });
+        let release: () => void = () => undefined;
+        guest.gate = new Promise<void>((r) => {
+          release = r;
+        });
+        fireEvent.click(retry);
+        await waitFor(() => expect(audioEl()).toBeNull());
+        tracking = true;
+        await act(async () => {
+          release();
+        });
+        await waitFor(() => expect(audioEl()).toBeTruthy());
+      },
+    },
+  ];
+
+  it.each(scenarios)(
+    'never lights a stale sentence when $name',
+    async ({ generating, change, page }) => {
+      guest.generating = generating;
+      await playFirstClipToItsEnd();
+      await change();
+      tracking = false;
+      expect(screen.getAllByText(`Page ${page} of 2`).length).toBeGreaterThan(
+        0
+      );
+      expect(seen.length).toBeGreaterThan(0);
+      expect(seen.filter((i) => i !== null && i !== '0')).toEqual([]);
+    }
+  );
+});
+
+describe('read-along through every narration state', () => {
+  const sentences = (letters: string) =>
+    letters
+      .split('')
+      .map((p) => `${words(9, p)}.`)
+      .join(' ');
+  const ONE_PAGE = sentences('abc');
+  const TWO_PAGES = sentences('abcdef');
+  const FOUR_PAGES = sentences('abcdefghijkl');
+
+  const scrolled: (string | undefined)[] = [];
+  const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+  beforeEach(() => {
+    resetGuest();
+    vi.mocked(services.getGuestStoryAudioBatchStatusService).mockClear();
+    scrolled.length = 0;
+    HTMLElement.prototype.scrollIntoView = function (this: HTMLElement) {
+      scrolled.push(this.textContent?.slice(0, 2));
+    };
+  });
+  afterEach(() => {
+    HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
+    resetGuest();
+  });
+
+  const define = (prop: 'currentTime' | 'duration', value: number) =>
+    Object.defineProperty(audioEl(), prop, {
+      value,
+      configurable: true,
+      writable: true,
+    });
+  const metadata = async (duration: number) => {
+    define('duration', duration);
+    await act(async () => {
+      fireEvent.loadedMetadata(audioEl());
+    });
+  };
+  const tick = async (time: number) => {
+    define('currentTime', time);
+    await act(async () => {
+      fireEvent.timeUpdate(audioEl());
+    });
+  };
+  const loadAndTick = async (time: number) => {
+    await metadata(30);
+    await tick(time);
+  };
+  const newSource = () => {
+    define('currentTime', 0);
+    define('duration', Number.NaN);
+  };
+  const clipEnds = async () => {
+    await tick(30);
+    await endAudio();
+  };
+  const clipEndsOntoNewSource = async () => {
+    newSource();
+    await endAudio();
+  };
+  const pressPlay = async () => {
+    await act(async () => {
+      fireEvent.click(playButton());
+    });
+  };
+  const replayFromStart = async () => {
+    await pressPlay();
+    define('currentTime', 0);
+  };
+  const open = async (text: string) => {
+    guest.story = { id: 'story-1', title: 'T', textContent: text };
+    renderReader();
+    fireEvent.click(await screen.findByRole('switch'));
+    await waitReady();
+    await pressPlay();
+  };
+
+  type Step = () => Promise<void>;
+  const rows: {
+    state: string;
+    clips: number;
+    text: string;
+    failed?: number[];
+    generating?: number[];
+    before: Step[];
+    last: Step;
+    page: number;
+    marker: string | null;
+    clock: string;
+    playing: boolean;
+    scroll: string[];
+  }[] = [
+    {
+      state: 'single clip, playing',
+      clips: 1,
+      text: ONE_PAGE,
+      before: [() => metadata(30)],
+      last: () => tick(15),
+      page: 1,
+      marker: 'b0',
+      clock: '00:15 / 00:30',
+      playing: true,
+      scroll: ['b0'],
+    },
+    {
+      state: 'single clip, paused mid-clip',
+      clips: 1,
+      text: ONE_PAGE,
+      before: [() => loadAndTick(15)],
+      last: pressPlay,
+      page: 1,
+      marker: 'b0',
+      clock: '00:15 / 00:30',
+      playing: false,
+      scroll: [],
+    },
+    {
+      state: 'multi clip, second clip playing',
+      clips: 2,
+      text: TWO_PAGES,
+      before: [
+        () => loadAndTick(29),
+        clipEndsOntoNewSource,
+        () => metadata(30),
+      ],
+      last: () => tick(15),
+      page: 2,
+      marker: 'e0',
+      clock: '00:15 / 00:30',
+      playing: true,
+      scroll: ['e0'],
+    },
+    {
+      state: 'next clip generating',
+      clips: 2,
+      text: TWO_PAGES,
+      generating: [1],
+      before: [() => loadAndTick(29)],
+      last: clipEnds,
+      page: 1,
+      marker: null,
+      clock: 'Preparing audio…',
+      playing: true,
+      scroll: [],
+    },
+    {
+      state: 'next clip generating, then failed',
+      clips: 2,
+      text: TWO_PAGES,
+      generating: [1],
+      before: [
+        () => loadAndTick(29),
+        clipEnds,
+        async () => {
+          guest.generating = [];
+          guest.failed = [1];
+        },
+      ],
+      last: nextPoll,
+      page: 1,
+      marker: null,
+      clock: '00:30 / 00:30',
+      playing: false,
+      scroll: [],
+    },
+    {
+      state: 'next clip already failed',
+      clips: 2,
+      text: TWO_PAGES,
+      failed: [1],
+      before: [() => loadAndTick(29)],
+      last: clipEnds,
+      page: 1,
+      marker: null,
+      clock: '00:30 / 00:30',
+      playing: false,
+      scroll: [],
+    },
+    {
+      state: 'single clip finished',
+      clips: 1,
+      text: ONE_PAGE,
+      before: [() => loadAndTick(29)],
+      last: clipEnds,
+      page: 1,
+      marker: null,
+      clock: '00:00 / 00:30',
+      playing: false,
+      scroll: [],
+    },
+    {
+      state: 'single clip replayed (same source, no new metadata)',
+      clips: 1,
+      text: ONE_PAGE,
+      before: [() => loadAndTick(29), clipEnds, replayFromStart],
+      last: () => tick(15),
+      page: 1,
+      marker: 'b0',
+      clock: '00:15 / 00:30',
+      playing: true,
+      scroll: ['b0'],
+    },
+    {
+      state: 'multi clip finished',
+      clips: 2,
+      text: TWO_PAGES,
+      before: [
+        () => loadAndTick(29),
+        clipEndsOntoNewSource,
+        () => loadAndTick(29),
+      ],
+      last: async () => {
+        await clipEndsOntoNewSource();
+        await metadata(30);
+      },
+      page: 1,
+      marker: null,
+      clock: '00:00 / 00:30',
+      playing: false,
+      scroll: [],
+    },
+    {
+      state: 'multi clip replayed',
+      clips: 2,
+      text: TWO_PAGES,
+      before: [
+        () => loadAndTick(29),
+        clipEndsOntoNewSource,
+        () => loadAndTick(29),
+        clipEndsOntoNewSource,
+        () => metadata(30),
+        pressPlay,
+      ],
+      last: () => tick(15),
+      page: 1,
+      marker: 'b0',
+      clock: '00:15 / 00:30',
+      playing: true,
+      scroll: ['b0'],
+    },
+    {
+      state: 'clip-cap stop, on the page after the last clip',
+      clips: 2,
+      text: FOUR_PAGES,
+      before: [
+        () => loadAndTick(29),
+        clipEndsOntoNewSource,
+        () => loadAndTick(29),
+      ],
+      last: clipEnds,
+      page: 3,
+      marker: null,
+      clock: '--:-- / --:--',
+      playing: false,
+      scroll: [],
+    },
+    {
+      state: 'clip-cap stop, back on the last narrated page',
+      clips: 2,
+      text: FOUR_PAGES,
+      before: [
+        () => loadAndTick(29),
+        clipEndsOntoNewSource,
+        () => loadAndTick(29),
+        clipEnds,
+      ],
+      last: async () => {
+        fireEvent.keyDown(document, { key: 'ArrowLeft' });
+      },
+      page: 2,
+      marker: null,
+      clock: '00:00 / 00:30',
+      playing: false,
+      scroll: [],
+    },
+    {
+      state: 'clip-cap stop, replayed from the last narrated page',
+      clips: 2,
+      text: FOUR_PAGES,
+      before: [
+        () => loadAndTick(29),
+        clipEndsOntoNewSource,
+        () => loadAndTick(29),
+        clipEnds,
+        async () => {
+          fireEvent.keyDown(document, { key: 'ArrowLeft' });
+        },
+        replayFromStart,
+      ],
+      last: () => tick(15),
+      page: 2,
+      marker: 'e0',
+      clock: '00:15 / 00:30',
+      playing: true,
+      scroll: ['e0'],
+    },
+    {
+      state: 'page turn during playback, before the new clip loads',
+      clips: 2,
+      text: TWO_PAGES,
+      before: [() => loadAndTick(15)],
+      last: async () => {
+        newSource();
+        await turnTo(1);
+      },
+      page: 2,
+      marker: null,
+      clock: '00:00 / 00:00',
+      playing: true,
+      scroll: [],
+    },
+    {
+      state: 'page turn during playback, new clip playing',
+      clips: 2,
+      text: TWO_PAGES,
+      before: [
+        () => loadAndTick(15),
+        async () => {
+          newSource();
+          await turnTo(1);
+        },
+        () => metadata(30),
+      ],
+      last: () => tick(15),
+      page: 2,
+      marker: 'e0',
+      clock: '00:15 / 00:30',
+      playing: true,
+      scroll: ['e0'],
+    },
+  ];
+
+  it.each(rows)(
+    '$state: marker $marker, clock $clock',
+    async ({
+      clips,
+      text,
+      failed,
+      generating,
+      before,
+      last,
+      page,
+      marker,
+      clock,
+      playing,
+      scroll,
+    }) => {
+      guest.clips = clips;
+      guest.failed = failed ?? [];
+      guest.generating = generating ?? [];
+      await open(text);
+      for (const step of before) {
+        await step();
+      }
+      scrolled.length = 0;
+      await last();
+      const pageCount = resolvePages(undefined, text).length;
+      expect(
+        screen.getAllByText(`Page ${page} of ${pageCount}`).length
+      ).toBeGreaterThan(0);
+      expect(
+        Array.from(document.querySelectorAll('[data-active="true"]')).map((e) =>
+          e.textContent?.slice(0, 2)
+        )
+      ).toEqual(marker ? [marker] : []);
+      expect(document.querySelector('small')?.textContent).toBe(clock);
+      expect(playButton().getAttribute('aria-pressed')).toBe(String(playing));
+      expect(scrolled).toEqual(scroll);
+    },
+    10_000
+  );
+
+  it('signed in, with the first clip ready before the story loads, follows and advances the narration', async () => {
+    guest.clips = 2;
+    let releaseStory: () => void = () => undefined;
+    vi.mocked(services.getStoryByIdService).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releaseStory = () =>
+            resolve({ id: 'story-1', title: 'T', textContent: TWO_PAGES });
+        })
+    );
+    vi.mocked(services.startStoryAudioBatchService).mockImplementation(() =>
+      services.startGuestStoryAudioBatchService('story-1')
+    );
+    renderReader(false);
+    await waitFor(() =>
+      expect(services.startStoryAudioBatchService).toHaveBeenCalled()
+    );
+    await act(async () => {
+      await vi.mocked(services.startStoryAudioBatchService).mock.results[0]
+        ?.value;
+    });
+    expect(screen.getByText('Loading story...')).toBeTruthy();
+    await act(async () => {
+      releaseStory();
+    });
+    fireEvent.click(await screen.findByRole('switch'));
+    await waitReady();
+    await pressPlay();
+    await metadata(30);
+    await tick(15);
+    expect(
+      Array.from(document.querySelectorAll('[data-active="true"]')).map((e) =>
+        e.textContent?.slice(0, 2)
+      )
+    ).toEqual(['b0']);
+    expect(document.querySelector('small')?.textContent).toBe('00:15 / 00:30');
+    await clipEndsOntoNewSource();
+    await waitFor(() => expect(played).toEqual(['0.mp3', '1.mp3']));
+    expect(screen.getAllByText('Page 2 of 2').length).toBeGreaterThan(0);
+  });
+});
+
+describe('keyboard focus on the last page', () => {
+  beforeEach(() => {
+    guest.clips = 6;
+    guest.pending = 0;
+    guest.failed = [5];
+    guest.story = { id: 'story-1', title: 'T', textContent: TEXT };
+  });
+  afterEach(() => {
+    guest.failed = [];
+  });
+
+  it('scrolls every control above the sticky Play button clear of it when focused', async () => {
+    renderReader();
+    await waitFor(() => screen.getByRole('switch'));
+    fireEvent.click(screen.getByRole('switch'));
+    await waitReady();
+    await turnTo(5);
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Finish story' })).toBeTruthy();
+
+    const buttons = Array.from(document.querySelectorAll('button'));
+    const above = buttons.slice(0, buttons.indexOf(playButton()));
+    expect(above.length).toBeGreaterThan(4);
+    for (const button of above) {
+      expect(
+        button.closest(
+          '[class~="[&_button]:scroll-mb-[calc(9.5rem+env(safe-area-inset-bottom))]"]'
+        ),
+        button.textContent ?? ''
+      ).not.toBeNull();
+    }
   });
 });

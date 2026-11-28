@@ -131,7 +131,10 @@
   },
   "overrides": [
     {
-      "includes": ["lib/use-auth-state.test.ts"],
+      "includes": [
+        "lib/use-auth-state.test.ts",
+        "components/story-reader.test.tsx"
+      ],
       "linter": {
         "rules": {
           "correctness": {

@@ -859,8 +859,16 @@ function redactJson(
 }
 
 const SLOT_CHARS = /[\uE000\uE001]/g;
-const SUBSCRIPT_OWNER = /[\w\]]/;
+const SUBSCRIPT_OWNER = /[\w\]"'`]/;
 const SLOT = /\uE000(\d+)\uE001/g;
+
+function charBefore(text: string, at: number): number {
+  let i = at - 1;
+  while (i >= 0 && (text[i] === ' ' || text[i] === '\t')) {
+    i--;
+  }
+  return i;
+}
 
 function shieldJsonSpans(text: string, slots: string[]): string {
   const first = text.search(/\S/);
@@ -870,7 +878,8 @@ function shieldJsonSpans(text: string, slots: string[]): string {
   for (const [start, end] of jsonSpans(text)) {
     JSON_VALUE_START.lastIndex = start + 1;
     if (
-      SUBSCRIPT_OWNER.test(text[start - 1] ?? '') ||
+      (text[start] === '[' &&
+        SUBSCRIPT_OWNER.test(text[charBefore(text, start)] ?? '')) ||
       !JSON_VALUE_START.test(text)
     ) {
       continue;

@@ -3484,6 +3484,15 @@ describe('round 13: JSON delimiters, padded credentials, routes, classification'
     expect(out.startsWith('{"a":1}')).toBe(true);
   });
 
+  it.each([
+    'token [0]=Qa7xWb8y',
+    'token\t[0] = Qa7xWb8y',
+    'password ["a"]=Qa7xWb8y',
+    '"password" [0]: Qa7xWb8y',
+  ])('a spaced subscript still reaches its value: %s', (input) => {
+    expect(redact(input)).not.toContain('Qa7xWb8y');
+  });
+
   it('a JSON value after a sensitive key is still masked', () => {
     expect(redact('token=["Qa7x","Wb8y"] page=3')).toBe(
       'token=[REDACTED] page=3'

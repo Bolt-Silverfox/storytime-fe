@@ -358,16 +358,25 @@ const V8_FRAME =
   /^\s*at (?:((?:async |new )?[\w$.<>[\]]{1,120}) \((\S{1,820}|<anonymous>|native)\)|(\S{1,820}))$/;
 const GECKO_FRAME = /^([\w$.<>/[\]*]{0,120})@(\S{0,820})$/;
 const FILE_NAME = /^[\w.-]{1,100}$/;
+const BUILD_ASSET = /^\/_next\/static\/[\w./-]{1,300}$/;
 const PUBLIC_SCRIPTS = new Set(['/firebase-messaging-sw.js']);
+
+const isAppOrigin = (origin: string) =>
+  safeRead(
+    () => typeof window !== 'undefined' && window.location.origin === origin,
+    false
+  );
 
 function webLocation(file: string): string | undefined {
   const url = parseUrl(file);
   if (!(url && /^https?:$/.test(url.protocol))) {
     return undefined;
   }
+  if (!isAppOrigin(url.origin)) {
+    return normalisePath(url.pathname);
+  }
   const path =
-    url.pathname.startsWith('/_next/static/') ||
-    PUBLIC_SCRIPTS.has(url.pathname)
+    BUILD_ASSET.test(url.pathname) || PUBLIC_SCRIPTS.has(url.pathname)
       ? url.pathname
       : normalisePath(url.pathname);
   return `${url.origin}${path}`;
@@ -387,7 +396,7 @@ function frameLocation(location: string): string | undefined {
     return web && `${web}:${line}:${column}`;
   }
   const name = file.split(/[?#]/)[0].split(/[\\/]/).at(-1) ?? '';
-  return FILE_NAME.test(name) ? `${name}:${line}:${column}` : undefined;
+  return `${FILE_NAME.test(name) ? name : '[file]'}:${line}:${column}`;
 }
 
 function stackFrame(line: string): string | undefined {
@@ -492,6 +501,7 @@ interface Walk {
   records: number;
   active: WeakSet<object>;
   errors: WeakSet<object>;
+  http: WeakMap<object, HttpFields>;
 }
 
 type Thrown = string | Record<string, unknown> | unknown[];
@@ -524,7 +534,7 @@ function cleanRecord(
   walk: Walk
 ): Record<string, unknown> {
   const source = value as Record<string, unknown>;
-  const isError = value instanceof Error;
+  const isError = safeRead(() => value instanceof Error, false);
   const isHttp = isAxiosLike(value);
   const record: Record<string, unknown> = {};
   const name = safeRead(() => source.name, undefined);
@@ -568,19 +578,47 @@ function cleanRecord(
   } else if (cause !== undefined) {
     record.cause = cleanThrown(cause, depth + 1, walk);
   }
-  const errors = safeRead(() => source.errors, undefined);
-  if (Array.isArray(errors)) {
-    record.errors = errors
-      .slice(0, MAX_RECORDS)
-      .map((item) => cleanThrown(item, depth + 1, walk));
+  const errors = cleanMembers(source, depth, walk);
+  if (errors !== undefined) {
+    record.errors = errors;
   }
   if (isHttp) {
-    Object.assign(record, httpFields(source));
+    const fields = httpFields(source);
+    Object.assign(record, fields);
+    walk.http.set(record, fields);
   }
   if (isError) {
     walk.errors.add(record);
   }
   return record;
+}
+
+function cleanMembers(
+  source: Record<string, unknown>,
+  depth: number,
+  walk: Walk
+): Thrown[] | string | undefined {
+  const errors = safeRead(() => source.errors, THREW);
+  const isArray = safeRead(() => Array.isArray(errors), THREW);
+  if (errors === THREW || isArray === THREW) {
+    return UNREADABLE;
+  }
+  if (!isArray) {
+    return undefined;
+  }
+  const members = errors as unknown[];
+  const length = safeRead(() => members.length, 0);
+  const out: Thrown[] = [];
+  for (let i = 0; i < Math.min(length, MAX_RECORDS); i++) {
+    out.push(
+      cleanThrown(
+        safeRead(() => members[i], undefined),
+        depth + 1,
+        walk
+      )
+    );
+  }
+  return out;
 }
 
 function toException(record: Record<string, unknown>, walk: Walk): Error {
@@ -640,6 +678,7 @@ function errorEntry(
     records: 0,
     active: new WeakSet(),
     errors: new WeakSet(),
+    http: new WeakMap(),
   };
   const cleaned = error === undefined ? undefined : cleanThrown(error, 0, walk);
   const record =
@@ -656,18 +695,7 @@ function errorEntry(
           walk
         )
       : undefined;
-  const isHttp = safeRead(
-    () => !!error && typeof error === 'object' && isAxiosLike(error),
-    false
-  );
-  const {
-    name,
-    message: recordMessage,
-    code,
-    status,
-    method,
-    path,
-  } = record ?? {};
+  const fields = record && walk.http.get(record);
   return {
     message: safeMessage,
     data: [
@@ -679,15 +707,12 @@ function errorEntry(
     context,
     tags: cleanTags(read('tags')),
     http:
-      record && isHttp
-        ? ({
-            name: String(name),
-            message: String(recordMessage),
-            ...(code === undefined ? {} : { code }),
-            ...(status === undefined ? {} : { status }),
-            ...(method === undefined ? {} : { method }),
-            ...(path === undefined ? {} : { path }),
-          } as HttpSummary)
+      record && fields
+        ? {
+            name: String(record.name),
+            message: typeof record.message === 'string' ? record.message : '',
+            ...fields,
+          }
         : undefined,
   };
 }

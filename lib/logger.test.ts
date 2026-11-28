@@ -90,6 +90,9 @@ const makeAxiosError = (
     }
   );
 
+const APP = window.location.origin;
+const USERINFO_APP = APP.replace('://', '://user:pw@');
+
 const networkError = (url = '/kids/7') =>
   new AxiosError('Network Error', 'ERR_NETWORK', {
     url,
@@ -580,6 +583,38 @@ describe('hostile errors never stop reporting', () => {
     expect(() => logger.error('Failed to fetch kids', revoked)).not.toThrow();
   });
 
+  it('a revoked proxy thrown as the error still reports the listed message', () => {
+    const { proxy, revoke } = Proxy.revocable({}, {});
+    revoke();
+    logger.error('Failed to fetch kids', proxy);
+    expect(spies.error).toHaveBeenCalledOnce();
+    expect(sentry.captureMessage).toHaveBeenCalledWith(
+      'Failed to fetch kids',
+      expect.objectContaining({ level: 'error' })
+    );
+  });
+
+  it('an unreadable errors collection keeps the parent report', () => {
+    const { proxy, revoke } = Proxy.revocable([], {});
+    revoke();
+    const err = Object.assign(new Error('e'), { errors: proxy });
+    logger.error('Failed to fetch kids', err);
+    expect(sentry.captureException).toHaveBeenCalledOnce();
+    expect(exception().errors).toBe('[unreadable]');
+  });
+
+  it('builds the errors array itself, ignoring overridden array methods', () => {
+    const raw = { config: { headers: { Authorization: 'Bearer hdrsecret' } } };
+    const members = [new Error('a')];
+    Object.assign(members, { slice: () => ({ map: () => [raw] }) });
+    logger.error(
+      'Failed to fetch kids',
+      Object.assign(new Error('e'), { errors: members })
+    );
+    expect(exception().errors).toHaveLength(1);
+    expect(fieldsMatching(sinks(), 'hdrsecret')).toEqual([]);
+  });
+
   it('a throwing console does not stop Sentry reporting or leave the flag set', () => {
     spies.error.mockImplementation(() => {
       throw new Error('console broke');
@@ -630,7 +665,7 @@ describe('stack frames', () => {
     expect(
       stackOf(
         [
-          '    at loadKids (https://app.example.com/_next/static/chunks/page.js?token=Kq7Lm:10:5)',
+          `    at loadKids (${APP}/_next/static/chunks/page.js?token=Kq7Lm:10:5)`,
           'Caused by: SyntaxError: Unexpected token "Kq7Lm"',
           '    at JSON.parse (<anonymous>)',
         ],
@@ -639,7 +674,7 @@ describe('stack frames', () => {
     ).toBe(
       [
         'Error: [omitted]',
-        '    at loadKids (https://app.example.com/_next/static/chunks/page.js:10:5)',
+        `    at loadKids (${APP}/_next/static/chunks/page.js:10:5)`,
       ].join('\n')
     );
     expect(fieldsMatching(sinks(), 'Kq7Lm')).toEqual([]);
@@ -648,20 +683,20 @@ describe('stack frames', () => {
   it('normalises page paths and keeps build output and the service worker', () => {
     expect(
       stackOf([
-        '    at c (https://app.example.com/story/kq7lm:5:6)',
-        '    at d (https://user:pw@app.example.com/_next/static/chunks/main.js:7:8)',
-        '    at e (https://app.example.com/stories/AdaLovelace/reader.js:9:1)',
-        '    at f (https://app.example.com/firebase-messaging-sw.js:3:4)',
-        'load@https://app.example.com/%61uth/kids/Kq7Lm.js:1:2',
+        `    at c (${APP}/story/kq7lm:5:6)`,
+        `    at d (${USERINFO_APP}/_next/static/chunks/main.js:7:8)`,
+        `    at e (${APP}/stories/AdaLovelace/reader.js:9:1)`,
+        `    at f (${APP}/firebase-messaging-sw.js:3:4)`,
+        `load@${APP}/%61uth/kids/Kq7Lm.js:1:2`,
       ])
     ).toBe(
       [
         'Error: [omitted]',
-        '    at c (https://app.example.com/story/:id:5:6)',
-        '    at d (https://app.example.com/_next/static/chunks/main.js:7:8)',
-        '    at e (https://app.example.com/stories/:id/:id:9:1)',
-        '    at f (https://app.example.com/firebase-messaging-sw.js:3:4)',
-        'load@https://app.example.com/auth/kids/:id:1:2',
+        `    at c (${APP}/story/:id:5:6)`,
+        `    at d (${APP}/_next/static/chunks/main.js:7:8)`,
+        `    at e (${APP}/stories/:id/:id:9:1)`,
+        `    at f (${APP}/firebase-messaging-sw.js:3:4)`,
+        `load@${APP}/auth/kids/:id:1:2`,
       ].join('\n')
     );
   });
@@ -689,23 +724,50 @@ describe('stack frames', () => {
     expect(fieldsMatching(sinks(), /kq7lm|Kq7Lm/)).toEqual([]);
   });
 
-  it('a message that fakes a frame does not become one', () => {
+  it('drops the origin and normalises the path of a frame on another host', () => {
     expect(
-      stackOf(
-        ['    at real (https://app.example.com/_next/static/a.js:1:1)'],
-        'x\n    at Kq7Lm (a.js:1:1)'
-      )
+      stackOf([
+        '    at a (https://evil.example/_next/static/Kq7Lm.js:1:2)',
+        `    at b (${APP}/_next/static/chunks/a%20Kq7Lm.js:3:4)`,
+      ])
     ).toBe(
       [
         'Error: [omitted]',
-        '    at real (https://app.example.com/_next/static/a.js:1:1)',
+        '    at a (/:id/:id/:id:1:2)',
+        `    at b (${APP}/:id/:id/:id/:id:3:4)`,
       ].join('\n')
+    );
+  });
+
+  it('marks an unsupported file name and keeps the frames after it', () => {
+    expect(
+      stackOf([
+        '    at a (/app/stories/[id].js:1:1)',
+        '    at b (/app/lib/y.ts:2:2)',
+      ])
+    ).toBe(
+      ['Error: [omitted]', '    at a ([file]:1:1)', '    at b (y.ts:2:2)'].join(
+        '\n'
+      )
+    );
+  });
+
+  it('a message that fakes a frame does not become one', () => {
+    expect(
+      stackOf(
+        [`    at real (${APP}/_next/static/a.js:1:1)`],
+        'x\n    at Kq7Lm (a.js:1:1)'
+      )
+    ).toBe(
+      ['Error: [omitted]', `    at real (${APP}/_next/static/a.js:1:1)`].join(
+        '\n'
+      )
     );
   });
 
   it('keeps a headerless stack whose frame contains the message text', () => {
     const err = new Error('app.js');
-    err.stack = 'load@https://app.example.com/_next/static/chunks/app.js:10:5';
+    err.stack = `load@${APP}/_next/static/chunks/app.js:10:5`;
     logger.error('Failed to fetch kids', err);
     expect(exception().stack).toBe(err.stack);
   });
@@ -755,6 +817,40 @@ describe('axios errors reach Sentry with context', () => {
         /qsecret|hdrsecret|bodysecret|leak@example|9f1c2d3e/
       )
     ).toEqual([]);
+  });
+
+  it('the HTTP summary uses only validated fields', () => {
+    logger.error('Failed to fetch kids', {
+      isAxiosError: true,
+      status: 700,
+      code: 42,
+      config: { url: '/kids', method: 'get' },
+    });
+    const [, hint] = sentry.captureMessage.mock.calls[0] as [string, Hint];
+    expect(hint.contexts.http_error).toEqual({
+      name: 'AxiosError',
+      message: '',
+      method: 'GET',
+      path: '/kids',
+    });
+    expect(hint.fingerprint).not.toContain('700');
+  });
+
+  it('classifies an axios error once, even if isAxiosError changes', () => {
+    let reads = 0;
+    const err = {
+      get isAxiosError() {
+        reads++;
+        return reads === 1;
+      },
+      config: { url: '/kids/7', method: 'get' },
+      status: 401,
+    };
+    logger.error('Failed to fetch kids', err, { expected: true });
+    expect(sentry.captureMessage).toHaveBeenCalledWith(
+      'Expected failure: unauthorised GET /kids/:id',
+      expect.objectContaining({ level: 'warning' })
+    );
   });
 
   it('different endpoints get different fingerprints', () => {

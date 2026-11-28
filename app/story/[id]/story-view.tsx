@@ -8,6 +8,7 @@ import StoryReader from '@/components/story-reader';
 import Modal from '@/components/ui/modal';
 import VoiceSelector, { type SelectedVoice } from '@/components/voice-selector';
 import { useStoryQuota } from '@/lib/hooks/use-story-quota';
+import { isExpectedFailure, logger } from '@/lib/logger';
 import { getReadAlongDefault } from '@/lib/reader/read-along-preference';
 import {
   addFavoriteService,
@@ -87,7 +88,9 @@ export default function StoryView({ storyId }: { storyId: string }) {
         setIsFavorite(true);
       }
     } catch (err) {
-      console.error('Failed to update favorite:', err);
+      logger.error('Failed to update favorite', err, {
+        expected: isExpectedFailure(err),
+      });
     } finally {
       setFavoriteBusy(false);
     }
@@ -170,7 +173,9 @@ export default function StoryView({ storyId }: { storyId: string }) {
         void refetchQuota();
         return;
       }
-      console.error('Failed to prepare story:', err);
+      logger.error('Failed to prepare story', err, {
+        expected: isExpectedFailure(err),
+      });
       setStartError('We couldn’t open this story. Please try again.');
     } finally {
       setPreparing(false);

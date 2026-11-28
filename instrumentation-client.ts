@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/nextjs';
+import { isLoggerConsoleEmit } from '@/lib/logger';
 import { beforeSend, beforeSendTransaction } from '@/lib/sentry-scrub';
 
 // Client-side-only Sentry. We deliberately do NOT add the server/edge
@@ -20,6 +21,13 @@ Sentry.init({
   traceLifecycle: 'static',
   beforeSend,
   beforeSendTransaction,
+  // The logger records its own breadcrumb for warn/error; drop the duplicate
+  // that Sentry's console integration would add for the logger's console write.
+  // Console breadcrumbs from raw console.* calls are untouched.
+  beforeBreadcrumb: (breadcrumb) =>
+    breadcrumb.category === 'console' && isLoggerConsoleEmit()
+      ? null
+      : breadcrumb,
 });
 
 // Instruments App Router client-side navigations for tracing.

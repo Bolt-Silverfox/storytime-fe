@@ -2,6 +2,7 @@
 import { motion as m } from 'motion/react';
 import { useEffect, useState } from 'react';
 import KidsCard from '@/components/kids-card';
+import { isExpectedFailure, logger } from '@/lib/logger';
 import { getKidsService } from '@/lib/services';
 import kid1 from '@/public/kid-3.svg';
 import kid3 from '@/public/kid-3.svg';
@@ -30,7 +31,9 @@ const KidsRow = () => {
         }));
         setKids(mappedKids);
       } catch (error) {
-        console.error('Failed to fetch kids:', error);
+        logger.error('Failed to fetch kids', error, {
+          expected: isExpectedFailure(error),
+        });
         setKids([]);
       } finally {
         setLoading(false);

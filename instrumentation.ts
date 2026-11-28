@@ -40,6 +40,7 @@ export async function register() {
     const { registerTelemetry } = await import('./lib/otel');
     registerTelemetry();
   } catch (error) {
+    // biome-ignore lint/suspicious/noConsole: bootstrap diagnostics must not depend on the logger/Sentry
     console.warn('[OpenTelemetry] disabled - failed to register:', error);
   }
 }

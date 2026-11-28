@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { isExpectedFailure, logger } from '@/lib/logger';
 import {
   getAvailableVoicesService,
   getPreferredVoiceService,
@@ -86,7 +87,9 @@ const VoiceSelector = ({
           setSelectedVoiceId(preferred.id);
         }
       } catch (err) {
-        console.error('Failed to fetch voices:', err);
+        logger.error('Failed to fetch voices', err, {
+          expected: isExpectedFailure(err),
+        });
         setVoices([]);
       } finally {
         setLoading(false);
@@ -118,7 +121,9 @@ const VoiceSelector = ({
     const audio = new Audio(voice.previewUrl);
     previewAudioRef.current = audio;
     audio.play().catch((playError) => {
-      console.error('Error playing audio:', playError);
+      logger.error('Error playing audio', playError, {
+        expected: isExpectedFailure(playError),
+      });
     });
   };
 

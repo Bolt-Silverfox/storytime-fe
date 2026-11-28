@@ -1,6 +1,13 @@
 'use client';
 
-import { type ReactNode, useEffect, useRef } from 'react';
+import {
+  type ReactNode,
+  type RefObject,
+  useEffect,
+  useMemo,
+  useRef,
+} from 'react';
+import { type SentenceRange, sentencesOf } from '@/lib/reader/read-along';
 import { progressPercent, swipeDirection } from '@/lib/reader/reader-state';
 
 const NAV_BUTTON =
@@ -17,11 +24,50 @@ const isEditable = (target: EventTarget | null): boolean => {
   );
 };
 
+const SCROLL_KEYS = new Set([
+  'PageDown',
+  'PageUp',
+  'ArrowDown',
+  'ArrowUp',
+  'Home',
+  'End',
+  ' ',
+]);
+
+const activatesOnSpace = (target: EventTarget | null): boolean => {
+  const el = target as HTMLElement | null;
+  return (
+    !!el &&
+    typeof el.closest === 'function' &&
+    !!el.closest('button, summary, [role="button"], [role="switch"]')
+  );
+};
+
+const onScrollbar = (e: PointerEvent): boolean => {
+  const el = e.target;
+  if (!(el instanceof Element)) {
+    return false;
+  }
+  const isViewport = el === document.documentElement;
+  const box = el.getBoundingClientRect();
+  const right = isViewport
+    ? el.clientWidth
+    : box.left + el.clientLeft + el.clientWidth;
+  const bottom = isViewport
+    ? el.clientHeight
+    : box.top + el.clientTop + el.clientHeight;
+  return (
+    (el.scrollHeight > el.clientHeight && e.clientX >= right) ||
+    (el.scrollWidth > el.clientWidth && e.clientY >= bottom)
+  );
+};
+
 interface PageViewProps {
   pages: string[];
   page: number;
-  // True while this page is the one being narrated.
-  highlighted: boolean;
+  // Index of the sentence being narrated on this page (estimated), or null for
+  // no highlight.
+  activeSentence: number | null;
   onNext: () => void;
   onPrev: () => void;
   // Rendered under the last page only (finish / quiz actions).
@@ -30,10 +76,57 @@ interface PageViewProps {
   pageStatus?: ReactNode;
 }
 
+// Tint plus an underline: the tint alone is too close to the page colour to
+// find at a glance, the brand underline gives the second, stronger cue (and no
+// reflow, unlike a heavier font weight).
+const ACTIVE_SENTENCE =
+  'rounded-sm bg-reader-hl text-reader-hl-fg scroll-mb-32 underline decoration-brand-text decoration-2 dark:decoration-reader-hl-fg underline-offset-4 [box-decoration-break:clone]';
+
+// scroll-mb-32 keeps the sentence clear of the sticky Play button when
+// scrollIntoView aligns it to the panel bottom. In dark mode the brand colour
+// is too dim against the tint (2.6:1), so the underline takes the text colour.
+
+// Follow-scroll backs off this long after the user scrolls by hand.
+const USER_SCROLL_PAUSE_MS = 4000;
+// A smooth scroll of our own keeps emitting scroll events for about this long.
+const OWN_SCROLL_SETTLE_MS = 1000;
+
+const renderSentences = (
+  text: string,
+  sentences: SentenceRange[],
+  active: number | null,
+  activeRef: RefObject<HTMLSpanElement | null>
+): ReactNode[] => {
+  const out: ReactNode[] = [];
+  let at = 0;
+  sentences.forEach((s, i) => {
+    if (s.start > at) {
+      out.push(text.slice(at, s.start));
+    }
+    const isActive = i === active;
+    out.push(
+      <span
+        key={s.start}
+        ref={isActive ? activeRef : undefined}
+        data-sentence={i}
+        data-active={isActive ? 'true' : undefined}
+        className={isActive ? ACTIVE_SENTENCE : undefined}
+      >
+        {text.slice(s.start, s.end)}
+      </span>
+    );
+    at = s.end;
+  });
+  if (at < text.length) {
+    out.push(text.slice(at));
+  }
+  return out;
+};
+
 const PageView = ({
   pages,
   page,
-  highlighted,
+  activeSentence,
   onNext,
   onPrev,
   endActions,
@@ -70,6 +163,92 @@ const PageView = ({
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, []);
+
+  const text = pages[page] ?? '';
+  const sentences = useMemo(() => sentencesOf(text), [text]);
+  const activeRef = useRef<HTMLSpanElement | null>(null);
+  const lastUserScroll = useRef(Number.NEGATIVE_INFINITY);
+  const lastOwnScroll = useRef(Number.NEGATIVE_INFINITY);
+
+  // Wheel, touch-drag, scroll keys and a scrollbar drag come
+  // only from the user (scrollIntoView fires none of them), so they mark
+  // manual scrolling without catching our own.
+  useEffect(() => {
+    const mark = () => {
+      lastUserScroll.current = Date.now();
+    };
+    let draggingScrollbar = false;
+    const onPointerDown = (e: PointerEvent) => {
+      draggingScrollbar = onScrollbar(e);
+    };
+    const onPointerUp = () => {
+      draggingScrollbar = false;
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (
+        !e.defaultPrevented &&
+        SCROLL_KEYS.has(e.key) &&
+        !isEditable(e.target) &&
+        !(e.key === ' ' && activatesOnSpace(e.target))
+      ) {
+        mark();
+      }
+    };
+    // Other scrolls with no such input only show up as scroll events; ours
+    // also do, so ignore those shortly after our own call.
+    const onScroll = () => {
+      if (
+        draggingScrollbar ||
+        Date.now() - lastOwnScroll.current > OWN_SCROLL_SETTLE_MS
+      ) {
+        mark();
+      }
+    };
+    const passiveCapture = { capture: true, passive: true };
+    window.addEventListener('wheel', mark, { passive: true });
+    window.addEventListener('touchmove', mark, { passive: true });
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('pointerdown', onPointerDown, passiveCapture);
+    window.addEventListener('pointerup', onPointerUp, passiveCapture);
+    window.addEventListener('pointercancel', onPointerUp, passiveCapture);
+    window.addEventListener('scroll', onScroll, passiveCapture);
+    return () => {
+      window.removeEventListener('wheel', mark);
+      window.removeEventListener('touchmove', mark);
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('pointerdown', onPointerDown, {
+        capture: true,
+      });
+      window.removeEventListener('pointerup', onPointerUp, { capture: true });
+      window.removeEventListener('pointercancel', onPointerUp, {
+        capture: true,
+      });
+      window.removeEventListener('scroll', onScroll, { capture: true });
+    };
+  }, []);
+
+  // Keep the spoken sentence in view on long pages / small screens. Only that
+  // span scrolls into view ('nearest' = no movement when already visible).
+  useEffect(() => {
+    if (
+      activeSentence === null ||
+      Date.now() - lastUserScroll.current < USER_SCROLL_PAUSE_MS
+    ) {
+      return;
+    }
+    const el = activeRef.current;
+    if (!el || typeof el.scrollIntoView !== 'function') {
+      return;
+    }
+    const reduce =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    lastOwnScroll.current = Date.now();
+    el.scrollIntoView({
+      block: 'nearest',
+      behavior: reduce ? 'auto' : 'smooth',
+    });
+  }, [activeSentence]);
 
   if (count === 0) {
     return (
@@ -139,13 +318,11 @@ const PageView = ({
           key={page}
           data-testid='reader-page-text'
           id={`reading-page-${page}`}
-          className={`min-h-[12rem] break-words py-2 text-left font-abeezee text-xl not-italic leading-9 transition-colors duration-300 motion-safe:animate-[reader-page-in_250ms_ease-out] ${
-            highlighted
-              ? 'bg-reader-hl font-medium text-reader-hl-fg'
-              : 'text-strong'
-          }`}
+          className={`min-h-[12rem] break-words py-2 text-left font-abeezee text-xl not-italic leading-9 motion-safe:animate-[reader-page-in_250ms_ease-out] text-strong`}
         >
-          {pages[page]}
+          {/* One continuous text flow: the spans add no whitespace of their own,
+              so selecting and copying yields the page text unchanged. */}
+          {renderSentences(text, sentences, activeSentence, activeRef)}
         </div>
         {pageStatus}
       </div>

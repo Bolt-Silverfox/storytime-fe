@@ -1,6 +1,13 @@
 import { useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
-import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
 import { ensureGuestSession } from '@/lib/guest';
 import { GUEST_HISTORY_QUERY_KEY } from '@/lib/hooks/use-guest-history';
 import { STORY_QUOTA_QUERY_KEY } from '@/lib/hooks/use-story-quota';
@@ -13,6 +20,7 @@ import {
   saveReadingPosition,
 } from '@/lib/progress-store';
 import { pagesSignature, resolvePages } from '@/lib/reader/paginate';
+import { activeSentence, sentencesOf } from '@/lib/reader/read-along';
 import {
   alignClip,
   clipEndAction,
@@ -78,6 +86,8 @@ const StoryReader = ({
   storyId,
   voiceId,
   isGuest = false,
+  readAlong,
+  onReadAlongChange,
 }: {
   img: string;
   title: string;
@@ -92,9 +102,19 @@ const StoryReader = ({
   // When true, read via the guest endpoint (quota-limited) instead of the
   // authenticated one.
   isGuest?: boolean;
+  // The read-along switch can be owned by the parent so it survives this
+  // component unmounting (modal closed, "Change voice"). Uncontrolled when
+  // omitted.
+  readAlong?: boolean;
+  onReadAlongChange?: (on: boolean) => void;
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isChecked, setIsChecked] = useState(false);
+  const [localChecked, setLocalChecked] = useState(false);
+  const isChecked = readAlong ?? localChecked;
+  const setIsChecked = (on: boolean) => {
+    setLocalChecked(on);
+    onReadAlongChange?.(on);
+  };
   const [story, setStory] = useState<Story | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -138,7 +158,26 @@ const StoryReader = ({
   const [audioRetry, setAudioRetry] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [clipEnded, setClipEnded] = useState(false);
+  // A new clip starts from zero with an unknown length. Reset the clock in the
+  // same batch as the clip change so the new page never renders against the
+  // old clip's playhead (which would flash its last sentence).
+  const rewindClock = () => {
+    setCurrentTime(0);
+    setClipEnded(false);
+  };
+  const resetClock = () => {
+    rewindClock();
+    setDuration(0);
+  };
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(
+    null
+  );
+  const attachAudio = useCallback((el: HTMLAudioElement | null) => {
+    audioRef.current = el;
+    setAudioElement(el);
+  }, []);
   const readyClipsRef = useRef<Map<number, string>>(new Map());
   const clipIndexRef = useRef(0);
   const isPlayingRef = useRef(false);
@@ -292,6 +331,7 @@ const StoryReader = ({
       setFailedIndices(new Set());
       setAudioParagraphs([]);
       setAudioUrl(null);
+      resetClock();
       setAudioSounding(false);
       setCurrentClip(0);
       setIsPlaying(false);
@@ -398,6 +438,7 @@ const StoryReader = ({
           clipIndexRef.current = next;
           setCurrentClip(next);
           setAudioUrl(readyByIndex.get(next) as string);
+          resetClock();
           if (isCheckedRef.current) {
             dispatch({ type: 'clip', clip: next, from: next - 1 });
           }
@@ -523,7 +564,7 @@ const StoryReader = ({
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: audioUrl is a deliberate trigger so listeners attach when the <audio> element (re)mounts on a new clip; the body reads the element via ref, not audioUrl directly.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: audioElement and audioUrl are triggers (the element mounting, or switching clip); the body reads the live element via ref, since the state can still hold one that just unmounted.
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) {
@@ -535,6 +576,7 @@ const StoryReader = ({
     // At clip end, advance to the next paragraph; wait if it isn't ready yet;
     // stop (and reset) once the whole story has been read through.
     const handleEnded = () => {
+      setClipEnded(true);
       const current = clipIndexRef.current;
       const next = current + 1;
       const action = clipEndAction({
@@ -550,6 +592,7 @@ const StoryReader = ({
         clipIndexRef.current = next;
         setCurrentClip(next);
         setAudioUrl(readyClipsRef.current.get(next) ?? null);
+        resetClock();
         // Turn the page with the narration (only if the reader is on it).
         if (isCheckedRef.current) {
           dispatch({ type: 'clip', clip: next, from: current });
@@ -574,6 +617,9 @@ const StoryReader = ({
       // Clips cover only the first pages of a long story: stop on the next
       // page, the story isn't finished.
       if (action === 'stop') {
+        // The ended clip's playhead must not outlive the narration: going back
+        // a page would otherwise light that clip's last sentence again.
+        rewindClock();
         dispatch({ type: 'clip', clip: next, from: current });
         return;
       }
@@ -587,7 +633,13 @@ const StoryReader = ({
         0;
       clipIndexRef.current = first;
       setCurrentClip(first);
-      setAudioUrl(readyClipsRef.current.get(first) ?? null);
+      const firstUrl = readyClipsRef.current.get(first) ?? null;
+      setAudioUrl(firstUrl);
+      if (firstUrl === audio.getAttribute('src')) {
+        rewindClock();
+      } else {
+        resetClock();
+      }
       if (isCheckedRef.current && !singleFileRef.current) {
         dispatch({ type: 'clip', clip: first, from: current });
       }
@@ -608,17 +660,14 @@ const StoryReader = ({
       audio.removeEventListener('loadedmetadata', updateDuration);
       audio.removeEventListener('ended', handleEnded);
     };
-    // Re-run when the audio element (re)mounts on a new clip URL, so the
-    // listeners attach to the element that actually exists. With [] the effect
-    // ran once before any <audio> was rendered and never attached anything.
-  }, [audioUrl]);
+  }, [audioElement, audioUrl]);
 
   // A new or removed <audio> element starts silent: its predecessor's
   // `playing` must not leak into it (unmounting fires no `emptied`).
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reset is keyed on the element changing, not read from it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset is keyed on the element or its clip changing, not read from them.
   useEffect(() => {
     setAudioSounding(false);
-  }, [audioUrl]);
+  }, [audioElement, audioUrl]);
 
   // When the current clip changes (next paragraph), resume playback if we were
   // already playing.
@@ -726,6 +775,7 @@ const StoryReader = ({
     setAudioLoading(false);
     setCurrentClip(target);
     setAudioUrl(readyClipsRef.current.get(target) ?? null);
+    resetClock();
     return 'switched';
   };
 
@@ -765,6 +815,9 @@ const StoryReader = ({
     }
     if (!(audioRef.current && audioUrl)) {
       return;
+    }
+    if (clipEnded) {
+      rewindClock();
     }
     audioRef.current.play().catch((error) => {
       console.error('Failed to play audio:', error);
@@ -813,6 +866,29 @@ const StoryReader = ({
   });
   const hasQuiz = mode === 'interactive' && (story?.questions?.length ?? 0) > 0;
 
+  // Estimated sentence being spoken: how far through the clip we are, spread
+  // over the page's sentences by length. Single-file guests have no per-page
+  // clips, so no highlight.
+  const narratedText = pages[narratedPage] ?? '';
+  const narratedSentences = useMemo(
+    () => sentencesOf(narratedText),
+    [narratedText]
+  );
+  const narratedSentence = activeSentence(
+    narratedText,
+    narratedSentences,
+    duration > 0 ? currentTime / duration : Number.NaN
+  );
+
+  // The clock belongs to the narrated clip. While the reader sits on another
+  // page (before Play re-aims the narration there) it says nothing about this
+  // page, so don't show the other clip's length.
+  const clockIsForThisPage =
+    !(isChecked && useAudioParagraphs) || reader.page === narratedPage;
+  const timeLabel = clockIsForThisPage
+    ? `${formatTime(currentTime)} / ${formatTime(duration)}`
+    : '--:-- / --:--';
+
   if (loading) {
     return (
       <div className='flex items-center justify-center h-64'>
@@ -839,11 +915,11 @@ const StoryReader = ({
   const synthMoving = audioSounding && Boolean(audioUrl);
 
   return (
-    <div>
+    <div className='[&_button]:scroll-mb-[calc(9.5rem+env(safe-area-inset-bottom))]'>
       {/* Hidden audio element */}
       {audioUrl && (
         <audio
-          ref={audioRef}
+          ref={attachAudio}
           src={audioUrl}
           preload='metadata'
           onPlaying={() => setAudioSounding(true)}
@@ -911,9 +987,7 @@ const StoryReader = ({
               </button>
             </div>
             <small className='text-body text-base not-italic font-normal leading-5 font-abeezee mt-2'>
-              {audioLoading || audioGenerating
-                ? 'Preparing audio…'
-                : `${formatTime(currentTime)} / ${formatTime(duration)}`}
+              {audioLoading || audioGenerating ? 'Preparing audio…' : timeLabel}
             </small>
           </div>
         ) : (
@@ -925,7 +999,7 @@ const StoryReader = ({
               <small className='text-body text-base not-italic font-normal leading-5 font-abeezee mt-2'>
                 {audioLoading || audioGenerating
                   ? 'Preparing audio…'
-                  : `${formatTime(currentTime)} / ${formatTime(duration)}`}
+                  : timeLabel}
               </small>
             </div>
             <div className='bg-surface flex justify-center items-center gap-3 shadow-[0px_0px_17px_0px_rgba(236,64,7,0.10)] px-6 py-2.5 rounded-[3.125rem] border-[0.5px] border-solid border-[#FAF4F2] font-qilka'>
@@ -1044,10 +1118,15 @@ const StoryReader = ({
               <PageView
                 pages={pages}
                 page={reader.page}
-                highlighted={
-                  isPlaying &&
+                activeSentence={
+                  // Playing, or paused part-way through the clip (keep the
+                  // "where we are" marker); hidden at the start / once finished.
+                  !clipEnded &&
+                  (isPlaying || currentTime > 0) &&
                   useAudioParagraphs &&
                   reader.page === narratedPage
+                    ? narratedSentence
+                    : null
                 }
                 onNext={() => turnPage('next')}
                 onPrev={() => turnPage('prev')}
@@ -1127,7 +1206,7 @@ const StoryReader = ({
           disabled={!canPlay}
           aria-label={isPlaying ? 'Pause' : 'Play'}
           aria-pressed={isPlaying}
-          className={`mt-12 rounded-full transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 ${
+          className={`sticky bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-10 mt-12 rounded-full shadow-lg transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 ${
             canPlay ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'
           }`}
         >

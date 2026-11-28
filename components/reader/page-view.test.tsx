@@ -12,7 +12,7 @@ const setup = (over: Partial<Parameters<typeof PageView>[0]> = {}) => {
     <PageView
       pages={pages}
       page={1}
-      highlighted={false}
+      activeSentence={null}
       onNext={onNext}
       onPrev={onPrev}
       endActions={<button type='button'>Finish story</button>}
@@ -110,7 +110,7 @@ describe('PageView', () => {
       <PageView
         pages={pages}
         page={2}
-        highlighted={false}
+        activeSentence={null}
         onNext={onNext}
         onPrev={onPrev}
       />
@@ -132,16 +132,167 @@ describe('PageView', () => {
     expect(screen.getByText('Finish story')).toBeTruthy();
   });
 
-  it('marks the page being narrated with the reader highlight tokens', () => {
-    setup({ highlighted: true });
-    expect(screen.getByTestId('reader-page-text').className).toContain(
-      'bg-reader-hl'
+  it('highlights only the active sentence, not the whole page', () => {
+    setup({
+      pages: ['One two. Three four! Five six?'],
+      page: 0,
+      activeSentence: 1,
+    });
+    const text = screen.getByTestId('reader-page-text');
+    expect(text.className).not.toContain('bg-reader-hl');
+    const active = text.querySelectorAll('[data-active="true"]');
+    expect(active).toHaveLength(1);
+    expect(active[0]?.textContent).toBe('Three four!');
+    expect(active[0]?.className).toContain('bg-reader-hl');
+  });
+
+  it('shows no highlight when activeSentence is null', () => {
+    setup({ pages: ['One two. Three four!'], page: 0 });
+    expect(document.querySelector('[data-active]')).toBeNull();
+  });
+
+  it('keeps the text content identical so copy works', () => {
+    const t = 'One two.  Three four!\nFive six?';
+    setup({ pages: [t], page: 0, activeSentence: 2 });
+    expect(screen.getByTestId('reader-page-text').textContent).toBe(t);
+  });
+
+  it('adds no live region or role to the highlight; only the page is announced', () => {
+    setup({ pages: ['One two. Three four!'], page: 0, activeSentence: 0 });
+    const status = screen.getByRole('status');
+    expect(status.textContent).toBe('Page 1 of 1');
+    const span = document.querySelector('[data-active]') as HTMLElement;
+    expect(span.getAttribute('role')).toBeNull();
+    expect(span.hasAttribute('aria-live')).toBe(false);
+    expect(document.querySelectorAll('[aria-live]')).toHaveLength(1);
+  });
+
+  it('scrolls only the active span into view, nearest, smooth unless reduced motion', () => {
+    const scroll = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scroll;
+    const mm = vi.fn(() => ({ matches: false }));
+    window.matchMedia = mm as unknown as typeof window.matchMedia;
+    const { rerender } = setup({
+      pages: ['One two. Three four!'],
+      page: 0,
+      activeSentence: 0,
+    });
+    expect(scroll).toHaveBeenCalledWith({
+      block: 'nearest',
+      behavior: 'smooth',
+    });
+    mm.mockReturnValue({ matches: true });
+    rerender(
+      <PageView
+        pages={['One two. Three four!']}
+        page={0}
+        activeSentence={1}
+        onNext={() => undefined}
+        onPrev={() => undefined}
+      />
     );
-    cleanup();
-    setup({ highlighted: false });
-    expect(screen.getByTestId('reader-page-text').className).not.toContain(
-      'bg-reader-hl'
+    expect(scroll).toHaveBeenLastCalledWith({
+      block: 'nearest',
+      behavior: 'auto',
+    });
+    expect(scroll).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not scroll again on a re-render with the same sentence', () => {
+    const scroll = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scroll;
+    const props = {
+      pages: ['One two. Three four!'],
+      page: 0,
+      activeSentence: 1,
+      onPrev: () => undefined,
+    };
+    const { rerender } = setup(props);
+    expect(scroll).toHaveBeenCalledTimes(1);
+    rerender(<PageView {...props} onNext={() => undefined} />);
+    rerender(<PageView {...props} onNext={() => undefined} />);
+    expect(scroll).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps leading and trailing whitespace in the text content', () => {
+    const t = '  One two. Three four!  ';
+    setup({ pages: [t], page: 0, activeSentence: 0 });
+    expect(screen.getByTestId('reader-page-text').textContent).toBe(t);
+  });
+
+  it('backs off the follow-scroll for 4 s after the user scrolls', () => {
+    const scroll = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scroll;
+    let now = 1_000_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    const props = {
+      pages: ['One. Two. Three. Four.'],
+      page: 0,
+      onNext: () => undefined,
+      onPrev: () => undefined,
+    };
+    const { rerender } = setup({ ...props, activeSentence: 0 });
+    expect(scroll).toHaveBeenCalledTimes(1);
+    fireEvent.wheel(window);
+    now += 1000;
+    rerender(<PageView {...props} activeSentence={1} />);
+    expect(scroll).toHaveBeenCalledTimes(1);
+    fireEvent.touchMove(window);
+    now += 3000;
+    rerender(<PageView {...props} activeSentence={2} />);
+    expect(scroll).toHaveBeenCalledTimes(1);
+    now += 4100;
+    rerender(<PageView {...props} activeSentence={3} />);
+    expect(scroll).toHaveBeenCalledTimes(2);
+    vi.restoreAllMocks();
+  });
+
+  it('gives the active sentence bottom scroll margin and an underline readable in both themes', () => {
+    setup({ pages: ['One two. Three four!'], page: 0, activeSentence: 0 });
+    const cls = document.querySelector('[data-active]')?.className ?? '';
+    expect(cls).toContain('scroll-mb-32');
+    expect(cls).toContain('dark:decoration-reader-hl-fg');
+  });
+
+  it('also backs off when the page scrolls on its own accord, but not for our own scroll', () => {
+    const scroll = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scroll;
+    let now = 5_000_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    const props = {
+      pages: ['One. Two. Three. Four.'],
+      page: 0,
+      onNext: () => undefined,
+      onPrev: () => undefined,
+    };
+    const { rerender } = setup({ ...props, activeSentence: 0 });
+    // scroll events right after our own scrollIntoView are ours
+    now += 300;
+    fireEvent.scroll(window);
+    now += 300;
+    rerender(<PageView {...props} activeSentence={1} />);
+    expect(scroll).toHaveBeenCalledTimes(2);
+    // a later scroll (keyboard, scrollbar) is the user's
+    now += 5000;
+    fireEvent.scroll(window);
+    now += 1000;
+    rerender(<PageView {...props} activeSentence={2} />);
+    expect(scroll).toHaveBeenCalledTimes(2);
+    vi.restoreAllMocks();
+  });
+
+  it('adds an underline second cue to the active sentence', () => {
+    setup({ pages: ['One two. Three four!'], page: 0, activeSentence: 0 });
+    expect(document.querySelector('[data-active]')?.className).toContain(
+      'underline'
     );
+  });
+
+  it('does not scroll when nothing is highlighted', () => {
+    const scroll = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scroll;
+    setup({ pages: ['One two.'], page: 0 });
+    expect(scroll).not.toHaveBeenCalled();
   });
 
   it('renders the page text without a card background or border', () => {
@@ -159,6 +310,180 @@ describe('PageView', () => {
     const cls = screen.getByTestId('reader-page-text').className;
     expect(cls).toContain('motion-safe:');
     expect(cls).not.toMatch(/(^|\s)animate-/);
+  });
+
+  describe('follow-scroll after scroll input within and after our own scroll settles', () => {
+    const scrollBy = (dispatch: () => void) => () => {
+      dispatch();
+      fireEvent.scroll(window);
+    };
+    const nextButton = () => screen.getByRole('button', { name: 'Next page' });
+    const html = document.documentElement;
+    const viewportScrollsAt = (width: number) => {
+      for (const [prop, value] of Object.entries({
+        clientWidth: width,
+        clientHeight: 800,
+        scrollHeight: 3000,
+      })) {
+        Object.defineProperty(html, prop, { value, configurable: true });
+      }
+    };
+    const pressAndScroll = (target: Element, clientX: number) => {
+      viewportScrollsAt(1000);
+      fireEvent.pointerDown(target, { clientX, clientY: 400 });
+      fireEvent.scroll(window);
+      fireEvent.pointerUp(target, { clientX, clientY: 400 });
+    };
+    const inputs: {
+      input: string;
+      act: () => void;
+      within: 'pauses' | 'follows';
+      after: 'pauses' | 'follows';
+    }[] = [
+      {
+        input: 'mouse wheel',
+        act: scrollBy(() => fireEvent.wheel(window)),
+        within: 'pauses',
+        after: 'pauses',
+      },
+      {
+        input: 'touch drag',
+        act: scrollBy(() => fireEvent.touchMove(window)),
+        within: 'pauses',
+        after: 'pauses',
+      },
+      ...['PageDown', 'PageUp', 'ArrowDown', 'ArrowUp', 'Home', 'End', ' '].map(
+        (key) => ({
+          input: `the ${JSON.stringify(key)} key`,
+          act: scrollBy(() => fireEvent.keyDown(document.body, { key })),
+          within: 'pauses' as const,
+          after: 'pauses' as const,
+        })
+      ),
+      {
+        input: 'a scrollbar drag',
+        act: () => pressAndScroll(html, 1005),
+        within: 'pauses',
+        after: 'pauses',
+      },
+      {
+        input: 'a pointer held on the page while it scrolls',
+        act: () => pressAndScroll(html, 500),
+        within: 'follows',
+        after: 'pauses',
+      },
+      {
+        input: 'a pointer held on a button while the page scrolls',
+        act: () => pressAndScroll(nextButton(), 1005),
+        within: 'follows',
+        after: 'pauses',
+      },
+      {
+        input: 'Space on a focused link',
+        act: () => {
+          const link = document.createElement('a');
+          link.href = '#';
+          document.body.append(link);
+          fireEvent.keyDown(link, { key: ' ' });
+          fireEvent.scroll(window);
+          link.remove();
+        },
+        within: 'pauses',
+        after: 'pauses',
+      },
+      {
+        input: 'a scroll event with no user input',
+        act: () => fireEvent.scroll(window),
+        within: 'follows',
+        after: 'pauses',
+      },
+      {
+        input: 'Space on a focused button',
+        act: () => fireEvent.keyDown(nextButton(), { key: ' ' }),
+        within: 'follows',
+        after: 'follows',
+      },
+      {
+        input: 'a click that scrolls nothing',
+        act: () => {
+          fireEvent.pointerDown(nextButton());
+          fireEvent.pointerUp(nextButton());
+        },
+        within: 'follows',
+        after: 'follows',
+      },
+      {
+        input: 'ArrowDown in a text field',
+        act: () => {
+          const field = document.createElement('input');
+          document.body.append(field);
+          fireEvent.keyDown(field, { key: 'ArrowDown' });
+          field.remove();
+        },
+        within: 'follows',
+        after: 'follows',
+      },
+    ];
+    const cases = inputs.flatMap(({ input, act, within, after }) => [
+      { input, act, delay: 300, when: 'within', expected: within },
+      { input, act, delay: 2000, when: 'after', expected: after },
+    ]);
+
+    it.each(cases)(
+      '$input $when the auto-scroll interval: $expected',
+      ({ act, delay, expected }) => {
+        const scroll = vi.fn();
+        HTMLElement.prototype.scrollIntoView = scroll;
+        let now = 9_000_000;
+        vi.spyOn(Date, 'now').mockImplementation(() => now);
+        const props = {
+          pages: ['One. Two. Three.'],
+          page: 0,
+          onNext: () => undefined,
+          onPrev: () => undefined,
+        };
+        const { rerender } = setup({ ...props, activeSentence: 0 });
+        expect(scroll).toHaveBeenCalledTimes(1);
+        now += delay;
+        act();
+        now += 500;
+        rerender(<PageView {...props} activeSentence={1} />);
+        expect(scroll).toHaveBeenCalledTimes(expected === 'follows' ? 2 : 1);
+        vi.restoreAllMocks();
+        for (const prop of ['clientWidth', 'clientHeight', 'scrollHeight']) {
+          Reflect.deleteProperty(html, prop);
+        }
+      }
+    );
+
+    it('keeps following when our own scroll happens while a pointer rests on the page', () => {
+      const scroll = vi.fn();
+      HTMLElement.prototype.scrollIntoView = scroll;
+      let now = 12_000_000;
+      vi.spyOn(Date, 'now').mockImplementation(() => now);
+      const props = {
+        pages: ['One. Two. Three.'],
+        page: 0,
+        onNext: () => undefined,
+        onPrev: () => undefined,
+      };
+      viewportScrollsAt(1000);
+      const { rerender } = setup({ ...props, activeSentence: 0 });
+      now += 2000;
+      fireEvent.pointerDown(html, { clientX: 500, clientY: 400 });
+      rerender(<PageView {...props} activeSentence={1} />);
+      expect(scroll).toHaveBeenCalledTimes(2);
+      now += 300;
+      fireEvent.scroll(window);
+      fireEvent.pointerUp(html, { clientX: 500, clientY: 400 });
+      now += 500;
+      rerender(<PageView {...props} activeSentence={2} />);
+      expect(scroll).toHaveBeenCalledTimes(3);
+      vi.restoreAllMocks();
+      for (const prop of ['clientWidth', 'clientHeight', 'scrollHeight']) {
+        Reflect.deleteProperty(html, prop);
+      }
+    });
   });
 
   it('renders a friendly empty state with no pages', () => {

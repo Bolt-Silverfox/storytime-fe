@@ -41,10 +41,10 @@ export function fieldsMatching(value: unknown, needle: Needle): string[] {
       return;
     }
     seen.add(node);
-    if (node instanceof Error) {
-      for (const key of ['name', 'message', 'stack']) {
-        visit(readOwn(node, key), `${path}.${key}`);
-      }
+    const errorFields =
+      node instanceof Error ? ['name', 'message', 'stack'] : [];
+    for (const key of errorFields) {
+      visit(readOwn(node, key), `${path}.${key}`);
     }
     if (node instanceof Map) {
       let index = 0;
@@ -60,6 +60,9 @@ export function fieldsMatching(value: unknown, needle: Needle): string[] {
       }
     }
     for (const key of Reflect.ownKeys(node)) {
+      if (errorFields.includes(key as string)) {
+        continue;
+      }
       const label = `${path}.${String(key)}`;
       visit(key, `${label}<key>`);
       visit(readOwn(node, key), label);

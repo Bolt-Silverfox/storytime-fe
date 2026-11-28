@@ -24,6 +24,17 @@ describe('fieldsMatching', () => {
     }
   );
 
+  it('reports each Error field once, including inherited ones', () => {
+    class MarkedError extends Error {}
+    MarkedError.prototype.name = 'marker-name';
+    const error = new MarkedError('marker');
+    expect(fieldsMatching(error, 'marker')).toEqual([
+      '$.name',
+      '$.message',
+      '$.stack',
+    ]);
+  });
+
   it('reads values behind getters', () => {
     const value = Object.defineProperty({}, 'secret', {
       get: () => 'marker',

@@ -910,6 +910,8 @@ describe('round 4: linear time', () => {
     ['bare userinfo', ' a:b:c'],
     ['encoded schemes', 'a%3A%2F%2Fb%3Ac'],
     ['home directories', ' C:\\Users\\a'],
+    ['bare userinfo after semicolons', ';a:b'],
+    ['home directories with spaces', ' C:\\Users\\a b'],
   ];
   // 8k vs 64k characters: linear is ~8x, quadratic ~64x, so < 20x separates
   // them with room for scheduler noise.
@@ -3309,6 +3311,17 @@ describe('URL credentials in caller text', () => {
   const forms: [string, (host: string) => string, string][] = [
     ['https', (h) => `https://${USER}:${PASS}@${h}/path`, '/path'],
     ['postgres', (h) => `postgres://${USER}:${PASS}@${h}/db`, '/db'],
+    ['apostrophes', (h) => `https://${USER}:it's'${PASS}@${h}/path`, '/path'],
+    [
+      'encoded with apostrophes',
+      (h) => encodeURIComponent(`https://${USER}:it's'${PASS}@${h}/path`),
+      '%2Fpath',
+    ],
+    [
+      'bare with apostrophes',
+      (h) => `connect ${USER}:it's'${PASS}@${h} failed`,
+      ' failed',
+    ],
     ['user only', (h) => `https://${USER}@${h}/path`, '/path'],
     ['protocol-relative', (h) => `//${USER}:${PASS}@${h}/path`, '/path'],
     ['bare', (h) => `connect ${USER}:${PASS}@${h} failed`, ' failed'],
@@ -3391,6 +3404,7 @@ describe('Windows user profiles in stack frames and caller text', () => {
     JSON.stringify({ stack: `at a (C:\\Users\\${NAME}\\app\\x.js:1:2)` }),
     `open /Users/${NAME}/app/x.ts`,
     `open /home/${NAME}/app/x.ts`,
+    `failed at C:\\Users\\Jane ${NAME}\\app\\x.js`,
   ])('caller text: %s', (input) => {
     const out = redact(input) as string;
     expect(out).not.toContain(NAME);

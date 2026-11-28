@@ -199,7 +199,10 @@ describe('robustness', () => {
       throw new Error('sdk down');
     });
     expect(() => logger.error('x', new Error('y'))).not.toThrow();
+    expect(sentry.addBreadcrumb).toHaveBeenCalledOnce();
+    expect(sentry.captureException).toHaveBeenCalledOnce();
     expect(() => logger.warn('x')).not.toThrow();
+    expect(sentry.addBreadcrumb).toHaveBeenCalledTimes(2);
   });
 
   it('is silent on the console in the test environment', () => {
@@ -2941,7 +2944,7 @@ describe('caller text: value ends', () => {
 
   it('omits the rest of the line when a sensitive group end is not found', () => {
     const member = `x Kq7Lm${'y'.repeat(2_100)}`;
-    const out = redact(`token=["${member}", "Zx4Wv"] tail\nnext line`);
+    const out = redact(`token=['${member}', 'Zx4Wv'] tail\nnext line`);
     expect(out).toBe('token=[REDACTED]\nnext line');
   });
 
@@ -3458,5 +3461,106 @@ describe('endpoint paths normalise by position, not by word', () => {
 
   it('a route-word slug groups with every other slug', () => {
     expect(path('stories/login')).toBe(path('stories/s1'));
+  });
+});
+
+describe('round 13: JSON delimiters, padded credentials, routes, classification', () => {
+  it.each([
+    { note: 'Authorization: "[REDACTED]"', next: 1 },
+    { note: 'k Authorization: "[REDACTED]"', next: 1 },
+    { note: 'a \'Authorization\': "[REDACTED]"', next: 1 },
+    { list: ['k Cookie: "[REDACTED]"'], next: 1 },
+    { note: "Authorization: 'x'", next: 1 },
+    { note: 'Cookie: "[REDACTED]"', next: 1 },
+    { note: 'Authorization: Bearer [REDACTED]', next: 1 },
+  ])('a header inside a JSON string keeps the JSON valid: %j', (value) => {
+    const out = redact(JSON.stringify(value)) as string;
+    expect(JSON.parse(out)).toMatchObject({ next: 1 });
+  });
+
+  it('still masks a raw header next to a JSON span', () => {
+    const out = redact('{"a":1} Authorization: Bearer Qa7xWb8y') as string;
+    expect(out).not.toContain('Qa7xWb8y');
+    expect(out.startsWith('{"a":1}')).toBe(true);
+  });
+
+  it('a JSON value after a sensitive key is still masked', () => {
+    expect(redact('token=["Qa7x","Wb8y"] page=3')).toBe(
+      'token=[REDACTED] page=3'
+    );
+  });
+
+  it.each([
+    [
+      'authorization=Negotiate YIIGhgYJKoZIhvcSAQICAQBu==, page=3',
+      'authorization=[REDACTED], page=3',
+    ],
+    [
+      'authorization=Basic dXNlcjpwYXNzd29yZA==, page=3',
+      'authorization=[REDACTED], page=3',
+    ],
+    [
+      'authorization=Basic dXNlcjpwYXNzd29yZA=, page=3',
+      'authorization=[REDACTED], page=3',
+    ],
+  ])('a padded token68 is one credential: %s', (input, expected) => {
+    expect(redact(input)).toBe(expected);
+  });
+
+  const path = (url: string) => {
+    sentry.captureException.mockClear();
+    logger.error('x', makeAxiosError(500, url));
+    return (
+      sentry.captureException.mock.calls[0][1] as {
+        tags: Record<string, string>;
+      }
+    ).tags['http.path'];
+  };
+
+  it.each([
+    ['stories/user', '/stories/:id'],
+    ['stories/user/progress', '/stories/user/progress'],
+    ['stories/daily-challenge', '/stories/:id'],
+    ['auth/link', '/:id/:id'],
+    ['voice/story', '/:id/:id'],
+    ['kids', '/kids'],
+    ['auth/kids', '/auth/kids'],
+  ])('literal words need a complete route: %s -> %s', (url, expected) => {
+    expect(path(url)).toBe(expected);
+  });
+
+  it('an incomplete route groups with a slug', () => {
+    expect(path('stories/user')).toBe(path('stories/s1'));
+  });
+
+  it.each([
+    'Could not render: payload load failed validation',
+    'parser: network error in row 3',
+    'Failed to fetch the avatar config from cache: corrupt',
+  ])(
+    'an offline TypeError with another message stays unexpected: %s',
+    (message) => {
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+      expect(isExpectedFailure(new TypeError(message))).toBe(false);
+    }
+  );
+
+  it.each([
+    'Failed to fetch',
+    'Load failed',
+    'NetworkError when attempting to fetch resource.',
+    'Network Error',
+  ])('an offline TypeError with a fetch failure is expected: %s', (message) => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    expect(isExpectedFailure(new TypeError(message))).toBe(true);
+  });
+
+  it.each([
+    [{ response: { status: 0 }, status: 401 }, true],
+    [{ response: { status: 500 }, status: 401 }, false],
+    [{ response: { status: 401 }, status: 500 }, true],
+    [{ response: { status: '401' }, status: 429 }, true],
+  ])('status is chosen like the HTTP summary: %j', (error, expected) => {
+    expect(isExpectedFailure(error)).toBe(expected);
   });
 });

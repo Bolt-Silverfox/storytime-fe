@@ -187,7 +187,7 @@ const UNICODE_SEPARATOR = /\\u00(22|27|60|3[ad])/gi;
 // "a token of friendship" and "Basic information" stay readable. A
 // capitalised "Bearer" is the scheme name and is masked whatever follows.
 const BEARER = /\bBearer\s+[\w.~+/=-]+/g;
-const SCHEME_LONG = /\b(?:bearer|token|digest|basic)\s+[\w.~+/=-]{16,}/gi;
+const SCHEME_LONG = /\b(bearer|token|digest|basic)\s+[\w.~+/=-]{16,}/gi;
 // Base64 credentials mix cases/digits; a plain word like "Information" does not.
 const SCHEME_BASIC =
   /\bBasic\s+(?=[A-Za-z0-9+/][a-z]*[A-Z0-9+/])[A-Za-z0-9+/]{8,}={0,2}/g;
@@ -464,6 +464,7 @@ function unquotedEnd(input: string, from: number, grammar: Grammar): number {
 const AUTH_SCHEME = /[A-Za-z][\w.-]{0,30}[^\S\r\n]+/y;
 const PARAM_NAME = /[\w-]+[^\S\r\n]*=[^\S\r\n]*/y;
 const PARAM_GAP = /[^\S\r\n]*,[^\S\r\n]*/y;
+const TOKEN68 = /[\w.~+/-]+=*(?![^\s,])(?![^\S\r\n]*=)/y;
 
 function paramEnd(input: string, at: number): number {
   PARAM_NAME.lastIndex = at;
@@ -507,8 +508,9 @@ function authSchemeEnd(input: string, from: number, grammar: Grammar): number {
   if (AUTH_SCHEME.test(input)) {
     const paramStart = AUTH_SCHEME.lastIndex;
     const word = input.slice(from, paramStart).trimEnd();
+    TOKEN68.lastIndex = paramStart;
     PARAM_NAME.lastIndex = paramStart;
-    const token68 = !PARAM_NAME.test(input);
+    const token68 = TOKEN68.test(input) || !PARAM_NAME.test(input);
     end = paramEnd(input, paramStart);
     if (!AUTH_SCHEMES.has(word.toLowerCase())) {
       PARAM_NAME.lastIndex = paramStart;
@@ -856,14 +858,21 @@ function redactJson(
   return out;
 }
 
-function redactJsonSpans(text: string): string {
+const SLOT_CHARS = /[\uE000\uE001]/g;
+const SUBSCRIPT_OWNER = /[\w\]]/;
+const SLOT = /\uE000(\d+)\uE001/g;
+
+function shieldJsonSpans(text: string, slots: string[]): string {
   const first = text.search(/\S/);
   const last = text.trimEnd().length;
   let out = '';
   let pos = 0;
   for (const [start, end] of jsonSpans(text)) {
     JSON_VALUE_START.lastIndex = start + 1;
-    if (!JSON_VALUE_START.test(text)) {
+    if (
+      SUBSCRIPT_OWNER.test(text[start - 1] ?? '') ||
+      !JSON_VALUE_START.test(text)
+    ) {
       continue;
     }
     const source = text.slice(start, end);
@@ -873,20 +882,19 @@ function redactJsonSpans(text: string): string {
     }
     const state = { changed: false };
     const cleaned = redactJson(parsed, 0, state);
-    if (!state.changed) {
-      continue;
-    }
     const whole = start === first && end === last;
     const indent = whole ? /\n([ \t]{1,10})\S/.exec(source)?.[1] : undefined;
-    out += `${text.slice(pos, start)}${JSON.stringify(cleaned, null, indent)}`;
+    slots.push(state.changed ? JSON.stringify(cleaned, null, indent) : source);
+    out += `${text.slice(pos, start)}\uE000${slots.length - 1}\uE001`;
     pos = end;
   }
   return pos === 0 ? text : out + text.slice(pos);
 }
 
 function redactText(text: string): string {
-  return redactKeyNames(
-    redactJsonSpans(text)
+  const slots: string[] = [];
+  const masked = redactKeyNames(
+    shieldJsonSpans(text.replace(SLOT_CHARS, '\uFFFD'), slots)
       .replace(URL_USERINFO, maskUserinfo)
       .replace(HOME_IN_TEXT, '$1~')
       .replace(UNICODE_SEPARATOR, (_, hex: string) => {
@@ -897,11 +905,16 @@ function redactText(text: string): string {
       .replace(AUTH_HEADER_LINE, maskHeaderValue)
       .replace(COOKIE_HEADER, maskHeaderValue)
       .replace(BEARER, `Bearer ${REDACTED}`)
-      .replace(SCHEME_LONG, REDACTED)
+      .replace(SCHEME_LONG, (_, scheme: string) =>
+        scheme.toLowerCase() === 'digest' ? REDACTED : `${scheme} ${REDACTED}`
+      )
       .replace(SCHEME_BASIC, `Basic ${REDACTED}`)
       .replace(FRAGMENT_TOKEN, `$1t=${REDACTED}`)
       .replace(ENCODED_FRAGMENT_TOKEN, `$1t$2${REDACTED}`)
   ).replace(EMAIL, REDACTED);
+  return slots.length
+    ? masked.replace(SLOT, (_, index: string) => slots[Number(index)])
+    : masked;
 }
 
 function isAxiosLike(value: object): boolean {
@@ -933,15 +946,18 @@ const ROUTES = `
   create-new-password/success verify-email dashboard/ai-voice
   dashboard/notification dashboard/personal-settings
   dashboard/security-settings favorites library contact privacy-policy faq
-  about terms-and-conditions
+  about terms-and-conditions stories kids notifications devices
+  parent-favorites auth/kids guest/stories/:id guest/stories/:id/audio user/me
+  stories/:id story
 `;
 
 interface RouteNode {
   fixed: Map<string, RouteNode>;
   param?: RouteNode;
+  complete: boolean;
 }
 
-const routeNode = (): RouteNode => ({ fixed: new Map() });
+const routeNode = (): RouteNode => ({ fixed: new Map(), complete: false });
 
 const ROUTE_TREE = routeNode();
 for (const route of ROUTES.split(/\s+/).filter(Boolean)) {
@@ -956,10 +972,34 @@ for (const route of ROUTES.split(/\s+/).filter(Boolean)) {
       node = next;
     }
   }
+  node.complete = true;
+}
+ROUTE_TREE.complete = true;
+
+function longestRoute(
+  node: RouteNode,
+  words: string[],
+  at: number
+): string[] | undefined {
+  let best: string[] | undefined = node.complete ? [] : undefined;
+  if (at >= words.length) {
+    return best;
+  }
+  const branches: [RouteNode | undefined, string][] = [
+    [node.fixed.get(words[at]), words[at]],
+    [node.param, ':id'],
+  ];
+  for (const [next, shown] of branches) {
+    const rest = next && longestRoute(next, words, at + 1);
+    if (rest && (!best || rest.length + 1 > best.length)) {
+      best = [shown, ...rest];
+    }
+  }
+  return best;
 }
 const MAX_SEGMENTS = 20;
 
-/** Path only (no origin/query/fragment); a segment stays readable only where a known route has that word at that position, every other segment becomes ":id". */
+/** Path only (no origin/query/fragment); words stay readable only within the longest complete known route that the path starts with, every other segment becomes ":id". */
 function normalisePath(url: unknown): string | undefined {
   if (typeof url !== 'string') {
     return undefined;
@@ -973,15 +1013,17 @@ function normalisePath(url: unknown): string | undefined {
     segments[first] === 'api' && segments[first + 1] === 'v1'
       ? first + 2
       : first;
-  let node: RouteNode | undefined = ROUTE_TREE;
+  const words = segments.filter((seg, i) => seg !== '' && i >= routeStart);
+  const route = longestRoute(ROUTE_TREE, words, 0) ?? [];
+  let word = 0;
   const path = segments
     .map((seg, i) => {
       if (seg === '' || i < routeStart) {
         return seg;
       }
-      const fixed = node?.fixed.get(seg);
-      node = fixed ?? node?.param;
-      return fixed ? seg : ':id';
+      const shown = route[word] ?? ':id';
+      word++;
+      return shown;
     })
     .join('/');
   return path.startsWith('/') ? path : `/${path}`;
@@ -1679,7 +1721,8 @@ export function isExpectedFailure(
 }
 
 const OFFLINE_CODES = new Set(['ECONNABORTED', 'ETIMEDOUT']);
-const FETCH_FAILURE = /failed to fetch|networkerror|load failed|network error/i;
+const FETCH_FAILURE =
+  /^(?:Failed to fetch|Load failed|NetworkError when attempting to fetch resource\.|Network Error)$/;
 
 function classifyFailure(error: unknown, statuses?: number[]): boolean {
   if (!error || typeof error !== 'object') {
@@ -1692,7 +1735,7 @@ function classifyFailure(error: unknown, statuses?: number[]): boolean {
   if (e.code === 'ERR_CANCELED' || e.code === 'ERR_NETWORK') {
     return true;
   }
-  const status = e.response?.status ?? e.status;
+  const status = [e.response?.status, e.status].find(isHttpStatus);
   if (
     typeof status === 'number' &&
     (status === 401 || status === 429 || !!statuses?.includes(status))

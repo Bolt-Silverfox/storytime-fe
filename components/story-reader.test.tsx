@@ -685,7 +685,7 @@ describe('sentence read-along highlight', () => {
     fireEvent.keyDown(document, { key: 'ArrowLeft' });
     expect(screen.getAllByText('Page 2 of 4').length).toBeGreaterThan(0);
     expect(active()).toEqual([]);
-    expect(screen.getByText('00:00 / 00:00')).toBeTruthy();
+    expect(screen.getByText('00:00 / 00:30')).toBeTruthy();
   });
 
   it('keeps the spoken sentence clear of the sticky Play button', async () => {
@@ -1454,6 +1454,419 @@ describe('the reader opens with read-along already on', () => {
       pageShownIs(page + 2);
     }
   );
+});
+
+describe('read-along through every narration state', () => {
+  const sentences = (letters: string) =>
+    letters
+      .split('')
+      .map((p) => `${words(9, p)}.`)
+      .join(' ');
+  const ONE_PAGE = sentences('abc');
+  const TWO_PAGES = sentences('abcdef');
+  const FOUR_PAGES = sentences('abcdefghijkl');
+
+  const scrolled: (string | undefined)[] = [];
+  const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+  beforeEach(() => {
+    resetGuest();
+    vi.mocked(services.getGuestStoryAudioBatchStatusService).mockClear();
+    scrolled.length = 0;
+    HTMLElement.prototype.scrollIntoView = function (this: HTMLElement) {
+      scrolled.push(this.textContent?.slice(0, 2));
+    };
+  });
+  afterEach(() => {
+    HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
+    resetGuest();
+  });
+
+  const define = (prop: 'currentTime' | 'duration', value: number) =>
+    Object.defineProperty(audioEl(), prop, {
+      value,
+      configurable: true,
+      writable: true,
+    });
+  const metadata = async (duration: number) => {
+    define('duration', duration);
+    await act(async () => {
+      fireEvent.loadedMetadata(audioEl());
+    });
+  };
+  const tick = async (time: number) => {
+    define('currentTime', time);
+    await act(async () => {
+      fireEvent.timeUpdate(audioEl());
+    });
+  };
+  const loadAndTick = async (time: number) => {
+    await metadata(30);
+    await tick(time);
+  };
+  const newSource = () => {
+    define('currentTime', 0);
+    define('duration', Number.NaN);
+  };
+  const clipEnds = async () => {
+    await tick(30);
+    await endAudio();
+  };
+  const clipEndsOntoNewSource = async () => {
+    newSource();
+    await endAudio();
+  };
+  const pressPlay = async () => {
+    await act(async () => {
+      fireEvent.click(playButton());
+    });
+  };
+  const replayFromStart = async () => {
+    await pressPlay();
+    define('currentTime', 0);
+  };
+  const open = async (text: string) => {
+    guest.story = { id: 'story-1', title: 'T', textContent: text };
+    renderReader();
+    fireEvent.click(await screen.findByRole('switch'));
+    await waitReady();
+    await pressPlay();
+  };
+
+  type Step = () => Promise<void>;
+  const rows: {
+    state: string;
+    clips: number;
+    text: string;
+    failed?: number[];
+    generating?: number[];
+    before: Step[];
+    last: Step;
+    page: number;
+    marker: string | null;
+    clock: string;
+    playing: boolean;
+    scroll: string[];
+  }[] = [
+    {
+      state: 'single clip, playing',
+      clips: 1,
+      text: ONE_PAGE,
+      before: [() => metadata(30)],
+      last: () => tick(15),
+      page: 1,
+      marker: 'b0',
+      clock: '00:15 / 00:30',
+      playing: true,
+      scroll: ['b0'],
+    },
+    {
+      state: 'single clip, paused mid-clip',
+      clips: 1,
+      text: ONE_PAGE,
+      before: [() => loadAndTick(15)],
+      last: pressPlay,
+      page: 1,
+      marker: 'b0',
+      clock: '00:15 / 00:30',
+      playing: false,
+      scroll: [],
+    },
+    {
+      state: 'multi clip, second clip playing',
+      clips: 2,
+      text: TWO_PAGES,
+      before: [
+        () => loadAndTick(29),
+        clipEndsOntoNewSource,
+        () => metadata(30),
+      ],
+      last: () => tick(15),
+      page: 2,
+      marker: 'e0',
+      clock: '00:15 / 00:30',
+      playing: true,
+      scroll: ['e0'],
+    },
+    {
+      state: 'next clip generating',
+      clips: 2,
+      text: TWO_PAGES,
+      generating: [1],
+      before: [() => loadAndTick(29)],
+      last: clipEnds,
+      page: 1,
+      marker: null,
+      clock: 'Preparing audio…',
+      playing: true,
+      scroll: [],
+    },
+    {
+      state: 'next clip generating, then failed',
+      clips: 2,
+      text: TWO_PAGES,
+      generating: [1],
+      before: [
+        () => loadAndTick(29),
+        clipEnds,
+        async () => {
+          guest.generating = [];
+          guest.failed = [1];
+        },
+      ],
+      last: nextPoll,
+      page: 1,
+      marker: null,
+      clock: '00:30 / 00:30',
+      playing: false,
+      scroll: [],
+    },
+    {
+      state: 'next clip already failed',
+      clips: 2,
+      text: TWO_PAGES,
+      failed: [1],
+      before: [() => loadAndTick(29)],
+      last: clipEnds,
+      page: 1,
+      marker: null,
+      clock: '00:30 / 00:30',
+      playing: false,
+      scroll: [],
+    },
+    {
+      state: 'single clip finished',
+      clips: 1,
+      text: ONE_PAGE,
+      before: [() => loadAndTick(29)],
+      last: clipEnds,
+      page: 1,
+      marker: null,
+      clock: '00:00 / 00:30',
+      playing: false,
+      scroll: [],
+    },
+    {
+      state: 'single clip replayed (same source, no new metadata)',
+      clips: 1,
+      text: ONE_PAGE,
+      before: [() => loadAndTick(29), clipEnds, replayFromStart],
+      last: () => tick(15),
+      page: 1,
+      marker: 'b0',
+      clock: '00:15 / 00:30',
+      playing: true,
+      scroll: ['b0'],
+    },
+    {
+      state: 'multi clip finished',
+      clips: 2,
+      text: TWO_PAGES,
+      before: [
+        () => loadAndTick(29),
+        clipEndsOntoNewSource,
+        () => loadAndTick(29),
+      ],
+      last: async () => {
+        await clipEndsOntoNewSource();
+        await metadata(30);
+      },
+      page: 1,
+      marker: null,
+      clock: '00:00 / 00:30',
+      playing: false,
+      scroll: [],
+    },
+    {
+      state: 'multi clip replayed',
+      clips: 2,
+      text: TWO_PAGES,
+      before: [
+        () => loadAndTick(29),
+        clipEndsOntoNewSource,
+        () => loadAndTick(29),
+        clipEndsOntoNewSource,
+        () => metadata(30),
+        pressPlay,
+      ],
+      last: () => tick(15),
+      page: 1,
+      marker: 'b0',
+      clock: '00:15 / 00:30',
+      playing: true,
+      scroll: ['b0'],
+    },
+    {
+      state: 'clip-cap stop, on the page after the last clip',
+      clips: 2,
+      text: FOUR_PAGES,
+      before: [
+        () => loadAndTick(29),
+        clipEndsOntoNewSource,
+        () => loadAndTick(29),
+      ],
+      last: clipEnds,
+      page: 3,
+      marker: null,
+      clock: '--:-- / --:--',
+      playing: false,
+      scroll: [],
+    },
+    {
+      state: 'clip-cap stop, back on the last narrated page',
+      clips: 2,
+      text: FOUR_PAGES,
+      before: [
+        () => loadAndTick(29),
+        clipEndsOntoNewSource,
+        () => loadAndTick(29),
+        clipEnds,
+      ],
+      last: async () => {
+        fireEvent.keyDown(document, { key: 'ArrowLeft' });
+      },
+      page: 2,
+      marker: null,
+      clock: '00:00 / 00:30',
+      playing: false,
+      scroll: [],
+    },
+    {
+      state: 'clip-cap stop, replayed from the last narrated page',
+      clips: 2,
+      text: FOUR_PAGES,
+      before: [
+        () => loadAndTick(29),
+        clipEndsOntoNewSource,
+        () => loadAndTick(29),
+        clipEnds,
+        async () => {
+          fireEvent.keyDown(document, { key: 'ArrowLeft' });
+        },
+        replayFromStart,
+      ],
+      last: () => tick(15),
+      page: 2,
+      marker: 'e0',
+      clock: '00:15 / 00:30',
+      playing: true,
+      scroll: ['e0'],
+    },
+    {
+      state: 'page turn during playback, before the new clip loads',
+      clips: 2,
+      text: TWO_PAGES,
+      before: [() => loadAndTick(15)],
+      last: async () => {
+        newSource();
+        await turnTo(1);
+      },
+      page: 2,
+      marker: null,
+      clock: '00:00 / 00:00',
+      playing: true,
+      scroll: [],
+    },
+    {
+      state: 'page turn during playback, new clip playing',
+      clips: 2,
+      text: TWO_PAGES,
+      before: [
+        () => loadAndTick(15),
+        async () => {
+          newSource();
+          await turnTo(1);
+        },
+        () => metadata(30),
+      ],
+      last: () => tick(15),
+      page: 2,
+      marker: 'e0',
+      clock: '00:15 / 00:30',
+      playing: true,
+      scroll: ['e0'],
+    },
+  ];
+
+  it.each(rows)(
+    '$state: marker $marker, clock $clock',
+    async ({
+      clips,
+      text,
+      failed,
+      generating,
+      before,
+      last,
+      page,
+      marker,
+      clock,
+      playing,
+      scroll,
+    }) => {
+      guest.clips = clips;
+      guest.failed = failed ?? [];
+      guest.generating = generating ?? [];
+      await open(text);
+      for (const step of before) {
+        await step();
+      }
+      scrolled.length = 0;
+      await last();
+      const pageCount = resolvePages(undefined, text).length;
+      expect(
+        screen.getAllByText(`Page ${page} of ${pageCount}`).length
+      ).toBeGreaterThan(0);
+      expect(
+        Array.from(document.querySelectorAll('[data-active="true"]')).map((e) =>
+          e.textContent?.slice(0, 2)
+        )
+      ).toEqual(marker ? [marker] : []);
+      expect(document.querySelector('small')?.textContent).toBe(clock);
+      expect(playButton().getAttribute('aria-pressed')).toBe(String(playing));
+      expect(scrolled).toEqual(scroll);
+    },
+    10_000
+  );
+
+  it('signed in, with the first clip ready before the story loads, follows and advances the narration', async () => {
+    guest.clips = 2;
+    let releaseStory: () => void = () => undefined;
+    vi.mocked(services.getStoryByIdService).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releaseStory = () =>
+            resolve({ id: 'story-1', title: 'T', textContent: TWO_PAGES });
+        })
+    );
+    vi.mocked(services.startStoryAudioBatchService).mockImplementation(() =>
+      services.startGuestStoryAudioBatchService('story-1')
+    );
+    renderReader(false);
+    await waitFor(() =>
+      expect(services.startStoryAudioBatchService).toHaveBeenCalled()
+    );
+    await act(async () => {
+      await vi.mocked(services.startStoryAudioBatchService).mock.results[0]
+        ?.value;
+    });
+    expect(screen.getByText('Loading story...')).toBeTruthy();
+    await act(async () => {
+      releaseStory();
+    });
+    fireEvent.click(await screen.findByRole('switch'));
+    await waitReady();
+    await pressPlay();
+    await metadata(30);
+    await tick(15);
+    expect(
+      Array.from(document.querySelectorAll('[data-active="true"]')).map((e) =>
+        e.textContent?.slice(0, 2)
+      )
+    ).toEqual(['b0']);
+    expect(document.querySelector('small')?.textContent).toBe('00:15 / 00:30');
+    await clipEndsOntoNewSource();
+    await waitFor(() => expect(played).toEqual(['0.mp3', '1.mp3']));
+    expect(screen.getAllByText('Page 2 of 2').length).toBeGreaterThan(0);
+  });
 });
 
 describe('keyboard focus on the last page', () => {

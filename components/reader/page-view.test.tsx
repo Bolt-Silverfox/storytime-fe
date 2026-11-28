@@ -312,6 +312,180 @@ describe('PageView', () => {
     expect(cls).not.toMatch(/(^|\s)animate-/);
   });
 
+  describe('follow-scroll after scroll input within and after our own scroll settles', () => {
+    const scrollBy = (dispatch: () => void) => () => {
+      dispatch();
+      fireEvent.scroll(window);
+    };
+    const nextButton = () => screen.getByRole('button', { name: 'Next page' });
+    const html = document.documentElement;
+    const viewportScrollsAt = (width: number) => {
+      for (const [prop, value] of Object.entries({
+        clientWidth: width,
+        clientHeight: 800,
+        scrollHeight: 3000,
+      })) {
+        Object.defineProperty(html, prop, { value, configurable: true });
+      }
+    };
+    const pressAndScroll = (target: Element, clientX: number) => {
+      viewportScrollsAt(1000);
+      fireEvent.pointerDown(target, { clientX, clientY: 400 });
+      fireEvent.scroll(window);
+      fireEvent.pointerUp(target, { clientX, clientY: 400 });
+    };
+    const inputs: {
+      input: string;
+      act: () => void;
+      within: 'pauses' | 'follows';
+      after: 'pauses' | 'follows';
+    }[] = [
+      {
+        input: 'mouse wheel',
+        act: scrollBy(() => fireEvent.wheel(window)),
+        within: 'pauses',
+        after: 'pauses',
+      },
+      {
+        input: 'touch drag',
+        act: scrollBy(() => fireEvent.touchMove(window)),
+        within: 'pauses',
+        after: 'pauses',
+      },
+      ...['PageDown', 'PageUp', 'ArrowDown', 'ArrowUp', 'Home', 'End', ' '].map(
+        (key) => ({
+          input: `the ${JSON.stringify(key)} key`,
+          act: scrollBy(() => fireEvent.keyDown(document.body, { key })),
+          within: 'pauses' as const,
+          after: 'pauses' as const,
+        })
+      ),
+      {
+        input: 'a scrollbar drag',
+        act: () => pressAndScroll(html, 1005),
+        within: 'pauses',
+        after: 'pauses',
+      },
+      {
+        input: 'a pointer held on the page while it scrolls',
+        act: () => pressAndScroll(html, 500),
+        within: 'follows',
+        after: 'pauses',
+      },
+      {
+        input: 'a pointer held on a button while the page scrolls',
+        act: () => pressAndScroll(nextButton(), 1005),
+        within: 'follows',
+        after: 'pauses',
+      },
+      {
+        input: 'Space on a focused link',
+        act: () => {
+          const link = document.createElement('a');
+          link.href = '#';
+          document.body.append(link);
+          fireEvent.keyDown(link, { key: ' ' });
+          fireEvent.scroll(window);
+          link.remove();
+        },
+        within: 'pauses',
+        after: 'pauses',
+      },
+      {
+        input: 'a scroll event with no user input',
+        act: () => fireEvent.scroll(window),
+        within: 'follows',
+        after: 'pauses',
+      },
+      {
+        input: 'Space on a focused button',
+        act: () => fireEvent.keyDown(nextButton(), { key: ' ' }),
+        within: 'follows',
+        after: 'follows',
+      },
+      {
+        input: 'a click that scrolls nothing',
+        act: () => {
+          fireEvent.pointerDown(nextButton());
+          fireEvent.pointerUp(nextButton());
+        },
+        within: 'follows',
+        after: 'follows',
+      },
+      {
+        input: 'ArrowDown in a text field',
+        act: () => {
+          const field = document.createElement('input');
+          document.body.append(field);
+          fireEvent.keyDown(field, { key: 'ArrowDown' });
+          field.remove();
+        },
+        within: 'follows',
+        after: 'follows',
+      },
+    ];
+    const cases = inputs.flatMap(({ input, act, within, after }) => [
+      { input, act, delay: 300, when: 'within', expected: within },
+      { input, act, delay: 2000, when: 'after', expected: after },
+    ]);
+
+    it.each(cases)(
+      '$input $when the auto-scroll interval: $expected',
+      ({ act, delay, expected }) => {
+        const scroll = vi.fn();
+        HTMLElement.prototype.scrollIntoView = scroll;
+        let now = 9_000_000;
+        vi.spyOn(Date, 'now').mockImplementation(() => now);
+        const props = {
+          pages: ['One. Two. Three.'],
+          page: 0,
+          onNext: () => undefined,
+          onPrev: () => undefined,
+        };
+        const { rerender } = setup({ ...props, activeSentence: 0 });
+        expect(scroll).toHaveBeenCalledTimes(1);
+        now += delay;
+        act();
+        now += 500;
+        rerender(<PageView {...props} activeSentence={1} />);
+        expect(scroll).toHaveBeenCalledTimes(expected === 'follows' ? 2 : 1);
+        vi.restoreAllMocks();
+        for (const prop of ['clientWidth', 'clientHeight', 'scrollHeight']) {
+          Reflect.deleteProperty(html, prop);
+        }
+      }
+    );
+
+    it('keeps following when our own scroll happens while a pointer rests on the page', () => {
+      const scroll = vi.fn();
+      HTMLElement.prototype.scrollIntoView = scroll;
+      let now = 12_000_000;
+      vi.spyOn(Date, 'now').mockImplementation(() => now);
+      const props = {
+        pages: ['One. Two. Three.'],
+        page: 0,
+        onNext: () => undefined,
+        onPrev: () => undefined,
+      };
+      viewportScrollsAt(1000);
+      const { rerender } = setup({ ...props, activeSentence: 0 });
+      now += 2000;
+      fireEvent.pointerDown(html, { clientX: 500, clientY: 400 });
+      rerender(<PageView {...props} activeSentence={1} />);
+      expect(scroll).toHaveBeenCalledTimes(2);
+      now += 300;
+      fireEvent.scroll(window);
+      fireEvent.pointerUp(html, { clientX: 500, clientY: 400 });
+      now += 500;
+      rerender(<PageView {...props} activeSentence={2} />);
+      expect(scroll).toHaveBeenCalledTimes(3);
+      vi.restoreAllMocks();
+      for (const prop of ['clientWidth', 'clientHeight', 'scrollHeight']) {
+        Reflect.deleteProperty(html, prop);
+      }
+    });
+  });
+
   it('renders a friendly empty state with no pages', () => {
     setup({ pages: [], page: 0 });
     expect(screen.getByText('Story content not available')).toBeTruthy();

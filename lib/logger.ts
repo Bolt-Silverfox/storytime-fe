@@ -767,9 +767,12 @@ function maskHeaderValue(match: string, label: string): string {
 }
 
 const URL_USERINFO =
-  /(?:(?<![\w.+-])([a-z][a-z0-9+.-]*:\/\/)|(?<![\w.+:/-])(\/\/))[^\s/?#"<>]*@|(?<![\w.+-])((?:[a-z][a-z0-9+.-]*%3A)?%2F%2F)(?:(?!%2F|%3F|%23)[^\s/?#"<>])*%40|(^|[\s=(,;"'])[\w.~%+-]{1,128}:[^\s/?#"<>@]{1,256}@(?=[\w[])/gi;
-const HOME_IN_TEXT =
-  /(?<![\w.-])((?:file:\/\/\/?)?(?:[A-Za-z]:)?(?:\\{1,4}|\/)(?:Users|home)(?:\\{1,4}|\/))[^\\/\r\n"'<>|*?:]{1,64}(?=\\|\/)/gi;
+  /(?:(?<![\w.+-])([a-z][a-z0-9+.-]*:\/\/)|(?<![\w.+:/-])(\/\/))[^\s/?#"<>]*@|(?<![\w.+-])((?:[a-z][a-z0-9+.-]*%3A)?%2F%2F)(?:(?!%2F|%3F|%23)[^\s/?#"<>])*%40|(?<=^|\s)((?:[\w.-]+=)?["'(]{0,3})[\w.~%+-]+:[^\s/?#"<>@]+@(?=[\w[])/gi;
+const PROFILE_NAME = String.raw`[^\\/\s"'<>|*?:]{1,64}`;
+const HOME_IN_TEXT = new RegExp(
+  String.raw`(?<![\w.-])((?:file:\/\/\/?)?(?:[A-Za-z]:)?(?:\\{1,4}|\/)(?:Users|home)(?:\\{1,4}|\/))(?:${PROFILE_NAME}(?: ${PROFILE_NAME}){1,3}(?=[\\/])|${PROFILE_NAME})`,
+  'gi'
+);
 
 function maskUserinfo(
   _match: string,

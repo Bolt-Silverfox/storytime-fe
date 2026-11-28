@@ -3319,6 +3319,13 @@ describe('URL credentials in caller text', () => {
       '%2Fpath',
     ],
     [
+      'bare with a long password',
+      (h) => `connect ${USER}:${PASS.repeat(80)}@${h} failed`,
+      ' failed',
+    ],
+    ['bare after a key', (h) => `url=${USER}:${PASS}@${h} failed`, ' failed'],
+    ['bare in quotes', (h) => `("${USER}:${PASS}@${h}") failed`, ' failed'],
+    [
       'bare with apostrophes',
       (h) => `connect ${USER}:it's'${PASS}@${h} failed`,
       ' failed',
@@ -3410,6 +3417,17 @@ describe('Windows user profiles in stack frames and caller text', () => {
     const out = redact(input) as string;
     expect(out).not.toContain(NAME);
     expect(out).toContain('app');
+  });
+
+  it.each([
+    [`open C:\\Users\\${NAME}`, 'open C:\\Users\\~'],
+    [`open /home/${NAME} failed`, 'open /home/~ failed'],
+    [
+      `open C:\\Users\\${NAME} and then more text`,
+      'open C:\\Users\\~ and then more text',
+    ],
+  ])('a profile directory at the end of a path: %s', (input, expected) => {
+    expect(redact(input)).toBe(expected);
   });
 });
 

@@ -1758,6 +1758,47 @@ describe('read-along through every narration state', () => {
     },
     10_000
   );
+
+  it('signed in, with the first clip ready before the story loads, follows and advances the narration', async () => {
+    guest.clips = 2;
+    let releaseStory: () => void = () => undefined;
+    vi.mocked(services.getStoryByIdService).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releaseStory = () =>
+            resolve({ id: 'story-1', title: 'T', textContent: TWO_PAGES });
+        })
+    );
+    vi.mocked(services.startStoryAudioBatchService).mockImplementation(() =>
+      services.startGuestStoryAudioBatchService('story-1')
+    );
+    renderReader(false);
+    await waitFor(() =>
+      expect(services.startStoryAudioBatchService).toHaveBeenCalled()
+    );
+    await act(async () => {
+      await vi.mocked(services.startStoryAudioBatchService).mock.results[0]
+        ?.value;
+    });
+    expect(screen.getByText('Loading story...')).toBeTruthy();
+    await act(async () => {
+      releaseStory();
+    });
+    fireEvent.click(await screen.findByRole('switch'));
+    await waitReady();
+    await pressPlay();
+    await metadata(30);
+    await tick(15);
+    expect(
+      Array.from(document.querySelectorAll('[data-active="true"]')).map((e) =>
+        e.textContent?.slice(0, 2)
+      )
+    ).toEqual(['b0']);
+    expect(document.querySelector('small')?.textContent).toBe('00:15 / 00:30');
+    await clipEndsOntoNewSource();
+    await waitFor(() => expect(played).toEqual(['0.mp3', '1.mp3']));
+    expect(screen.getAllByText('Page 2 of 2').length).toBeGreaterThan(0);
+  });
 });
 
 describe('keyboard focus on the last page', () => {

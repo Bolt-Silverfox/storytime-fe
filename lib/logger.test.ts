@@ -2073,7 +2073,8 @@ describe('round 11: every serialised header form', () => {
       cookie: `session="x"; theme=${SECRET}`,
       next: 'keep',
     });
-    expect(redact(body)).toBe('{"cookie":[REDACTED],"next":"keep"}');
+    const out = JSON.parse(redact(body) as string);
+    expect(out).toEqual({ cookie: '[REDACTED]', next: 'keep' });
   });
 
   it.each([
@@ -3103,6 +3104,45 @@ describe('outage limiter and the wall clock', () => {
     logger.error('kids', net(), { expected: true });
     expect(sentry.captureMessage).toHaveBeenCalledTimes(2);
   });
+
+  it('a backward clock step does not reopen the window early', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:10:00Z'));
+    const net = () =>
+      new AxiosError('Network Error', 'ERR_NETWORK', {
+        url: '/kids/7',
+        method: 'get',
+        headers: new AxiosHeaders(),
+      } as never);
+    logger.error('kids', net(), { expected: true });
+    vi.setSystemTime(new Date('2026-01-01T00:09:59.999Z'));
+    logger.error('kids', net(), { expected: true });
+    expect(sentry.captureMessage).toHaveBeenCalledOnce();
+    vi.advanceTimersByTime(61_000);
+    logger.error('kids', net(), { expected: true });
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('redacted JSON stays JSON', () => {
+  it.each([
+    [{ cookie: 'sid=Qa7x', next: 1 }],
+    [{ Cookie: ['sid=Qa7x', 'b=Wb8y'], next: 1 }],
+    [{ 'set-cookie': 'sid=Qa7x; Path=/', next: 1 }],
+    [{ authorization: 'Bearer Qa7x', next: 1 }],
+    [{ headers: { Authorization: 'Digest a="Qa7x", b="Wb8y"' }, next: 1 }],
+    [{ msg: 'Cookie: sid=Qa7x', next: 1 }],
+    [{ msg: 'authorization: Bearer Qa7x', next: 1 }],
+  ])('%j', (value) => {
+    for (const text of [
+      JSON.stringify(value),
+      JSON.stringify(value, null, 2),
+    ]) {
+      const out = redact(text) as string;
+      expect(out).not.toMatch(/Qa7x|Wb8y/);
+      expect(JSON.parse(out)).toMatchObject({ next: 1 });
+    }
+  });
 });
 
 describe('caller text: generated formats x keys x secrets', () => {
@@ -3225,8 +3265,11 @@ describe('caller text: generated formats x keys x secrets', () => {
     )
   );
 
-  it.each(cases)('%s / %s / %s', (_format, _key, _secret, input, survivor) => {
+  it.each(cases)('%s / %s / %s', (format, _key, _secret, input, survivor) => {
     const out = redact(input) as string;
+    if (format === 'compact JSON' || format === 'pretty JSON') {
+      expect(JSON.parse(out)).toMatchObject({ kidId: 'k1', page: 3 });
+    }
     for (const piece of PIECES) {
       expect(out).not.toContain(piece);
     }

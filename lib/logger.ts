@@ -753,6 +753,19 @@ function redactString(input: string, budget: Walk): string {
     : value;
 }
 
+const QUOTED_VALUE = /^(["'])[\s\S]*\1$/;
+const STRING_ARRAY = /^\[\s*"[\s\S]*"\s*\]$/;
+
+function maskHeaderValue(match: string, label: string): string {
+  const value = match.slice(label.length);
+  const masked = QUOTED_VALUE.test(value)
+    ? `${value[0]}${REDACTED}${value[0]}`
+    : STRING_ARRAY.test(value)
+      ? `"${REDACTED}"`
+      : REDACTED;
+  return `${label}${masked}`;
+}
+
 const JSON_VALUE_START = /\s*(?:["{[\]}\d-]|true|false|null)/y;
 const MAX_JSON_DEPTH = 20;
 
@@ -859,8 +872,8 @@ function redactText(text: string): string {
         return /["'`]/.test(char) ? `\\${char}` : char;
       })
       .replace(JWT, REDACTED)
-      .replace(AUTH_HEADER_LINE, `$1${REDACTED}`)
-      .replace(COOKIE_HEADER, `$1${REDACTED}`)
+      .replace(AUTH_HEADER_LINE, maskHeaderValue)
+      .replace(COOKIE_HEADER, maskHeaderValue)
       .replace(BEARER, `Bearer ${REDACTED}`)
       .replace(SCHEME_LONG, REDACTED)
       .replace(SCHEME_BASIC, `Basic ${REDACTED}`)
@@ -1763,6 +1776,10 @@ function report(scope: string | undefined, entry: ErrorEntry): void {
 // failing with ERR_NETWORK / CORS) or a misrouted bearer (401 on a normal
 // endpoint). Send one warning-level event per endpoint per minute for those.
 const OUTAGE_EVENT_INTERVAL_MS = 60_000;
+const monotonicNow = () =>
+  typeof performance !== 'undefined' && typeof performance.now === 'function'
+    ? performance.now()
+    : Date.now();
 // Auth *actions* (a 401 here is a normal wrong-credentials / expired-refresh
 // outcome). Other /auth/* endpoints (auth/kids, auth/linked-accounts, ...) are
 // ordinary authenticated calls: a 401 there is worth one event per minute.
@@ -1792,7 +1809,7 @@ function maybeReportExpectedOutage(
     return; // The user is offline: not an outage.
   }
   const key = `${http.method ?? ''} ${http.path ?? ''} ${network ? 'net' : '401'}`;
-  const now = Date.now();
+  const now = monotonicNow();
   const last = lastOutageEvent.get(key);
   if (
     last !== undefined &&

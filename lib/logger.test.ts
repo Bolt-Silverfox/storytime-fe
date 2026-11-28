@@ -3496,6 +3496,21 @@ describe('round 13: JSON delimiters, padded credentials, routes, classification'
     expect(redact(input)).not.toContain('Qa7xWb8y');
   });
 
+  it.each([
+    'authorization=Digest realm= example, nonce=Qa7xWb8y, response=Rz9kLm2p',
+    'authorization=Digest realm =example, nonce=Qa7xWb8y',
+  ])('a Digest parameter with spaces is not a token68: %s', (input) => {
+    expect(redact(input)).not.toMatch(/Qa7xWb8y|Rz9kLm2p/);
+  });
+
+  it.each([
+    ['{"note":"kid@example.com","note":"ok"}', '{"note":"ok"}'],
+    ['{"token":"Qa7xWb8y","token":"[REDACTED]"}', '{"token":"[REDACTED]"}'],
+    ['x {"a":{"b":"kid@example.com","b":1}} y', 'x {"a":{"b":1}} y'],
+  ])('a duplicate JSON member never comes back: %s', (input, expected) => {
+    expect(redact(input)).toBe(expected);
+  });
+
   it('a JSON value after a sensitive key is still masked', () => {
     expect(redact('token=["Qa7x","Wb8y"] page=3')).toBe(
       'token=[REDACTED] page=3'

@@ -464,7 +464,8 @@ function unquotedEnd(input: string, from: number, grammar: Grammar): number {
 const AUTH_SCHEME = /[A-Za-z][\w.-]{0,30}[^\S\r\n]+/y;
 const PARAM_NAME = /[\w-]+[^\S\r\n]*=[^\S\r\n]*/y;
 const PARAM_GAP = /[^\S\r\n]*,[^\S\r\n]*/y;
-const TOKEN68 = /[\w.~+/-]+=*(?![^\s,])(?![^\S\r\n]*=)/y;
+const TOKEN68 =
+  /[\w.~+/-]+(?:=+(?=[^\S\r\n]*(?:,|$))|(?![^\s,]))(?![^\S\r\n]*=)/my;
 
 function paramEnd(input: string, at: number): number {
   PARAM_NAME.lastIndex = at;
@@ -825,35 +826,26 @@ function jsonSpans(input: string): [number, number][] {
   return spans;
 }
 
-function redactJson(
-  value: unknown,
-  depth: number,
-  state: { changed: boolean }
-): unknown {
+function redactJson(value: unknown, depth: number): unknown {
   if (typeof value === 'string') {
-    const text = redactText(value);
-    state.changed ||= text !== value;
-    return text;
+    return redactText(value);
   }
   if (value === null || typeof value !== 'object') {
     return value;
   }
   if (depth >= MAX_JSON_DEPTH) {
-    state.changed = true;
     return '[Truncated]';
   }
   if (Array.isArray(value)) {
-    return value.map((item) => redactJson(item, depth + 1, state));
+    return value.map((item) => redactJson(item, depth + 1));
   }
   const out: Record<string, unknown> = {};
   for (const [key, item] of Object.entries(value)) {
-    const name = redactJson(key, depth, state) as string;
-    if (isSensitiveKey(key)) {
-      state.changed = true;
-      put(out, name, REDACTED);
-    } else {
-      put(out, name, redactJson(item, depth + 1, state));
-    }
+    put(
+      out,
+      redactText(key),
+      isSensitiveKey(key) ? REDACTED : redactJson(item, depth + 1)
+    );
   }
   return out;
 }
@@ -889,11 +881,10 @@ function shieldJsonSpans(text: string, slots: string[]): string {
     if (parsed === THREW) {
       continue;
     }
-    const state = { changed: false };
-    const cleaned = redactJson(parsed, 0, state);
+    const cleaned = redactJson(parsed, 0);
     const whole = start === first && end === last;
     const indent = whole ? /\n([ \t]{1,10})\S/.exec(source)?.[1] : undefined;
-    slots.push(state.changed ? JSON.stringify(cleaned, null, indent) : source);
+    slots.push(JSON.stringify(cleaned, null, indent));
     out += `${text.slice(pos, start)}\uE000${slots.length - 1}\uE001`;
     pos = end;
   }

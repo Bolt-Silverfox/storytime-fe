@@ -3311,6 +3311,7 @@ describe('URL credentials in caller text', () => {
   const forms: [string, (host: string) => string, string][] = [
     ['https', (h) => `https://${USER}:${PASS}@${h}/path`, '/path'],
     ['postgres', (h) => `postgres://${USER}:${PASS}@${h}/db`, '/db'],
+    ['after a label', (h) => `URL:https://${USER}:${PASS}@${h}/path`, '/path'],
     ['apostrophes', (h) => `https://${USER}:it's'${PASS}@${h}/path`, '/path'],
     [
       'encoded with apostrophes',

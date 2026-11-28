@@ -767,18 +767,19 @@ function maskHeaderValue(match: string, label: string): string {
 }
 
 const URL_USERINFO =
-  /(?<![\w.+:/-])((?:[a-z][a-z0-9+.-]*:)?\/\/)[^\s/?#"<>]*@|(?<![\w.+-])((?:[a-z][a-z0-9+.-]*%3A)?%2F%2F)(?:(?!%2F|%3F|%23)[^\s/?#"<>])*%40|(^|[\s=(,;"'])[\w.~%+-]{1,128}:[^\s/?#"<>@]{1,256}@(?=[\w[])/gi;
+  /(?:(?<![\w.+-])([a-z][a-z0-9+.-]*:\/\/)|(?<![\w.+:/-])(\/\/))[^\s/?#"<>]*@|(?<![\w.+-])((?:[a-z][a-z0-9+.-]*%3A)?%2F%2F)(?:(?!%2F|%3F|%23)[^\s/?#"<>])*%40|(^|[\s=(,;"'])[\w.~%+-]{1,128}:[^\s/?#"<>@]{1,256}@(?=[\w[])/gi;
 const HOME_IN_TEXT =
   /(?<![\w.-])((?:file:\/\/\/?)?(?:[A-Za-z]:)?(?:\\{1,4}|\/)(?:Users|home)(?:\\{1,4}|\/))[^\\/\r\n"'<>|*?:]{1,64}(?=\\|\/)/gi;
 
 function maskUserinfo(
   _match: string,
-  head: string | undefined,
+  scheme: string | undefined,
+  relative: string | undefined,
   encodedHead: string | undefined,
   lead: string | undefined
 ): string {
   return encodedHead === undefined
-    ? `${head ?? lead ?? ''}${REDACTED}@`
+    ? `${scheme ?? relative ?? lead ?? ''}${REDACTED}@`
     : `${encodedHead}${REDACTED}%40`;
 }
 

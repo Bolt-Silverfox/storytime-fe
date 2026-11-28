@@ -766,6 +766,22 @@ function maskHeaderValue(match: string, label: string): string {
   return `${label}${masked}`;
 }
 
+const URL_USERINFO =
+  /(?<![\w.+:/-])((?:[a-z][a-z0-9+.-]*:)?\/\/)[^\s/?#"'<>]*@|(?<![\w.+-])((?:[a-z][a-z0-9+.-]*%3A)?%2F%2F)(?:(?!%2F|%3F|%23)[^\s/?#"'<>])*%40|(^|[\s=(,;"'])[\w.~%+-]+:[^\s/?#"'<>@]+@(?=[\w[])/gi;
+const HOME_IN_TEXT =
+  /(?<![\w.-])((?:file:\/\/\/?)?(?:[A-Za-z]:)?(?:\\{1,4}|\/)(?:Users|home)(?:\\{1,4}|\/))[^\\/\s"'<>|*?:]+(?=\\|\/)/gi;
+
+function maskUserinfo(
+  _match: string,
+  head: string | undefined,
+  encodedHead: string | undefined,
+  lead: string | undefined
+): string {
+  return encodedHead === undefined
+    ? `${head ?? lead ?? ''}${REDACTED}@`
+    : `${encodedHead}${REDACTED}%40`;
+}
+
 const JSON_VALUE_START = /\s*(?:["{[\]}\d-]|true|false|null)/y;
 const MAX_JSON_DEPTH = 20;
 
@@ -867,6 +883,8 @@ function redactJsonSpans(text: string): string {
 function redactText(text: string): string {
   return redactKeyNames(
     redactJsonSpans(text)
+      .replace(URL_USERINFO, maskUserinfo)
+      .replace(HOME_IN_TEXT, '$1~')
       .replace(UNICODE_SEPARATOR, (_, hex: string) => {
         const char = String.fromCharCode(Number.parseInt(hex, 16));
         return /["'`]/.test(char) ? `\\${char}` : char;
@@ -891,31 +909,76 @@ function isAxiosLike(value: object): boolean {
   );
 }
 
-const ROUTE_WORDS = new Set(
-  (
-    'access api apple audio auth available avatar avatars batch categories ' +
-    'change-password completed continue-reading daily-challenge devices ' +
-    'feedback google guest help-support history invite kid kids library link ' +
-    'linked-accounts login logout mark-all-read me notification-preferences ' +
-    'notifications oauth parent-favorites passwordless preferred progress ' +
-    'quota recommended refresh refresh-token register request ' +
-    'request-password-reset reset-password search send-verification session ' +
-    'share stories story system unlink upload-avatar user users v1 ' +
-    'validate-reset-token verify verify-email voice'
-  ).split(' ')
-);
+const ROUTES = `
+  auth/apple auth/google auth/change-password auth/kids/:id auth/link/apple
+  auth/link/google auth/linked-accounts auth/login auth/logout auth/magic
+  auth/refresh auth/refresh-token auth/register auth/passwordless/request
+  auth/request-password-reset auth/reset-password/:id auth/send-verification
+  auth/validate-reset-token auth/verify-email auth/verify/:id
+  auth/unlink/google auth/unlink/apple avatars/system devices/register
+  guest/history guest/quota guest/session guest/stories/:id/audio/:id
+  help-support/feedback notifications/mark-all-read
+  notification-preferences/users/:id notification-preferences/:id
+  parent-favorites/:id stories/categories stories/user/library/completed
+  stories/user/library/continue-reading stories/user/progress
+  stories/user/quota stories/daily-challenge/kid/:id stories/:id/audio
+  user/me/avatar user/me/upload-avatar users/:id voice/access
+  voice/available voice/preferred voice/story/audio/batch invite/:id
+  reset-password/:id kids/:id progress/:id story/:id login/code
+  register/setup/success register/setup/voice forgot-password/verify
+  create-new-password/success verify-email dashboard/ai-voice
+  dashboard/notification dashboard/personal-settings
+  dashboard/security-settings favorites library contact privacy-policy faq
+  about terms-and-conditions
+`;
+
+interface RouteNode {
+  fixed: Map<string, RouteNode>;
+  param?: RouteNode;
+}
+
+const routeNode = (): RouteNode => ({ fixed: new Map() });
+
+const ROUTE_TREE = routeNode();
+for (const route of ROUTES.split(/\s+/).filter(Boolean)) {
+  let node = ROUTE_TREE;
+  for (const seg of route.split('/')) {
+    if (seg === ':id') {
+      node.param ??= routeNode();
+      node = node.param;
+    } else {
+      const next = node.fixed.get(seg) ?? routeNode();
+      node.fixed.set(seg, next);
+      node = next;
+    }
+  }
+}
 const MAX_SEGMENTS = 20;
 
-/** Path only (no origin/query/fragment); every segment that is not a known route word becomes ":id". */
+/** Path only (no origin/query/fragment); a segment stays readable only where a known route has that word at that position, every other segment becomes ":id". */
 function normalisePath(url: unknown): string | undefined {
   if (typeof url !== 'string') {
     return undefined;
   }
-  const path = url
+  const segments = url
     .split(/[?#]/)[0]
     .replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]*/i, '')
-    .split('/', MAX_SEGMENTS)
-    .map((seg) => (seg === '' || ROUTE_WORDS.has(seg) ? seg : ':id'))
+    .split('/', MAX_SEGMENTS);
+  const first = segments.findIndex((seg) => seg !== '');
+  const routeStart =
+    segments[first] === 'api' && segments[first + 1] === 'v1'
+      ? first + 2
+      : first;
+  let node: RouteNode | undefined = ROUTE_TREE;
+  const path = segments
+    .map((seg, i) => {
+      if (seg === '' || i < routeStart) {
+        return seg;
+      }
+      const fixed = node?.fixed.get(seg);
+      node = fixed ?? node?.param;
+      return fixed ? seg : ':id';
+    })
     .join('/');
   return path.startsWith('/') ? path : `/${path}`;
 }
@@ -1115,7 +1178,8 @@ function structuralUrl(text: string): string | undefined {
 const MAX_FRAMES = 50;
 const MAX_FRAME_LINE = 1_000;
 const FRAME_LOCATION = /^(\S{1,800}?):(\d{1,7}):(\d{1,7})$/;
-const HOME_DIR = /^((?:file:\/\/)?)\/(?:Users|home)\/[^/]+(?=\/)/i;
+const HOME_DIR =
+  /^((?:file:\/\/\/?)?(?:[A-Za-z]:)?)([\\/])(?:Users|home|Documents and Settings)[\\/][^\\/]+(?=[\\/])/i;
 const WEB_FILE = /^(https?:\/\/[^/]+)(\/.*)$/i;
 const V8_FRAME =
   /^\s*at (?:((?:async |new )?[\w$.<>[\]]{1,120}) \((\S{1,820}|<anonymous>|native)\)|(\S{1,820}))$/;
@@ -1137,7 +1201,7 @@ function frameLocation(location: string): string | undefined {
   const file = m[1]
     .replace(/[?#].*$/, '')
     .replace(/^([a-z][a-z\d+.-]*:\/\/)[^/@]*@/i, '$1')
-    .replace(HOME_DIR, '$1/~');
+    .replace(HOME_DIR, '$1$2~');
   const web = WEB_FILE.exec(file);
   const shown =
     web && !web[2].startsWith('/_next/static/')

@@ -623,39 +623,59 @@ describe('round 2: expected-outage scope and bounds', () => {
 
   it('keeps the rate-limiter map bounded', () => {
     vi.useFakeTimers();
-    const words = [
-      'kids',
-      'stories',
-      'guest',
-      'voice',
-      'user',
-      'devices',
+    const paths = [
+      'kids/1',
+      'stories/1',
+      'stories/categories',
+      'stories/user/quota',
+      'stories/user/progress',
+      'stories/user/library/completed',
+      'stories/user/library/continue-reading',
+      'stories/daily-challenge/kid/1',
+      'guest/quota',
+      'guest/history',
+      'guest/session',
+      'guest/stories/1/audio/1',
+      'voice/access',
+      'voice/available',
+      'voice/preferred',
+      'user/me',
+      'user/me/avatar',
+      'devices/register',
       'notifications',
-      'avatars',
-      'help-support',
-      'parent-favorites',
-      'categories',
+      'notifications/mark-all-read',
+      'avatars/system',
+      'help-support/feedback',
+      'parent-favorites/1',
+      'auth/kids/1',
+      'auth/linked-accounts',
+      'notification-preferences/1',
+      'users/1',
+      'invite/1',
+      'progress/1',
       'library',
-      'progress',
-      'quota',
-      'history',
-      'session',
-      'audio',
-      'feedback',
-      'access',
-      'available',
     ];
-    for (const a of words) {
-      for (const b of words) {
-        logger.error('x', makeAxiosError(401, `/${a}/${b}`), {
-          expected: true,
-        });
+    const methods = [
+      'get',
+      'post',
+      'put',
+      'patch',
+      'delete',
+      'head',
+      'options',
+    ];
+    for (const method of methods) {
+      for (const url of paths) {
+        const error = makeAxiosError(401, url);
+        if (error.config) {
+          error.config.method = method;
+        }
+        logger.error('x', error, { expected: true });
       }
     }
-    expect(sentry.captureMessage).toHaveBeenCalledTimes(400);
-    // Oldest keys were evicted, so a very early key is reportable again.
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(210);
     sentry.captureMessage.mockClear();
-    logger.error('x', makeAxiosError(401, '/kids/kids'), { expected: true });
+    logger.error('x', makeAxiosError(401, 'kids/1'), { expected: true });
     expect(sentry.captureMessage).toHaveBeenCalledOnce();
     vi.useRealTimers();
   });
@@ -885,6 +905,11 @@ describe('round 4: linear time', () => {
     ['JSON openers', '[{"'],
     ['multi-line group', 'token: [\n'],
     ['deep brackets', '[[[[{{{{'],
+    ['URL schemes', 'a://b:c'],
+    ['protocol-relative', ' //a:b'],
+    ['bare userinfo', ' a:b:c'],
+    ['encoded schemes', 'a%3A%2F%2Fb%3Ac'],
+    ['home directories', ' C:\\Users\\a'],
   ];
   // 8k vs 64k characters: linear is ~8x, quadratic ~64x, so < 20x separates
   // them with room for scheduler noise.
@@ -3274,5 +3299,131 @@ describe('caller text: generated formats x keys x secrets', () => {
       expect(out).not.toContain(piece);
     }
     expect(out).toContain(survivor);
+  });
+});
+
+describe('URL credentials in caller text', () => {
+  const USER = 'Qa7xuser';
+  const PASS = 'Wb8ypass';
+  const hosts = ['internal', 'dbhost:5432', 'api.example.com', '10.0.0.7'];
+  const forms: [string, (host: string) => string, string][] = [
+    ['https', (h) => `https://${USER}:${PASS}@${h}/path`, '/path'],
+    ['postgres', (h) => `postgres://${USER}:${PASS}@${h}/db`, '/db'],
+    ['user only', (h) => `https://${USER}@${h}/path`, '/path'],
+    ['protocol-relative', (h) => `//${USER}:${PASS}@${h}/path`, '/path'],
+    ['bare', (h) => `connect ${USER}:${PASS}@${h} failed`, ' failed'],
+    [
+      'encoded',
+      (h) => encodeURIComponent(`https://${USER}:${PASS}@${h}/path`),
+      '%2Fpath',
+    ],
+    [
+      'in a query',
+      (h) => `/cb?next=https://${USER}:${PASS}@${h}/x&page=3`,
+      '&page=3',
+    ],
+    [
+      'encoded in a query',
+      (h) =>
+        `/cb?next=${encodeURIComponent(`https://${USER}:${PASS}@${h}/x`)}&page=3`,
+      '&page=3',
+    ],
+    [
+      'in JSON',
+      (h) => JSON.stringify({ url: `redis://${USER}:${PASS}@${h}`, page: 3 }),
+      '"page":3',
+    ],
+  ];
+  const cases = forms.flatMap(([name, build, survivor]) =>
+    hosts.map((host) => [name, host, build(host), survivor] as const)
+  );
+
+  it.each(cases)('%s on %s', (_name, host, input, survivor) => {
+    logger.warn(input);
+    const out = redact(input) as string;
+    for (const text of [out, String(spies.warn.mock.calls[0][0])]) {
+      expect(text).not.toMatch(/Qa7x|Wb8y/);
+      expect(text).toContain(survivor);
+    }
+    const bareHost = host.split(':')[0];
+    expect(out).toContain(bareHost);
+  });
+
+  it('keeps the host, port and path', () => {
+    expect(redact(`https://${USER}:${PASS}@internal:8080/a/b?c=1`)).toBe(
+      'https://[REDACTED]@internal:8080/a/b?c=1'
+    );
+  });
+});
+
+describe('Windows user profiles in stack frames and caller text', () => {
+  const NAME = 'Qa7xname';
+  const frames: [string, string][] = [
+    [
+      `    at a (C:\\Users\\${NAME}\\app\\lib\\x.js:1:2)`,
+      '    at a (C:\\~\\app\\lib\\x.js:1:2)',
+    ],
+    [
+      `    at b (file:///C:/Users/${NAME}/app/lib/y.js:3:4)`,
+      '    at b (file:///C:/~/app/lib/y.js:3:4)',
+    ],
+    [
+      `    at c (d:\\users\\${NAME}\\app\\z.js:5:6)`,
+      '    at c (d:\\~\\app\\z.js:5:6)',
+    ],
+    [`    at d (C:\\Documents and Settings\\${NAME}\\w.js:7:8)`, ''],
+  ];
+
+  it.each(frames)('%s', (frame, expected) => {
+    const err = new Error('e');
+    err.stack = `Error: e\n${frame}`;
+    logger.error('m', err);
+    const stack = (sentry.captureException.mock.calls[0][0] as Error).stack;
+    expect(stack).toBe(
+      expected ? `Error: [omitted]\n${expected}` : 'Error: [omitted]'
+    );
+    expect(fieldsMatching(spies.error.mock.calls, NAME)).toEqual([]);
+  });
+
+  it.each([
+    `failed at C:\\Users\\${NAME}\\app\\x.js:1:2`,
+    `failed at file:///C:/Users/${NAME}/app/x.js`,
+    JSON.stringify({ stack: `at a (C:\\Users\\${NAME}\\app\\x.js:1:2)` }),
+    `open /Users/${NAME}/app/x.ts`,
+    `open /home/${NAME}/app/x.ts`,
+  ])('caller text: %s', (input) => {
+    const out = redact(input) as string;
+    expect(out).not.toContain(NAME);
+    expect(out).toContain('app');
+  });
+});
+
+describe('endpoint paths normalise by position, not by word', () => {
+  const path = (url: string) => {
+    sentry.captureException.mockClear();
+    logger.error('x', makeAxiosError(500, url));
+    return (
+      sentry.captureException.mock.calls[0][1] as {
+        tags: Record<string, string>;
+      }
+    ).tags['http.path'];
+  };
+
+  it.each([
+    ['stories/login', '/stories/:id'],
+    ['stories/library', '/stories/:id'],
+    ['stories/categories', '/stories/categories'],
+    ['/api/v1/stories/voice', '/api/v1/stories/:id'],
+    ['auth/kids/kids', '/auth/kids/:id'],
+    ['guest/stories/history/audio/batch', '/guest/stories/:id/audio/:id'],
+    ['parent-favorites/me', '/parent-favorites/:id'],
+    ['kids/auth/login', '/kids/:id/:id'],
+    ['auth/login', '/auth/login'],
+  ])('%s -> %s', (url, expected) => {
+    expect(path(url)).toBe(expected);
+  });
+
+  it('a route-word slug groups with every other slug', () => {
+    expect(path('stories/login')).toBe(path('stories/s1'));
   });
 });

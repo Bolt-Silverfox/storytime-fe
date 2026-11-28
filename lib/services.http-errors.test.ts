@@ -94,7 +94,9 @@ describe.each(services)('%s errors', (_name, call, url, path) => {
   it('let the logger report a 401 outage for the endpoint', async () => {
     get.mockRejectedValueOnce(httpError(url, 401));
     const err = await caught(call);
-    logger.error('failed', err, { expected: isExpectedFailure(err) });
+    logger.error('Failed to fetch kids', err, {
+      expected: isExpectedFailure(err),
+    });
     expect(sentry.captureMessage).toHaveBeenCalledOnce();
     const [message, hint] = sentry.captureMessage.mock.calls[0] as [
       string,
@@ -105,7 +107,10 @@ describe.each(services)('%s errors', (_name, call, url, path) => {
     expect(hint.tags['http.path']).toBe(path);
     expect(hint.tags['http.status']).toBe('401');
     expect(sentry.addBreadcrumb).toHaveBeenCalledWith(
-      expect.objectContaining({ level: 'warning', message: 'failed' })
+      expect.objectContaining({
+        level: 'warning',
+        message: 'Failed to fetch kids',
+      })
     );
     expect(
       fieldsMatching(
@@ -121,7 +126,9 @@ describe.each(services)('%s errors', (_name, call, url, path) => {
     expect(err.message).toBe('No response from server');
     expect(err.status).toBeNull();
     expect(isExpectedFailure(err)).toBe(true);
-    logger.error('failed', err, { expected: isExpectedFailure(err) });
+    logger.error('Failed to fetch kids', err, {
+      expected: isExpectedFailure(err),
+    });
     expect(sentry.captureException).not.toHaveBeenCalled();
     expect(sentry.captureMessage.mock.calls[0]?.[0]).toBe(
       `Expected failure: network error GET ${path}`

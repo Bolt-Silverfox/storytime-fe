@@ -864,7 +864,7 @@ const SLOT = /\uE000(\d+)\uE001/g;
 
 function charBefore(text: string, at: number): number {
   let i = at - 1;
-  while (i >= 0 && (text[i] === ' ' || text[i] === '\t')) {
+  while (i >= 0 && /\s/.test(text[i])) {
     i--;
   }
   return i;

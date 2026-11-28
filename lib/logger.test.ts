@@ -3489,6 +3489,9 @@ describe('round 13: JSON delimiters, padded credentials, routes, classification'
     'token\t[0] = Qa7xWb8y',
     'password ["a"]=Qa7xWb8y',
     '"password" [0]: Qa7xWb8y',
+    'password\n[0]=Qa7xWb8y',
+    'password\r\n [0]=Qa7xWb8y',
+    'password%5D [0]=Qa7xWb8y',
   ])('a spaced subscript still reaches its value: %s', (input) => {
     expect(redact(input)).not.toContain('Qa7xWb8y');
   });

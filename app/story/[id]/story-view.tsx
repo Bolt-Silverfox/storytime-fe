@@ -8,6 +8,7 @@ import StoryReader from '@/components/story-reader';
 import Modal from '@/components/ui/modal';
 import VoiceSelector, { type SelectedVoice } from '@/components/voice-selector';
 import { useStoryQuota } from '@/lib/hooks/use-story-quota';
+import { getReadAlongDefault } from '@/lib/reader/read-along-preference';
 import {
   addFavoriteService,
   getPreferredVoiceService,
@@ -33,7 +34,7 @@ export default function StoryView({ storyId }: { storyId: string }) {
   const [expand, setExpand] = useState(false);
   const [step, setStep] = useState(1);
   // Lives here so the read-along switch survives the reader unmounting.
-  const [readAlong, setReadAlong] = useState(false);
+  const [readAlong, setReadAlong] = useState(getReadAlongDefault);
   const [preparing, setPreparing] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   // Backend refused a NEW story for quota before the reader could mount.

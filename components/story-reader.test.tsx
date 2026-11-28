@@ -86,7 +86,7 @@ vi.mock('@/lib/services', () => {
   };
 });
 
-import { saveReadingPosition } from '@/lib/progress-store';
+import { getReadingPosition, saveReadingPosition } from '@/lib/progress-store';
 import { pagesSignature, resolvePages } from '@/lib/reader/paginate';
 import * as services from '@/lib/services';
 import StoryReader from './story-reader';
@@ -1384,6 +1384,74 @@ describe('read-along highlight when the narrated clip changes', () => {
       );
       expect(seen.length).toBeGreaterThan(0);
       expect(seen.filter((i) => i !== null && i !== '0')).toEqual([]);
+    }
+  );
+});
+
+describe('the reader opens with read-along already on', () => {
+  const sig = () => pagesSignature(resolvePages(undefined, TEXT));
+  const renderControlled = (readAlong: boolean) =>
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <StoryReader
+          img=''
+          title='T'
+          description='D'
+          voice='Storyteller'
+          setStep={() => undefined}
+          mode='plain'
+          storyId='story-1'
+          isGuest
+          readAlong={readAlong}
+          onReadAlongChange={() => undefined}
+        />
+      </QueryClientProvider>
+    );
+
+  beforeEach(() => {
+    vi.mocked(services.startGuestStoryAudioBatchService).mockClear();
+    resetGuest();
+    guest.clips = 6;
+    guest.story = { id: 'story-1', title: 'T', textContent: TEXT };
+  });
+  afterEach(resetGuest);
+
+  it.each([
+    { saved: null, shown: 1, savedAfter: 0 },
+    { saved: 3, shown: 4, savedAfter: 3 },
+  ])(
+    'with saved page $saved it shows page $shown and keeps $savedAfter saved',
+    async ({ saved, shown, savedAfter }) => {
+      if (saved !== null) {
+        restorePage(saved);
+      }
+      renderControlled(true);
+      await batchApplied();
+      pageShownIs(shown);
+      expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe(
+        'true'
+      );
+      expect(getReadingPosition('story-1', 6, sig())).toBe(savedAfter);
+    }
+  );
+
+  it.each([
+    { page: 0, label: 'the first page' },
+    { page: 2, label: 'a later page' },
+  ])(
+    'Play on $label narrates that page and turns with it',
+    async ({ page }) => {
+      restorePage(page);
+      renderControlled(true);
+      await batchApplied();
+      pageShownIs(page + 1);
+      fireEvent.click(playButton());
+      await waitFor(() => expect(played).toEqual([`${page}.mp3`]));
+      await endAudio();
+      await waitFor(() =>
+        expect(played).toEqual([`${page}.mp3`, `${page + 1}.mp3`])
+      );
+      pageShownIs(page + 2);
     }
   );
 });

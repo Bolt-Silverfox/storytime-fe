@@ -211,8 +211,8 @@ const HTTP_METHODS = new Set([
 const isHttpStatus = (s: unknown): s is number =>
   Number.isInteger(s) && (s as number) >= 100 && (s as number) <= 599;
 
-const isCount = (v: unknown): v is number =>
-  Number.isInteger(v) && (v as number) >= 0;
+const isSmallCount = (v: unknown): v is number =>
+  Number.isInteger(v) && (v as number) >= 0 && (v as number) < 1_000;
 
 const ERROR_CODES = new Set([
   'ERR_NETWORK',
@@ -260,13 +260,15 @@ const CONTEXT_RULES: Record<keyof LogContext, Rule> = {
       : undefined,
   status: (v) => (isHttpStatus(v) ? v : undefined),
   code: (v) =>
-    isCount(v) || isKnownCode(v) || (typeof v === 'string' && APP_CODE.test(v))
+    isSmallCount(v) ||
+    isKnownCode(v) ||
+    (typeof v === 'string' && APP_CODE.test(v))
       ? (v as string | number)
       : undefined,
   durationMs: (v) =>
     typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : undefined,
   requestId: (v) => (typeof v === 'string' && UUID.test(v) ? v : undefined),
-  attempt: (v) => (isCount(v) ? v : undefined),
+  attempt: (v) => (isSmallCount(v) ? v : undefined),
 };
 const CONTEXT_KEYS = Object.keys(CONTEXT_RULES) as (keyof LogContext)[];
 

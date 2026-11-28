@@ -265,6 +265,8 @@ describe('caller context: only allow-listed keys and shapes pass', () => {
     ['status', '500'],
     ['code', 'Kq7Lm-secret'],
     ['code', 'TOKEN_Kq7Lm'],
+    ['code', 123456],
+    ['attempt', 123456],
     ['durationMs', -1],
     ['durationMs', Number.NaN],
     ['requestId', 'Kq7Lm'],

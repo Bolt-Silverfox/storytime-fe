@@ -878,6 +878,13 @@ describe('round 4: linear time', () => {
     ['sensitive subscript chain 2', '[password]'],
     ['cookie header', 'cookie: "a '],
     ['authorization scheme', 'authorization: a-b '],
+    ['JSON objects', '{"token":["a","b"],"page":3} '],
+    ['pretty JSON', '{\n  "password": [\n    "a"\n  ]\n}\n'],
+    ['nested JSON', '{"a":{"b":[{"token":"x"}]},"c":"d"}'],
+    ['escaped JSON in JSON', '{"body":"{\\"token\\":\\"x\\"}"} '],
+    ['JSON openers', '[{"'],
+    ['multi-line group', 'token: [\n'],
+    ['deep brackets', '[[[[{{{{'],
   ];
   // 8k vs 64k characters: linear is ~8x, quadratic ~64x, so < 20x separates
   // them with room for scheduler noise.
@@ -1038,8 +1045,7 @@ describe('round 5: one redaction per call, priority budget', () => {
     const hint = sentry.captureException.mock.calls[0][1] as {
       extra: Record<string, string>;
     };
-    // 2 x 60k fits the 128k budget only if scanned once.
-    expect(hint.extra.b).not.toBe('[truncated]');
+    expect(hint.extra.b).toBe(`${'z'.repeat(8_000)}…[truncated]`);
   });
 });
 
@@ -1909,7 +1915,7 @@ describe('parse errors', () => {
     const err = new SyntaxError(
       'JSON Parse error: Unexpected identifier "Ada"'
     );
-    err.stack = 'parse@\nload@https://app/x.js:1:2';
+    err.stack = 'parse@\nload@https://app/_next/static/chunks/x.js:1:2';
     logger.error('x', err);
     const copy = sentry.captureException.mock.calls[0][0] as Error;
     expect(copy.stack).toBe(err.stack);
@@ -2705,14 +2711,14 @@ describe('thrown values: only allow-listed structure', () => {
         '    at b (/~/app/lib/y.ts:3:4)',
         '    at c (https://app.example.com/story/:id:5:6)',
         '    at d (https://app.example.com/_next/static/chunks/main.js:7:8)',
-        '    at e (https://app.example.com/stories/:id/reader.js:9:1)',
+        '    at e (https://app.example.com/stories/:id/:id:9:1)',
       ].join('\n')
     );
   });
 
   it('keeps a headerless stack whose frame contains the message text', () => {
     const err = new Error('app.js');
-    err.stack = 'load@https://app.example.com/app.js:10:5';
+    err.stack = 'load@https://app.example.com/_next/static/chunks/app.js:10:5';
     logger.error('m', err);
     expect(exception().stack).toBe(err.stack);
   });
@@ -2923,5 +2929,307 @@ describe('caller text: value ends', () => {
     ],
   ])('%s', (input, expected) => {
     expect(redact(input)).toBe(expected);
+  });
+});
+
+describe('caller text: structured values and URL quotes', () => {
+  it('masks every member of a sensitive array in pretty-printed JSON', () => {
+    const pretty = JSON.stringify(
+      { kidId: 'k1', token: ['Qa7x', 'Wb8y'], page: 3 },
+      null,
+      2
+    );
+    const out = redact(`Request failed: ${pretty}\nnext line`) as string;
+    expect(out).not.toMatch(/Qa7x|Wb8y/);
+    expect(out).toContain('"kidId":"k1"');
+    expect(out).toContain('"page":3');
+    expect(out.endsWith('\nnext line')).toBe(true);
+  });
+
+  it('keeps the layout of a whole pretty-printed JSON message', () => {
+    const pretty = JSON.stringify(
+      { kidId: 'k1', data: { token: ['Qa7x'] } },
+      null,
+      2
+    );
+    expect(redact(pretty)).toBe(
+      '{\n  "kidId": "k1",\n  "data": {\n    "token": "[REDACTED]"\n  }\n}'
+    );
+  });
+
+  it('masks a multi-line sensitive group that is not valid JSON', () => {
+    const out = redact("token: [\n  'Qa7x',\n  'Wb8y'\n]\npage=3") as string;
+    expect(out).not.toMatch(/Qa7x|Wb8y/);
+    expect(out).toContain('page=3');
+  });
+
+  it('omits the rest of the text when a multi-line sensitive group never closes', () => {
+    const out = redact(`token: [\n  "Qa7x",\n  "${'W'.repeat(2_100)}b8y"`);
+    expect(out).toBe('token: [REDACTED]');
+  });
+
+  it.each([
+    ["?password='one'two&page=3", '?password=[REDACTED]&page=3'],
+    [
+      `?password=${encodeURIComponent("'one'two")}&page=3`,
+      '?password=[REDACTED]&page=3',
+    ],
+    [
+      'url=https://a/x?token=%27one%27two&page=3',
+      'url=https://a/x?token=[REDACTED]&page=3',
+    ],
+    [
+      "next=%2Fx%3Ftoken%3D'one'two%26page%3D3",
+      'next=%2Fx%3Ftoken%3D[REDACTED]%26page%3D3',
+    ],
+  ])('a quote does not open a URL query value: %s', (input, expected) => {
+    expect(redact(`GET ${input}`)).toBe(`GET ${expected}`);
+  });
+
+  it('keeps quote parsing for ordinary assignments', () => {
+    expect(redact("password='one two' page=3")).toBe(
+      "password='[REDACTED]' page=3"
+    );
+  });
+
+  it.each([
+    ['authorization=Bearer opaque, page=3', 'authorization=[REDACTED], page=3'],
+    [
+      'authorization=Basic Kq7LmZx4, page=3',
+      'authorization=[REDACTED], page=3',
+    ],
+    [
+      'authorization=Digest username="a", response="Kq7Lm", page=3',
+      'authorization=[REDACTED]',
+    ],
+    [
+      'authorization=AWS4-HMAC-SHA256 Credential=Kq7Lm, Signature=Zx4Wv',
+      'authorization=[REDACTED]',
+    ],
+  ])('a token68 credential ends at its comma: %s', (input, expected) => {
+    expect(redact(input)).toBe(expected);
+  });
+});
+
+describe('frame paths outside the build output are normalised', () => {
+  const stackOf = (frames: string[]) => {
+    const err = new Error('e');
+    err.stack = ['Error: e', ...frames].join('\n');
+    logger.error('m', err);
+    return (sentry.captureException.mock.calls[0][0] as Error).stack;
+  };
+
+  it('a page path ending in .js keeps no segment', () => {
+    expect(
+      stackOf([
+        '    at e (https://app.example.com/stories/SampleName.js:9:1)',
+        '    at f (https://app.example.com/story/AdaLovelace/x.mjs:2:3)',
+      ])
+    ).toBe(
+      [
+        'Error: [omitted]',
+        '    at e (https://app.example.com/stories/:id:9:1)',
+        '    at f (https://app.example.com/story/:id/:id:2:3)',
+      ].join('\n')
+    );
+  });
+
+  it('keeps build output and the messaging service worker', () => {
+    expect(
+      stackOf([
+        '    at a (https://app.example.com/_next/static/chunks/app/page-1a2b.js:1:2)',
+        '    at b (https://app.example.com/firebase-messaging-sw.js:3:4)',
+      ])
+    ).toBe(
+      [
+        'Error: [omitted]',
+        '    at a (https://app.example.com/_next/static/chunks/app/page-1a2b.js:1:2)',
+        '    at b (https://app.example.com/firebase-messaging-sw.js:3:4)',
+      ].join('\n')
+    );
+  });
+});
+
+describe('tags share the output budget', () => {
+  const stringLengths = (value: unknown): number => {
+    if (typeof value === 'string') {
+      return value.length;
+    }
+    if (value && typeof value === 'object') {
+      return Object.entries(value).reduce(
+        (sum, [k, v]) => sum + k.length + stringLengths(v),
+        0
+      );
+    }
+    return 0;
+  };
+
+  it('large tags cannot push the event past the budget, and a short tag survives', () => {
+    const big = 'x'.repeat(7_900);
+    const context = Object.fromEntries(
+      Array.from({ length: 8 }, (_, i) => [`c${i}`, big])
+    );
+    const tags = {
+      feature: 'kids',
+      ...Object.fromEntries(
+        Array.from({ length: 8 }, (_, i) => [`t${i}`, big])
+      ),
+    };
+    logger.error('m', new Error('e'), { context, tags });
+    const hint = sentry.captureException.mock.calls[0][1] as {
+      tags: Record<string, string>;
+      extra: Record<string, unknown>;
+    };
+    expect(hint.tags.feature).toBe('kids');
+    expect(stringLengths(hint.tags) + stringLengths(hint.extra)).toBeLessThan(
+      64_000 + 8_100
+    );
+  });
+});
+
+describe('outage limiter and the wall clock', () => {
+  it('a backward clock step does not suppress the next outage event', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:10:00Z'));
+    const net = () =>
+      new AxiosError('Network Error', 'ERR_NETWORK', {
+        url: '/kids/7',
+        method: 'get',
+        headers: new AxiosHeaders(),
+      } as never);
+    logger.error('kids', net(), { expected: true });
+    vi.setSystemTime(new Date('2026-01-01T00:05:00Z'));
+    vi.advanceTimersByTime(61_000);
+    logger.error('kids', net(), { expected: true });
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('caller text: generated formats x keys x secrets', () => {
+  const PIECES = ['Qa7x', 'Wb8y', 'Zc9z'];
+  const SECRETS = [
+    PIECES.join("'"),
+    `'${PIECES.join("'")}`,
+    PIECES.join('"'),
+    PIECES.join(','),
+    PIECES.join('\n'),
+    `${PIECES[0]}[${PIECES[1]}]{${PIECES[2]}}`,
+    `${PIECES[0]}', "${PIECES[1]}\n]${PIECES[2]}`,
+  ];
+  const KEYS = [
+    'password',
+    'token',
+    'apiKey',
+    'refresh_token',
+    'authorization',
+    'cookie',
+    'secret',
+    'sessionId',
+  ];
+  const noWhitespace = (s: string) => !/\s/.test(s);
+  const headerValue = (key: string, s: string) =>
+    key === 'authorization'
+      ? `Authorization: Bearer ${s}`
+      : key === 'cookie'
+        ? `Cookie: sid=${s}; theme=dark`
+        : `${key}: ${s}`;
+
+  const formats: [
+    string,
+    (key: string, s: string) => string,
+    string,
+    ((s: string) => boolean)?,
+  ][] = [
+    [
+      'compact JSON',
+      (key, s) => JSON.stringify({ kidId: 'k1', [key]: s, page: 3 }),
+      '"page":3',
+    ],
+    [
+      'compact JSON array',
+      (key, s) => `failed ${JSON.stringify({ [key]: [s, s], page: 3 })}`,
+      '"page":3',
+    ],
+    [
+      'pretty JSON',
+      (key, s) => JSON.stringify({ kidId: 'k1', [key]: s, page: 3 }, null, 2),
+      '"page": 3',
+    ],
+    [
+      'pretty JSON array in text',
+      (key, s) =>
+        `Request failed: ${JSON.stringify({ data: { [key]: [s, s] }, page: 3 }, null, 2)}\nnext`,
+      '\nnext',
+    ],
+    [
+      'pretty JSON fragment that does not parse',
+      (key, s) =>
+        `${JSON.stringify({ data: { [key]: [s, s] }, [key]: s, page: 3 }, null, 2).slice(0, -2)}\n...`,
+      '"page": 3',
+    ],
+    [
+      'inspected object',
+      (key, s) =>
+        `{ kidId: 'k1', ${key}: [ ${JSON.stringify(s)}, ${JSON.stringify(s)} ], page: 3 }`,
+      'page: 3',
+    ],
+    [
+      'query',
+      (key, s) =>
+        `GET https://api.example.com/x?${key}=${encodeURIComponent(s)}&page=3 failed`,
+      '&page=3 failed',
+    ],
+    [
+      'encoded query',
+      (key, s) =>
+        `next=${encodeURIComponent(`/x?${key}=${encodeURIComponent(s)}&page=3`)} done`,
+      'done',
+    ],
+    [
+      'header',
+      (key, s) => `${headerValue(key, s)}\nAccept: */*`,
+      '\nAccept: */*',
+      noWhitespace,
+    ],
+    [
+      'free text, double-quoted',
+      (key, s) => `login failed ${key}=${JSON.stringify(s)} for kid`,
+      ' for kid',
+    ],
+    [
+      'free text, colon and double quotes',
+      (key, s) => `login failed, ${key}: ${JSON.stringify(s)} for kid`,
+      ' for kid',
+    ],
+    [
+      'free text, single-quoted',
+      (key, s) =>
+        `login failed ${key}='${s.replaceAll('\\', '\\\\').replaceAll("'", "\\'").replaceAll('\n', '\\n')}' for kid`,
+      ' for kid',
+    ],
+    [
+      'free text, unquoted',
+      (key, s) => `login failed ${key}=${s} for kid`,
+      ' for kid',
+      (s) =>
+        noWhitespace(s) && !/['"`]/.test(s[0]) && !/['"`][,:;&]|,["'`]/.test(s),
+    ],
+  ];
+
+  const cases = formats.flatMap(([format, build, survivor, applies]) =>
+    KEYS.flatMap((key) =>
+      SECRETS.filter((s) => applies?.(s) ?? true).map(
+        (s) =>
+          [format, key, JSON.stringify(s), build(key, s), survivor] as const
+      )
+    )
+  );
+
+  it.each(cases)('%s / %s / %s', (_format, _key, _secret, input, survivor) => {
+    const out = redact(input) as string;
+    for (const piece of PIECES) {
+      expect(out).not.toContain(piece);
+    }
+    expect(out).toContain(survivor);
   });
 });

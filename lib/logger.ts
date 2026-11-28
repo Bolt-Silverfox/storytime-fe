@@ -179,7 +179,7 @@ const JWT = /eyJ[\w-]{3,200}\.[\w-]{1,20000}\.[\w-]{0,2000}/g;
 // Header lines (Cookie: a=1; b=2, Authorization: Digest a="1", b="2") carry
 // several pairs whose names are not secret-looking: mask to the end of the line.
 const AUTH_HEADER_LINE =
-  /(authorization["']?\s*:\s*)(?:"(?:[^"\\\r\n]|\\.){0,8000}"|'(?:[^'\\\r\n]|\\.){0,8000}'|[^\s"'`][^\r\n]*)/gi;
+  /(authorization["']?\s*:\s*)(?:"(?:[^"\\\r\n]|\\.){0,8000}"|'(?:[^'\\\r\n]|\\.){0,8000}'|[^\s"'`[{][^\r\n]*)/gi;
 const COOKIE_HEADER =
   /(\b(?:set-)?cookie["']?\s*:\s*)(?:"(?:[^"\\\r\n]|\\.){0,8000}"|'(?:[^'\\\r\n]|\\.){0,8000}'|\[\s*"(?:[^"\\\r\n]|\\.){0,8000}"(?:\s*,\s*"(?:[^"\\\r\n]|\\.){0,8000}"){0,50}\s*\]|(?:\\+["'`]|[^\s"'`\\[{])(?:=\\*(["'`])(?:(?!\2)[^\r\n])*\2?|[^\r\n"'`\\]|\\[^\r\nnr"'`]|['`](?=[^\s,;"'`\\]))*)/gi;
 const UNICODE_SEPARATOR = /\\u00(22|27|60|3[ad])/gi;
@@ -370,18 +370,21 @@ const MAX_GROUP = 2_000;
 const GROUP_UNCLOSED = -1;
 const GROUP_DELIMITED = -2;
 const GROUP_UNBOUNDED = -3;
+const GROUP_TO_END = -4;
 
 function groupEnd(input: string, at: number, grammar: Grammar): number {
   const limit = Math.min(input.length, at + MAX_GROUP);
   const unclosed = new Set<string>();
   let depth = 0;
+  let multiline = false;
   for (let i = at; i < limit; i++) {
     const c = input[i];
-    if (c === '\n' || c === '\r') {
-      return GROUP_UNCLOSED;
-    }
     if (i > at && isUrlGrammar(grammar) && endsValueAt(input, i, grammar)) {
       return GROUP_DELIMITED;
+    }
+    if (c === '\n' || c === '\r') {
+      multiline = true;
+      continue;
     }
     if (OPENERS.includes(c)) {
       depth++;
@@ -399,6 +402,9 @@ function groupEnd(input: string, at: number, grammar: Grammar): number {
       }
     }
   }
+  if (multiline) {
+    return GROUP_TO_END;
+  }
   return limit < input.length ? GROUP_UNBOUNDED : GROUP_UNCLOSED;
 }
 
@@ -415,6 +421,9 @@ function unquotedEnd(input: string, from: number, grammar: Grammar): number {
       }
       if (end === GROUP_UNBOUNDED) {
         return lineEnd(input, i);
+      }
+      if (end === GROUP_TO_END) {
+        return input.length;
       }
       groups = false;
     } else if (c === ',' && i > from) {
@@ -498,6 +507,8 @@ function authSchemeEnd(input: string, from: number, grammar: Grammar): number {
   if (AUTH_SCHEME.test(input)) {
     const paramStart = AUTH_SCHEME.lastIndex;
     const word = input.slice(from, paramStart).trimEnd();
+    PARAM_NAME.lastIndex = paramStart;
+    const token68 = !PARAM_NAME.test(input);
     end = paramEnd(input, paramStart);
     if (!AUTH_SCHEMES.has(word.toLowerCase())) {
       PARAM_NAME.lastIndex = paramStart;
@@ -507,6 +518,9 @@ function authSchemeEnd(input: string, from: number, grammar: Grammar): number {
       if (end === paramStart || nextIsField) {
         return from + word.length;
       }
+    }
+    if (token68) {
+      return end;
     }
   } else {
     end = unquotedEnd(input, from, grammar);
@@ -608,12 +622,14 @@ function valueSpan(
   ctx: ValueContext
 ): { start: number; end: number } | null {
   if (ctx.headerLine) {
-    const end = lineEnd(input, from);
+    const end = OPENERS.includes(input[from] ?? '')
+      ? Math.max(lineEnd(input, from), unquotedEnd(input, from, ctx.grammar))
+      : lineEnd(input, from);
     return end > from ? { start: from, end } : null;
   }
   VALUE_OPEN_QUOTE.lastIndex = from;
   const open = VALUE_OPEN_QUOTE.exec(input);
-  if (open) {
+  if (open && !(isUrlGrammar(ctx.grammar) && open[2] === "'")) {
     const q = open[2];
     const level = open[1].length;
     const start = from + open[0].length;
@@ -731,8 +747,112 @@ function redactString(input: string, budget: Walk): string {
       value = value.slice(0, cut);
     }
   }
-  value = redactKeyNames(
-    value
+  value = redactText(value);
+  return value.length > MAX_STRING || cutInput
+    ? `${value.slice(0, MAX_STRING)}…[truncated]`
+    : value;
+}
+
+const JSON_VALUE_START = /\s*(?:["{[\]}\d-]|true|false|null)/y;
+const MAX_JSON_DEPTH = 20;
+
+function jsonSpans(input: string): [number, number][] {
+  const spans: [number, number][] = [];
+  const stack: number[] = [];
+  let inString = false;
+  for (let i = 0; i < input.length; i++) {
+    const c = input[i];
+    if (inString) {
+      if (c === '\\') {
+        i++;
+      } else if (c === '"') {
+        inString = false;
+      } else if (c === '\n' || c === '\r') {
+        inString = false;
+        stack.length = 0;
+      }
+    } else if (c === '"') {
+      inString = stack.length > 0;
+    } else if (c === '{' || c === '[') {
+      stack.push(i);
+    } else if (c === '}' || c === ']') {
+      const open = stack.pop();
+      if (open === undefined) {
+        continue;
+      }
+      if ((input[open] === '{') !== (c === '}')) {
+        stack.length = 0;
+      } else if (stack.length === 0) {
+        spans.push([open, i + 1]);
+      }
+    }
+  }
+  return spans;
+}
+
+function redactJson(
+  value: unknown,
+  depth: number,
+  state: { changed: boolean }
+): unknown {
+  if (typeof value === 'string') {
+    const text = redactText(value);
+    state.changed ||= text !== value;
+    return text;
+  }
+  if (value === null || typeof value !== 'object') {
+    return value;
+  }
+  if (depth >= MAX_JSON_DEPTH) {
+    state.changed = true;
+    return '[Truncated]';
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => redactJson(item, depth + 1, state));
+  }
+  const out: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(value)) {
+    const name = redactJson(key, depth, state) as string;
+    if (isSensitiveKey(key)) {
+      state.changed = true;
+      put(out, name, REDACTED);
+    } else {
+      put(out, name, redactJson(item, depth + 1, state));
+    }
+  }
+  return out;
+}
+
+function redactJsonSpans(text: string): string {
+  let out = '';
+  let pos = 0;
+  for (const [start, end] of jsonSpans(text)) {
+    JSON_VALUE_START.lastIndex = start + 1;
+    if (!JSON_VALUE_START.test(text)) {
+      continue;
+    }
+    const source = text.slice(start, end);
+    const parsed = safeRead(() => JSON.parse(source) as unknown, THREW);
+    if (parsed === THREW) {
+      continue;
+    }
+    const state = { changed: false };
+    const cleaned = redactJson(parsed, 0, state);
+    if (!state.changed) {
+      continue;
+    }
+    const whole =
+      text.slice(0, start).trim() === '' && text.slice(end).trim() === '';
+    const indent = whole ? /\n([ \t]{1,10})\S/.exec(source)?.[1] : undefined;
+    out += `${text.slice(pos, start)}${JSON.stringify(cleaned, null, indent)}`;
+    pos = end;
+  }
+  return pos === 0 ? text : out + text.slice(pos);
+}
+
+function redactText(text: string): string {
+  return redactKeyNames(
+    redactJsonSpans(text)
       .replace(UNICODE_SEPARATOR, (_, hex: string) => {
         const char = String.fromCharCode(Number.parseInt(hex, 16));
         return /["'`]/.test(char) ? `\\${char}` : char;
@@ -746,9 +866,6 @@ function redactString(input: string, budget: Walk): string {
       .replace(FRAGMENT_TOKEN, `$1t=${REDACTED}`)
       .replace(ENCODED_FRAGMENT_TOKEN, `$1t$2${REDACTED}`)
   ).replace(EMAIL, REDACTED);
-  return value.length > MAX_STRING || cutInput
-    ? `${value.slice(0, MAX_STRING)}…[truncated]`
-    : value;
 }
 
 function isAxiosLike(value: object): boolean {
@@ -818,6 +935,9 @@ const MAX_OUTPUT = 64_000;
 const MAX_CALL_SCAN = 128_000;
 const MAX_ENTRIES = 100;
 const MAX_TAGS = 20;
+const MAX_TAG_KEY = 32;
+const MAX_TAG_VALUE = 200;
+const TAG_RESERVE = MAX_TAGS * (MAX_TAG_KEY + MAX_TAG_VALUE + 4);
 const UNREADABLE = '[unreadable]';
 const UNSERIALIZABLE = '[Unserializable]';
 const THREW = Symbol('threw');
@@ -987,14 +1107,10 @@ const V8_FRAME =
   /^\s*at (?:((?:async |new )?[\w$.<>[\]]{1,120}) \((\S{1,820}|<anonymous>|native)\)|(\S{1,820}))$/;
 const GECKO_FRAME = /^([\w$.<>/[\]*]{0,120})@(\S{0,820})$/;
 
-function webPath(path: string): string {
-  const slash = path.lastIndexOf('/');
-  const last = path.slice(slash + 1);
-  const dir = normalisePath(path.slice(0, slash)) ?? '';
-  return FILE_NAME.test(last)
-    ? `${dir}/${last}`.replace(/^\/\//, '/')
-    : (normalisePath(path) ?? '');
-}
+const PUBLIC_SCRIPTS = new Set(['/firebase-messaging-sw.js']);
+
+const webPath = (path: string): string =>
+  PUBLIC_SCRIPTS.has(path) ? path : (normalisePath(path) ?? '');
 
 function frameLocation(location: string): string | undefined {
   if (location === '<anonymous>' || location === 'native' || location === '') {
@@ -1338,9 +1454,16 @@ function cleanTags(tags: unknown, walk: Walk): Record<string, string> {
   const source = safeRead(() => asRecord(tags), {} as Record<string, unknown>);
   const keys = safeRead(() => Object.keys(source), [] as string[]);
   for (const key of keys.slice(0, MAX_TAGS)) {
+    if (walk.out <= 0) {
+      break;
+    }
     const value = safeRead(() => source[key], undefined);
     if (typeof value === 'string' && !isSensitiveKey(key)) {
-      put(out, cleanString(walk, key), cleanString(walk, value));
+      put(
+        out,
+        emit(walk, redactString(key, walk).slice(0, MAX_TAG_KEY)),
+        emit(walk, redactString(value, walk).slice(0, MAX_TAG_VALUE))
+      );
     }
   }
   return out;
@@ -1404,7 +1527,7 @@ function sanitiseError(
   const walk = newWalk();
   walk.out = MAX_OUTPUT / 2;
   const cleaned = error === undefined ? undefined : clean(error, 0, walk, true);
-  walk.out += MAX_OUTPUT / 2;
+  walk.out += MAX_OUTPUT / 2 - TAG_RESERVE;
   const record =
     cleaned && typeof cleaned === 'object'
       ? (cleaned as Record<string, unknown>)
@@ -1434,7 +1557,10 @@ function sanitiseError(
     context,
     tags: cleanTags(
       safeRead(() => options.tags, undefined),
-      walk
+      {
+        ...walk,
+        out: Math.max(walk.out, 0) + TAG_RESERVE,
+      }
     ),
     http:
       record && fields
@@ -1667,7 +1793,11 @@ function maybeReportExpectedOutage(
   const key = `${http.method ?? ''} ${http.path ?? ''} ${network ? 'net' : '401'}`;
   const now = Date.now();
   const last = lastOutageEvent.get(key);
-  if (last !== undefined && now - last < OUTAGE_EVENT_INTERVAL_MS) {
+  if (
+    last !== undefined &&
+    now >= last &&
+    now - last < OUTAGE_EVENT_INTERVAL_MS
+  ) {
     return;
   }
   Sentry.captureMessage(

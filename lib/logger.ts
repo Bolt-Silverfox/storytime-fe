@@ -824,6 +824,8 @@ function redactJson(
 }
 
 function redactJsonSpans(text: string): string {
+  const first = text.search(/\S/);
+  const last = text.trimEnd().length;
   let out = '';
   let pos = 0;
   for (const [start, end] of jsonSpans(text)) {
@@ -841,8 +843,7 @@ function redactJsonSpans(text: string): string {
     if (!state.changed) {
       continue;
     }
-    const whole =
-      text.slice(0, start).trim() === '' && text.slice(end).trim() === '';
+    const whole = start === first && end === last;
     const indent = whole ? /\n([ \t]{1,10})\S/.exec(source)?.[1] : undefined;
     out += `${text.slice(pos, start)}${JSON.stringify(cleaned, null, indent)}`;
     pos = end;

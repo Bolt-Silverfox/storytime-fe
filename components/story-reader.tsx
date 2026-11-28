@@ -1,6 +1,13 @@
 import { useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
-import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
 import { ensureGuestSession } from '@/lib/guest';
 import { GUEST_HISTORY_QUERY_KEY } from '@/lib/hooks/use-guest-history';
 import { STORY_QUOTA_QUERY_KEY } from '@/lib/hooks/use-story-quota';
@@ -164,6 +171,13 @@ const StoryReader = ({
     setDuration(0);
   };
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(
+    null
+  );
+  const attachAudio = useCallback((el: HTMLAudioElement | null) => {
+    audioRef.current = el;
+    setAudioElement(el);
+  }, []);
   const readyClipsRef = useRef<Map<number, string>>(new Map());
   const clipIndexRef = useRef(0);
   const isPlayingRef = useRef(false);
@@ -550,7 +564,7 @@ const StoryReader = ({
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: audioUrl is a deliberate trigger so listeners attach when the <audio> element (re)mounts on a new clip; the body reads the element via ref, not audioUrl directly.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: audioElement and audioUrl are triggers (the element mounting, or switching clip); the body reads the live element via ref, since the state can still hold one that just unmounted.
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) {
@@ -646,17 +660,14 @@ const StoryReader = ({
       audio.removeEventListener('loadedmetadata', updateDuration);
       audio.removeEventListener('ended', handleEnded);
     };
-    // Re-run when the audio element (re)mounts on a new clip URL, so the
-    // listeners attach to the element that actually exists. With [] the effect
-    // ran once before any <audio> was rendered and never attached anything.
-  }, [audioUrl]);
+  }, [audioElement, audioUrl]);
 
   // A new or removed <audio> element starts silent: its predecessor's
   // `playing` must not leak into it (unmounting fires no `emptied`).
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reset is keyed on the element changing, not read from it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset is keyed on the element or its clip changing, not read from them.
   useEffect(() => {
     setAudioSounding(false);
-  }, [audioUrl]);
+  }, [audioElement, audioUrl]);
 
   // When the current clip changes (next paragraph), resume playback if we were
   // already playing.
@@ -908,7 +919,7 @@ const StoryReader = ({
       {/* Hidden audio element */}
       {audioUrl && (
         <audio
-          ref={audioRef}
+          ref={attachAudio}
           src={audioUrl}
           preload='metadata'
           onPlaying={() => setAudioSounding(true)}
